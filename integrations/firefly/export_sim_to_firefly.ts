@@ -49,9 +49,15 @@ async function main() {
 
   // 1. Run Simulation
   console.log('\n1️⃣  Running Baseline Simulation...');
-  const validator = new ProjectionValidator();
-  const results = await validator.runSimulation(AI_ENHANCED_LOCAL_SERVICE, 52); // 1 year
-  console.log(`   ✅ Simulation complete: ${results.totalWeeks} weeks`);
+  let results;
+  try {
+    const validator = new ProjectionValidator();
+    results = await validator.runSimulation(AI_ENHANCED_LOCAL_SERVICE, 52); // 1 year
+    console.log(`   ✅ Simulation complete: ${results.totalWeeks} weeks`);
+  } catch (error: any) {
+    console.error('❌ Simulation failed:', error.message);
+    process.exit(1);
+  }
   console.log(`   Final Revenue: $${results.finalRevenue.toLocaleString()}`);
 
   // 2. Initialize Firefly Client
@@ -76,15 +82,7 @@ async function main() {
     // Create Account
     let accountId: string;
     try {
-      // Try to create account (Firefly might error if duplicate name, but we can't easily check existence by name without search)
-      // For simplicity, we'll try to create and catch error, or assume it's new.
-      // Better approach: Search first. But FireflyClient doesn't have search yet.
-      // We'll just try to create. If it fails, we might need to handle it.
-      // Actually, let's just try to create. If it fails with 422, it might exist.
-      // A robust way is to list accounts and check.
-      // Let's list accounts first.
-      // Wait, FireflyClient.getUserGroupWealth lists accounts but filters by group.
-      // Let's just try to create and handle 422.
+      // Attempt to create account; if 422, search for existing account by name
       const account = await client.createAccount({
         name: agent.name,
         type: agent.type,
@@ -161,7 +159,13 @@ async function main() {
     const BATCH_SIZE = 10;
     for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
       const batch = transactions.slice(i, i + BATCH_SIZE);
-      await Promise.all(batch.map(tx => client.createTransaction(tx as any)));
+      const results = await Promise.allSettled(batch.map(tx => client.createTransaction(tx as any)));
+      
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.error(`\n      ❌ Failed to create transaction ${i + index}:`, result.reason?.message || result.reason);
+        }
+      });
       process.stdout.write('.');
     }
     console.log('\n      ✅ Done');
@@ -170,4 +174,7 @@ async function main() {
   console.log('\n✅ Export Complete!');
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error('❌ Export failed:', error);
+  process.exit(1);
+});
