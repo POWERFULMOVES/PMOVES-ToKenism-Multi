@@ -71,6 +71,15 @@ npx ts-node --project tsconfig.run.json firefly/run-integration.ts
 cat output/firefly-calibration/CALIBRATION_REPORT.md
 ```
 
+### Export Simulation Data
+
+Populate Firefly-iii with synthetic transaction history:
+
+```bash
+# Run simulation and export to Firefly
+npm run firefly:export-sim
+```
+
 ---
 
 ## 📚 Documentation
@@ -128,28 +137,36 @@ cat output/firefly-calibration/CALIBRATION_REPORT.md
 ## 🎯 Use Cases
 
 ### 1. Business Planning
+
 Validate cooperative food purchasing projections before launch:
+
 - Test different population sizes (100, 500, 1000+ members)
 - Compare market scenarios (bull, normal, bear, crypto-winter)
 - Validate ROI assumptions (1,366% baseline)
 - Optimize break-even timeline (3.3 months projected)
 
 ### 2. Real Data Validation
+
 Calibrate models with actual spending behavior:
+
 - Fetch 3-12 months of Firefly-iii transactions
 - Map spending categories (Groceries → groceries, etc.)
 - Adjust parameters (weekly budget, participation rate)
 - Generate confidence scores (HIGH/MEDIUM/LOW)
 
 ### 3. Token Economy Design
+
 Model blockchain-based incentive systems:
+
 - Simulate 260 weeks of token distributions
 - Track 100+ participants with Gaussian distribution
 - Test group purchase savings (15% baseline)
 - Validate staking rewards and governance
 
 ### 4. Continuous Improvement
+
 Improve projections as you collect data:
+
 - Weekly/monthly calibration runs
 - Track parameter drift over time
 - Identify emerging spending patterns
@@ -217,19 +234,23 @@ Recommendations:
 ## 🛠️ Technology Stack
 
 ### Core
+
 - **TypeScript 5.0** - Type-safe development
 - **Node.js 18+** - Runtime environment
 - **Ethers.js 6.x** - Ethereum utilities (for address generation)
 
 ### Testing
+
 - **Jest 29.x** - Unit and integration testing
 - **ts-jest** - TypeScript support for Jest
 
 ### Data Integration
+
 - **Axios** - HTTP client for Firefly-iii API
 - **Firefly-iii** - Personal finance manager (external)
 
 ### Development
+
 - **ESLint** - Code linting
 - **Prettier** - Code formatting
 - **ts-node** - TypeScript execution
@@ -337,6 +358,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 👥 Team
 
 **PMOVES Development Team**
+
 - Cooperative food systems specialists
 - Blockchain economists
 - Token economy architects
