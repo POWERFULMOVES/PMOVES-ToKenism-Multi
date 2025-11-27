@@ -112,6 +112,7 @@ npm run validate:quick
 ```
 
 Expected output:
+
 ```
 ================================================================================
 VALIDATION REPORT: AI-Enhanced Local Service Business
@@ -201,8 +202,8 @@ npm run validate:compare
 For custom simulations, use the TypeScript API:
 
 ```typescript
-import { ProjectionValidator } from './projections';
-import { AI_ENHANCED_LOCAL_SERVICE } from './projections/scenario-configs';
+import { ProjectionValidator } from "./projections";
+import { AI_ENHANCED_LOCAL_SERVICE } from "./projections/scenario-configs";
 
 // Create validator
 const validator = new ProjectionValidator();
@@ -221,25 +222,25 @@ console.log(`Break-Even: ${report.actual.breakEvenMonths} months`);
 Create your own projection model:
 
 ```typescript
-import { ProjectionModel } from './projections';
+import { ProjectionModel } from "./projections";
 
 const MY_CUSTOM_MODEL: ProjectionModel = {
-  name: 'My Custom Food Co-op',
-  description: 'Custom cooperative model',
+  name: "My Custom Food Co-op",
+  description: "Custom cooperative model",
 
   // Financial projections
   initialInvestment: 5000,
   projectedYear5Revenue: 100000,
-  projectedRiskAdjustedROI: 15.0,  // 1500%
+  projectedRiskAdjustedROI: 15.0, // 1500%
   projectedBreakEvenMonths: 4.0,
-  successProbability: 0.70,
+  successProbability: 0.7,
 
   // Simulation parameters
   populationSize: 600,
   participationRate: 0.65,
 
   // Revenue modeling
-  weeklyRevenuePerParticipant: 0.60,
+  weeklyRevenuePerParticipant: 0.6,
   growthRatePerWeek: 0.0115,
 
   // Token economy
@@ -260,8 +261,8 @@ Run multiple scenarios in parallel:
 import {
   AI_ENHANCED_LOCAL_SERVICE,
   ENERGY_CONSULTING,
-  TOKEN_PRE_ORDER
-} from './projections/scenario-configs';
+  TOKEN_PRE_ORDER,
+} from "./projections/scenario-configs";
 
 const validator = new ProjectionValidator();
 
@@ -270,13 +271,13 @@ const reports: ValidationReport[] = [];
 for (const model of [
   AI_ENHANCED_LOCAL_SERVICE,
   ENERGY_CONSULTING,
-  TOKEN_PRE_ORDER
+  TOKEN_PRE_ORDER,
 ]) {
   reports.push(await validator.validate(model));
 }
 
 // Compare results
-reports.forEach(report => {
+reports.forEach((report) => {
   console.log(`${report.model}: ${report.actual.roi}% ROI`);
 });
 ```
@@ -345,11 +346,13 @@ Token Impact:      POSITIVE   # Token economy effect
 #### 1. Revenue Variance
 
 **Formula:**
+
 ```
 Revenue Variance = ((Actual Revenue - Projected Revenue) / Projected Revenue) * 100
 ```
 
 **Interpretation:**
+
 - **Positive variance** - Simulation exceeded projections (good)
 - **Negative variance** - Simulation underperformed (concerning)
 - **±10%** - High confidence, projection accurate
@@ -359,11 +362,13 @@ Revenue Variance = ((Actual Revenue - Projected Revenue) / Projected Revenue) * 
 #### 2. ROI (Return on Investment)
 
 **Formula:**
+
 ```
 ROI = ((Year 5 Profit - Initial Investment) / Initial Investment) * 100
 ```
 
 **Example:**
+
 ```
 Initial Investment: $5,000
 Year 5 Profit: $364,488
@@ -371,6 +376,7 @@ ROI = (($364,488 - $5,000) / $5,000) * 100 = 7,190%
 ```
 
 **Interpretation:**
+
 - **>1000%** - Excellent return (highly successful)
 - **500-1000%** - Good return (successful)
 - **100-500%** - Moderate return (viable)
@@ -381,6 +387,7 @@ ROI = (($364,488 - $5,000) / $5,000) * 100 = 7,190%
 **Definition:** Week when cumulative profit becomes positive
 
 **Example Timeline:**
+
 ```
 Week 1-10:   -$5,000 (initial investment)
 Week 11-15:  -$2,500 (recovering)
@@ -389,6 +396,7 @@ Week 21-23:  +$200   ✅ BREAK-EVEN ACHIEVED (5.3 months)
 ```
 
 **Interpretation:**
+
 - **<3 months** - Fast break-even (low risk)
 - **3-6 months** - Moderate break-even (medium risk)
 - **>6 months** - Slow break-even (high risk)
@@ -397,11 +405,13 @@ Week 21-23:  +$200   ✅ BREAK-EVEN ACHIEVED (5.3 months)
 #### 4. Success Assessment
 
 **Criteria:**
+
 1. ROI ≥ 80% of projected ROI
 2. Revenue ≥ 80% of projected revenue
 3. Break-even ≤ 125% of projected timeline
 
 **Example:**
+
 ```
 Projected ROI: 1366%
 Actual ROI: 7594%
@@ -428,6 +438,7 @@ Sustainable Energy AI,63020,289456,359.4,818,6989,754.3,6.1,88.7
 ```
 
 **Use cases:**
+
 - Sort by score to rank models
 - Filter by variance to find outliers
 - Create charts comparing projected vs actual
@@ -443,6 +454,7 @@ Week,Cumulative Revenue,Cumulative Profit,ROI %,Token Value,Group Savings
 ```
 
 **Use cases:**
+
 - Plot revenue growth over time
 - Identify inflection points
 - Track token value accumulation
@@ -456,6 +468,7 @@ Week,Cumulative Revenue,Cumulative Profit,ROI %,Token Value,Group Savings
 Phase 4 calibrates projections using **real spending data** from Firefly-iii, your personal finance manager.
 
 **Benefits:**
+
 - Adjust parameters based on actual behavior
 - Validate assumptions with real data
 - Get confidence scores (HIGH/MEDIUM/LOW)
@@ -516,6 +529,7 @@ npx ts-node --project tsconfig.run.json firefly/run-integration.ts
 ```
 
 Expected output:
+
 ```
 Using model: AI-Enhanced Local Service Business
 Firefly URL: http://localhost:8080
@@ -566,22 +580,22 @@ Recommendations:
 #### Custom Time Period
 
 ```typescript
-import { FireflyIntegration } from './firefly';
-import { AI_ENHANCED_LOCAL_SERVICE } from './projections/scenario-configs';
+import { FireflyIntegration } from "./firefly";
+import { AI_ENHANCED_LOCAL_SERVICE } from "./projections/scenario-configs";
 
 const integration = new FireflyIntegration({
   firefly: {
-    baseUrl: 'http://localhost:8080',
-    apiToken: process.env.FIREFLY_API_TOKEN || '',
+    baseUrl: "http://localhost:8080",
+    apiToken: process.env.FIREFLY_API_TOKEN || "",
   },
   analysis: {
     // Analyze specific period
-    startDate: new Date('2024-01-01'),
-    endDate: new Date('2024-06-30'),
+    startDate: new Date("2024-01-01"),
+    endDate: new Date("2024-06-30"),
     totalPopulation: 500,
   },
   output: {
-    directory: './output/custom-calibration',
+    directory: "./output/custom-calibration",
     generateCSV: true,
     generateMarkdown: true,
   },
@@ -589,8 +603,32 @@ const integration = new FireflyIntegration({
 
 const result = await integration.run(AI_ENHANCED_LOCAL_SERVICE);
 
-console.log(`Confidence: ${result.calibrated.calibration.overallAccuracy.confidenceLevel}`);
+console.log(
+  `Confidence: ${result.calibrated.calibration.overallAccuracy.confidenceLevel}`
+);
 ```
+
+### Exporting Simulation Data to Firefly-iii
+
+You can populate your Firefly-iii instance with synthetic transaction data generated by the PMOVES simulation. This is useful for:
+
+- Visualizing simulation results in a familiar personal finance dashboard.
+- Testing the integration without needing real bank data.
+- Validating the economic model against "representative" user profiles.
+
+To run the export:
+
+```bash
+npm run firefly:export-sim
+```
+
+This script will:
+
+1.  Run a 1-year baseline simulation.
+2.  Create representative Firefly accounts (e.g., "Sim Agent: Average Member").
+3.  Generate and upload weekly transactions (Income, Groceries, etc.) for these accounts.
+
+Once complete, log in to Firefly-iii (`http://localhost:8080`) to explore the generated data.
 
 ### Understanding Calibration Reports
 
@@ -608,32 +646,34 @@ Main report with parameter adjustments:
 
 ## Overall Accuracy
 
-| Metric | Value |
-|--------|-------|
-| **Confidence Level** | HIGH |
-| **Confidence Score** | 87.3/100 |
-| **Average Variance** | 6.4% |
-| **Data Quality** | Excellent (12 weeks) |
+| Metric               | Value                |
+| -------------------- | -------------------- |
+| **Confidence Level** | HIGH                 |
+| **Confidence Score** | 87.3/100             |
+| **Average Variance** | 6.4%                 |
+| **Data Quality**     | Excellent (12 weeks) |
 
 ## Parameter Adjustments
 
-| Parameter | Baseline | Calibrated | Adjustment | Confidence |
-|-----------|----------|------------|------------|------------|
-| weeklyFoodBudget | $150.00 | $162.45 | +$12.45 (+8.3%) | HIGH |
-| participationRate | 75.0% | 68.0% | -7.0pp (-9.3%) | MEDIUM |
-| groceries % | 60.0% | 64.2% | +4.2pp (+7.0%) | HIGH |
-| prepared_food % | 25.0% | 21.9% | -3.1pp (-12.4%) | MEDIUM |
-| groupPurchaseSavings | 15.0% | 15.0% | 0.0pp (0.0%) | HIGH |
+| Parameter            | Baseline | Calibrated | Adjustment      | Confidence |
+| -------------------- | -------- | ---------- | --------------- | ---------- |
+| weeklyFoodBudget     | $150.00  | $162.45    | +$12.45 (+8.3%) | HIGH       |
+| participationRate    | 75.0%    | 68.0%      | -7.0pp (-9.3%)  | MEDIUM     |
+| groceries %          | 60.0%    | 64.2%      | +4.2pp (+7.0%)  | HIGH       |
+| prepared_food %      | 25.0%    | 21.9%      | -3.1pp (-12.4%) | MEDIUM     |
+| groupPurchaseSavings | 15.0%    | 15.0%      | 0.0pp (0.0%)    | HIGH       |
 
 ### Detailed Reasoning
 
 **weeklyFoodBudget: +8.3% (HIGH confidence)**
+
 - Baseline assumption: $150/week per participant
 - Actual average: $162.45/week across 12 weeks
 - Recommendation: Increase budget projection to $162
 - Impact: More realistic revenue projections (+8.3%)
 
 **participationRate: -9.3% (MEDIUM confidence)**
+
 - Baseline assumption: 75% of population participates
 - Actual participation: 68% based on active spending patterns
 - Recommendation: Use 68% for conservative forecasts
@@ -670,11 +710,11 @@ participationRate,0.75,0.68,-0.07,-9.33,medium,"Active participants (68%) lower 
 
 **Confidence Levels:**
 
-| Level | Variance | Interpretation |
-|-------|----------|----------------|
-| **HIGH** | ≤10% | Projection highly accurate, use calibrated value |
-| **MEDIUM** | 10-25% | Projection reasonable, consider calibration |
-| **LOW** | >25% | Projection unreliable, needs review |
+| Level      | Variance | Interpretation                                   |
+| ---------- | -------- | ------------------------------------------------ |
+| **HIGH**   | ≤10%     | Projection highly accurate, use calibrated value |
+| **MEDIUM** | 10-25%   | Projection reasonable, consider calibration      |
+| **LOW**    | >25%     | Projection unreliable, needs review              |
 
 **Confidence Score (0-100):**
 
@@ -687,6 +727,7 @@ Score = 100 - (6.4 * 2) = 87.2/100 → HIGH confidence
 ```
 
 **Data Quality Factors:**
+
 - **Excellent:** 12+ weeks of data
 - **Good:** 8-12 weeks of data
 - **Fair:** 4-8 weeks of data
@@ -697,34 +738,34 @@ Score = 100 - (6.4 * 2) = 87.2/100 → HIGH confidence
 Firefly-iii categories are automatically mapped to FoodUSD categories:
 
 | Firefly Category | FoodUSD Category | Auto-Detected |
-|------------------|------------------|---------------|
-| Groceries | groceries | Yes |
-| Supermarket | groceries | Yes |
-| Food & Drink | groceries | Yes |
-| Restaurants | dining | Yes |
-| Fast Food | prepared_food | Yes |
-| Takeaway | food_delivery | Yes |
-| Delivery | food_delivery | Yes |
-| Farmers Market | farmers_market | Yes |
-| Farm Stand | farmers_market | Yes |
+| ---------------- | ---------------- | ------------- |
+| Groceries        | groceries        | Yes           |
+| Supermarket      | groceries        | Yes           |
+| Food & Drink     | groceries        | Yes           |
+| Restaurants      | dining           | Yes           |
+| Fast Food        | prepared_food    | Yes           |
+| Takeaway         | food_delivery    | Yes           |
+| Delivery         | food_delivery    | Yes           |
+| Farmers Market   | farmers_market   | Yes           |
+| Farm Stand       | farmers_market   | Yes           |
 
 **Custom Mappings:**
 
 If you use custom categories in Firefly-iii:
 
 ```typescript
-import { FireflyDataTransformer, CategoryMapping } from './firefly';
+import { FireflyDataTransformer, CategoryMapping } from "./firefly";
 
 const customMappings: CategoryMapping[] = [
   {
-    fireflyCategory: 'Whole Foods',
-    foodUSDCategory: 'groceries',
-    description: 'Map Whole Foods to groceries',
+    fireflyCategory: "Whole Foods",
+    foodUSDCategory: "groceries",
+    description: "Map Whole Foods to groceries",
   },
   {
-    fireflyCategory: 'CSA Box',
-    foodUSDCategory: 'farmers_market',
-    description: 'Community Supported Agriculture',
+    fireflyCategory: "CSA Box",
+    foodUSDCategory: "farmers_market",
+    description: "Community Supported Agriculture",
   },
 ];
 
@@ -744,9 +785,9 @@ Modify projection models to test different scenarios:
 ```typescript
 const LARGE_POPULATION: ProjectionModel = {
   ...AI_ENHANCED_LOCAL_SERVICE,
-  name: 'AI Service (1000 members)',
-  populationSize: 1000,  // 2x population
-  participationRate: 0.70,  // Lower participation at scale
+  name: "AI Service (1000 members)",
+  populationSize: 1000, // 2x population
+  participationRate: 0.7, // Lower participation at scale
 };
 ```
 
@@ -755,10 +796,10 @@ const LARGE_POPULATION: ProjectionModel = {
 ```typescript
 const CRYPTO_WINTER: ProjectionModel = {
   ...TOKEN_PRE_ORDER,
-  name: 'Token Pre-Order (Crypto Winter)',
-  projectedRiskAdjustedROI: TOKEN_PRE_ORDER.projectedRiskAdjustedROI * 0.4,  // -60%
-  successProbability: 0.15,  // Very low success rate
-  growthRatePerWeek: TOKEN_PRE_ORDER.growthRatePerWeek * 0.5,  // 50% slower
+  name: "Token Pre-Order (Crypto Winter)",
+  projectedRiskAdjustedROI: TOKEN_PRE_ORDER.projectedRiskAdjustedROI * 0.4, // -60%
+  successProbability: 0.15, // Very low success rate
+  growthRatePerWeek: TOKEN_PRE_ORDER.growthRatePerWeek * 0.5, // 50% slower
 };
 ```
 
@@ -767,10 +808,10 @@ const CRYPTO_WINTER: ProjectionModel = {
 ```typescript
 const HIGH_TOKEN_REWARDS: ProjectionModel = {
   ...AI_ENHANCED_LOCAL_SERVICE,
-  name: 'AI Service (High Token Rewards)',
-  tokenDistributionRate: 0.80,  // 80% receive tokens (vs 60% baseline)
-  stakingParticipation: 0.60,   // 60% stake (vs 40% baseline)
-  groupBuyingSavings: 0.20,      // 20% savings (vs 15% baseline)
+  name: "AI Service (High Token Rewards)",
+  tokenDistributionRate: 0.8, // 80% receive tokens (vs 60% baseline)
+  stakingParticipation: 0.6, // 60% stake (vs 40% baseline)
+  groupBuyingSavings: 0.2, // 20% savings (vs 15% baseline)
 };
 ```
 
@@ -779,8 +820,11 @@ const HIGH_TOKEN_REWARDS: ProjectionModel = {
 Generate custom reports programmatically:
 
 ```typescript
-import { ProjectionValidator } from './projections';
-import { exportValidationReport, exportComparisonCSV } from './projections/export-results';
+import { ProjectionValidator } from "./projections";
+import {
+  exportValidationReport,
+  exportComparisonCSV,
+} from "./projections/export-results";
 
 const validator = new ProjectionValidator();
 const report = await validator.validate(MY_MODEL);
@@ -795,23 +839,23 @@ const customReport = `
 - Break-Even: ${report.actual.breakEvenMonths} months
 
 ## Risk Assessment
-${report.riskAssessment.successAchieved ? '✅ Success' : '❌ Failed'}
+${report.riskAssessment.successAchieved ? "✅ Success" : "❌ Failed"}
 - Risk Level: ${report.riskAssessment.riskLevel}
 - Confidence: ${report.riskAssessment.confidenceLevel}
 `;
 
-fs.writeFileSync('./output/custom-report.md', customReport);
+fs.writeFileSync("./output/custom-report.md", customReport);
 
 // Custom CSV export
 const csvData = [
-  ['Metric', 'Value'],
-  ['ROI', report.actual.roi],
-  ['Revenue', report.actual.revenue],
-  ['Profit', report.actual.profit],
+  ["Metric", "Value"],
+  ["ROI", report.actual.roi],
+  ["Revenue", report.actual.revenue],
+  ["Profit", report.actual.profit],
 ];
 
-const csvContent = csvData.map(row => row.join(',')).join('\n');
-fs.writeFileSync('./output/custom-data.csv', csvContent);
+const csvContent = csvData.map((row) => row.join(",")).join("\n");
+fs.writeFileSync("./output/custom-data.csv", csvContent);
 ```
 
 ---
@@ -821,12 +865,14 @@ fs.writeFileSync('./output/custom-data.csv', csvContent);
 ### 1. Data Quality
 
 **Firefly-iii Integration:**
+
 - Use **12+ weeks** of data for HIGH confidence
 - Categorize transactions consistently
 - Include all food-related spending (groceries, dining, delivery)
 - Update regularly for drift analysis
 
 **Validation:**
+
 - Run full validation suite before major decisions
 - Compare multiple scenarios (bull, normal, bear)
 - Validate assumptions quarterly
@@ -834,17 +880,20 @@ fs.writeFileSync('./output/custom-data.csv', csvContent);
 ### 2. Interpretation
 
 **Revenue Variance:**
+
 - **>300%** - Likely overly optimistic simulation or underestimated projections
 - **100-300%** - Strong performance, verify assumptions
 - **±50%** - Reasonable alignment
 - **<-50%** - Model underperforming, needs adjustment
 
 **ROI Analysis:**
+
 - Compare across all 5 models for ranking
 - Consider risk-adjusted ROI (multiply by success probability)
 - Account for market scenario (bull vs bear)
 
 **Break-Even:**
+
 - Aim for <6 months for low-risk ventures
 - Longer break-even acceptable if ROI is very high (>1000%)
 - Track weekly to identify inflection points
@@ -853,40 +902,43 @@ fs.writeFileSync('./output/custom-data.csv', csvContent);
 
 **Recommended Schedule:**
 
-| Frequency | Use Case | Duration |
-|-----------|----------|----------|
-| **Weekly** | Active project with real data | ~3 min |
-| **Monthly** | Established co-op, track drift | ~6 min |
-| **Quarterly** | Strategic planning, budget review | ~15 min (full suite + calibration) |
-| **Annually** | Long-term validation, projections update | ~30 min (comprehensive analysis) |
+| Frequency     | Use Case                                 | Duration                           |
+| ------------- | ---------------------------------------- | ---------------------------------- |
+| **Weekly**    | Active project with real data            | ~3 min                             |
+| **Monthly**   | Established co-op, track drift           | ~6 min                             |
+| **Quarterly** | Strategic planning, budget review        | ~15 min (full suite + calibration) |
+| **Annually**  | Long-term validation, projections update | ~30 min (comprehensive analysis)   |
 
 ### 4. Model Selection
 
 **Choose the right model for your use case:**
 
-| Model | Best For | Risk Level |
-|-------|----------|------------|
-| **AI-Enhanced Local Service** | Tech-savvy communities, high adoption | Low-Medium |
-| **Sustainable Energy AI** | Niche markets, specialized services | Medium |
-| **Community Token Pre-Order** | High trust communities, network effects | High |
-| **Bull Market Variant** | Optimistic scenarios, fundraising | Low |
-| **Bear Market Variant** | Conservative planning, risk assessment | High |
+| Model                         | Best For                                | Risk Level |
+| ----------------------------- | --------------------------------------- | ---------- |
+| **AI-Enhanced Local Service** | Tech-savvy communities, high adoption   | Low-Medium |
+| **Sustainable Energy AI**     | Niche markets, specialized services     | Medium     |
+| **Community Token Pre-Order** | High trust communities, network effects | High       |
+| **Bull Market Variant**       | Optimistic scenarios, fundraising       | Low        |
+| **Bear Market Variant**       | Conservative planning, risk assessment  | High       |
 
 ### 5. Reporting
 
 **Executive Stakeholders:**
+
 - Use Markdown reports (CALIBRATION_REPORT.md)
 - Focus on Overall Accuracy section
 - Highlight top 3 parameter adjustments
 - Include actionable recommendations
 
 **Technical Teams:**
+
 - Use CSV exports for detailed analysis
 - Import into Excel/Google Sheets for charts
 - Track weekly progression over time
 - Monitor category-level variances
 
 **Board/Investors:**
+
 - Create custom executive summary
 - Include ROI ranking comparison
 - Show risk-adjusted projections
@@ -901,11 +953,13 @@ fs.writeFileSync('./output/custom-data.csv', csvContent);
 #### 1. "Module not found" Error
 
 **Problem:**
+
 ```
 Error: Cannot find module './projections'
 ```
 
 **Solution:**
+
 ```bash
 # Ensure you're in integrations directory
 cd integrations
@@ -923,11 +977,13 @@ npm run build
 **Problem:** Validation runs for >10 minutes
 
 **Possible Causes:**
+
 - Running all 5 models sequentially (expected: 5-6 minutes)
 - Memory leak (rare)
 - Large population size (>1000)
 
 **Solution:**
+
 ```bash
 # Run quick validation first
 npm run validate:quick
@@ -939,6 +995,7 @@ npx ts-node --project tsconfig.run.json projections/run-validation.ts
 #### 3. Firefly-iii Connection Failed
 
 **Problem:**
+
 ```
 ❌ Failed to connect to Firefly-iii
 Error: ECONNREFUSED
@@ -947,6 +1004,7 @@ Error: ECONNREFUSED
 **Solutions:**
 
 **Check Firefly-iii is running:**
+
 ```bash
 curl http://localhost:8080/api/v1/about
 ```
@@ -954,18 +1012,21 @@ curl http://localhost:8080/api/v1/about
 Expected: JSON response with Firefly version
 
 **Verify API token:**
+
 ```bash
 curl -H "Authorization: Bearer YOUR_TOKEN" \
   http://localhost:8080/api/v1/about
 ```
 
 **Check environment variables:**
+
 ```bash
 echo $FIREFLY_API_TOKEN
 echo $FIREFLY_URL
 ```
 
 **Update token:**
+
 ```bash
 export FIREFLY_API_TOKEN="new-token-here"
 ```
@@ -975,6 +1036,7 @@ export FIREFLY_API_TOKEN="new-token-here"
 **Problem:** Calibration finds 0 food transactions
 
 **Causes:**
+
 - Transactions not categorized
 - Date range has no data
 - Custom categories not mapped
@@ -982,11 +1044,13 @@ export FIREFLY_API_TOKEN="new-token-here"
 **Solutions:**
 
 **1. Check Firefly-iii categories:**
+
 - Log in to Firefly-iii
 - Go to **Transactions**
 - Verify categories: Groceries, Restaurants, etc.
 
 **2. Expand date range:**
+
 ```typescript
 {
   analysis: {
@@ -998,9 +1062,10 @@ export FIREFLY_API_TOKEN="new-token-here"
 ```
 
 **3. Add custom mappings:**
+
 ```typescript
 const customMappings: CategoryMapping[] = [
-  { fireflyCategory: 'My Food Category', foodUSDCategory: 'groceries' },
+  { fireflyCategory: "My Food Category", foodUSDCategory: "groceries" },
 ];
 ```
 
@@ -1009,6 +1074,7 @@ const customMappings: CategoryMapping[] = [
 **Problem:** Confidence score <60, level = LOW
 
 **Causes:**
+
 - Insufficient data (<4 weeks)
 - High spending volatility
 - Inconsistent categorization
@@ -1016,6 +1082,7 @@ const customMappings: CategoryMapping[] = [
 **Solutions:**
 
 **1. Increase data period:**
+
 ```typescript
 {
   analysis: {
@@ -1026,11 +1093,13 @@ const customMappings: CategoryMapping[] = [
 ```
 
 **2. Review spending patterns:**
+
 - Check for large one-time purchases
 - Identify anomalies (holidays, special events)
 - Verify consistent categorization
 
 **3. Adjust model assumptions:**
+
 - Use median instead of average for volatile data
 - Exclude outlier weeks
 - Apply smoothing to weekly spending
@@ -1038,11 +1107,13 @@ const customMappings: CategoryMapping[] = [
 #### 6. TypeScript Compilation Errors
 
 **Problem:**
+
 ```
 error TS2345: Argument of type 'X' is not assignable to parameter of type 'Y'
 ```
 
 **Solution:**
+
 ```bash
 # Ensure TypeScript version matches
 npm install typescript@5.0 --save-dev
@@ -1056,6 +1127,7 @@ cat tsconfig.json
 ```
 
 Expected `tsconfig.json` settings:
+
 ```json
 {
   "compilerOptions": {

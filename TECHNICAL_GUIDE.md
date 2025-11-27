@@ -46,14 +46,17 @@ Comprehensive technical documentation for developers, architects, and contributo
 PMOVES is built in four progressive phases, each building on the previous:
 
 #### Phase 1: Event Bus (Foundation)
+
 **Purpose:** Decoupled communication between components
 
 **Components:**
+
 - `EventBus` - Core pub/sub event system
 - `SchemaValidator` - Event schema validation
 - Event topics for contract communication
 
 **Key Files:**
+
 - `integrations/event-bus/event-bus.ts` (295 lines)
 - `integrations/event-bus/schema-validator.ts`
 - `integrations/event-bus/schemas/` (JSON schemas)
@@ -63,9 +66,11 @@ PMOVES is built in four progressive phases, each building on the previous:
 **Why:** Enables loose coupling between contracts, allowing independent development and testing.
 
 #### Phase 2: Contract Integration (Business Logic)
+
 **Purpose:** Simulate 5 smart contract models
 
 **Components:**
+
 - `GroTokenDistribution` - Token distribution model
 - `FoodUSDModel` - Stablecoin spending tracker
 - `GroupPurchaseModel` - Cooperative buying mechanism
@@ -74,6 +79,7 @@ PMOVES is built in four progressive phases, each building on the previous:
 - `ContractCoordinator` - Unified orchestration
 
 **Key Files:**
+
 - `integrations/contracts/grotoken-model.ts`
 - `integrations/contracts/foodusd-model.ts`
 - `integrations/contracts/grouppurchase-model.ts`
@@ -86,15 +92,18 @@ PMOVES is built in four progressive phases, each building on the previous:
 **Why:** Centralized coordination of 5 independent contract models with shared state management.
 
 #### Phase 3: Projection Validation (Analysis)
+
 **Purpose:** Validate 5-year business projections against simulations
 
 **Components:**
+
 - `ProjectionValidator` - Core validation engine
 - Scenario configurations (3 baseline + 2 market variants)
 - Variance analysis & risk assessment
 - Report generation (Markdown + CSV)
 
 **Key Files:**
+
 - `integrations/projections/projection-validator.ts` (465 lines)
 - `integrations/projections/scenario-configs.ts` (228 lines)
 - `integrations/projections/export-results.ts`
@@ -104,15 +113,18 @@ PMOVES is built in four progressive phases, each building on the previous:
 **Why:** Allows flexible comparison of different business models and market conditions.
 
 #### Phase 4: Firefly Integration (Real Data)
+
 **Purpose:** Calibrate projections using real financial data
 
 **Components:**
+
 - `FireflyClient` - HTTP client for Firefly-iii API
 - `FireflyDataTransformer` - Category mapping & aggregation
 - `CalibrationEngine` - Parameter calibration logic
 - `FireflyIntegration` - Pipeline coordinator
 
 **Key Files:**
+
 - `integrations/firefly/firefly-client.ts`
 - `integrations/firefly/data-transformer.ts` (413 lines)
 - `integrations/firefly/calibration-engine.ts` (391 lines)
@@ -129,6 +141,7 @@ PMOVES is built in four progressive phases, each building on the previous:
 ### 1. Pub/Sub (Event Bus)
 
 **Implementation:**
+
 ```typescript
 // Publisher
 eventBus.publish(
@@ -148,26 +161,29 @@ eventBus.subscribe('finance.transactions.ingested.v1', async (event) => {
 ```
 
 **Benefits:**
+
 - Decouples producers and consumers
 - Enables asynchronous processing
 - Supports multiple subscribers per topic
 - Built-in retry logic with exponential backoff
 
 **Event Envelope Structure:**
+
 ```typescript
 interface EventEnvelope<T> {
-  id: string;                  // Unique event ID
-  topic: string;               // Event topic (e.g., 'finance.transactions.ingested.v1')
-  timestamp: string;           // ISO 8601 timestamp
-  source: string;              // Component that published event
-  data: T;                     // Event payload
-  metadata?: Record<string, any>;  // Optional metadata (retry count, etc.)
+  id: string; // Unique event ID
+  topic: string; // Event topic (e.g., 'finance.transactions.ingested.v1')
+  timestamp: string; // ISO 8601 timestamp
+  source: string; // Component that published event
+  data: T; // Event payload
+  metadata?: Record<string, any>; // Optional metadata (retry count, etc.)
 }
 ```
 
 ### 2. Coordinator Pattern (Contract Coordinator)
 
 **Implementation:**
+
 ```typescript
 export class ContractCoordinator {
   private groToken: GroTokenDistribution;
@@ -192,6 +208,7 @@ export class ContractCoordinator {
 ```
 
 **Benefits:**
+
 - Centralized orchestration of 5 models
 - Single source of truth for simulation state
 - Simplified API for consumers
@@ -200,6 +217,7 @@ export class ContractCoordinator {
 ### 3. Strategy Pattern (Market Scenarios)
 
 **Implementation:**
+
 ```typescript
 // Define strategies
 export const MARKET_SCENARIOS = {
@@ -226,6 +244,7 @@ const BULL_MARKET: ProjectionModel = {
 ```
 
 **Benefits:**
+
 - Easily test different market conditions
 - Compare best/worst case scenarios
 - Reusable scenario definitions
@@ -233,6 +252,7 @@ const BULL_MARKET: ProjectionModel = {
 ### 4. Pipeline Pattern (Firefly Integration)
 
 **Implementation:**
+
 ```typescript
 async run(model: ProjectionModel): Promise<IntegrationResult> {
   // 1. Fetch real data
@@ -255,6 +275,7 @@ async run(model: ProjectionModel): Promise<IntegrationResult> {
 ```
 
 **Benefits:**
+
 - Clear step-by-step processing
 - Easy to test individual stages
 - Transparent data flow
@@ -263,6 +284,7 @@ async run(model: ProjectionModel): Promise<IntegrationResult> {
 ### 5. Factory Pattern (Model Creation)
 
 **Implementation:**
+
 ```typescript
 // Factory for creating configured models
 export class ModelFactory {
@@ -322,20 +344,22 @@ export class ModelFactory {
 ```
 
 **Key Features:**
+
 - **Schema Validation:** All events validated against JSON schemas
 - **Retry Logic:** Failed handlers retried up to 3 times with exponential backoff
 - **Metrics:** Built-in metrics for published, handled, and failed events
 - **Global Handler:** Subscribe to all events with `subscribeAll('*', handler)`
 
 **Event Topics:**
+
 ```typescript
 // Phase 2: Contract events
-'finance.transactions.ingested.v1'
-'contracts.initialized.v1'
+"finance.transactions.ingested.v1";
+"contracts.initialized.v1";
 
 // Future phases
-'governance.proposal.created.v1'
-'staking.lock.created.v1'
+"governance.proposal.created.v1";
+"staking.lock.created.v1";
 ```
 
 ### Contract Model Architecture
@@ -380,21 +404,25 @@ export class ContractModel {
 **5 Contract Models:**
 
 1. **GroTokenDistribution** - Token distribution
+
    - Gaussian distribution (Box-Muller transform)
    - Weekly rewards to 60% of participants
    - $2 per token value
 
 2. **FoodUSDModel** - Food spending tracker
+
    - Category-based spending (groceries, dining, etc.)
    - Weekly budget allocation
    - Total spent tracking
 
 3. **GroupPurchaseModel** - Cooperative purchasing
+
    - Order creation & contribution
    - 15% savings calculation
    - Participant savings tracking
 
 4. **GroVaultModel** - Token staking
+
    - Time-locked staking (1-4 years)
    - APY: 10-50% based on lock duration
    - Voting power calculation
@@ -466,6 +494,7 @@ export class ContractModel {
 **Key Algorithms:**
 
 **1. Revenue Calculation:**
+
 ```typescript
 for (let week = 1; week <= 260; week++) {
   const participatingCount = Math.floor(populationSize * participationRate);
@@ -478,24 +507,28 @@ for (let week = 1; week <= 260; week++) {
 ```
 
 **2. Break-Even Detection:**
+
 ```typescript
 for (let week = 1; week <= 260; week++) {
   const cumulativeProfit = cumulativeRevenue - initialInvestment;
 
   if (cumulativeProfit >= 0 && !breakEvenAchieved) {
     breakEvenWeek = week;
-    breakEvenMonths = week / 4.33;  // Convert to months
+    breakEvenMonths = week / 4.33; // Convert to months
     breakEvenAchieved = true;
   }
 }
 ```
 
 **3. Variance Analysis:**
+
 ```typescript
 const projectedROIPercent = model.projectedRiskAdjustedROI * 100;
-const roiVariance = ((actualROI - projectedROIPercent) / projectedROIPercent) * 100;
+const roiVariance =
+  ((actualROI - projectedROIPercent) / projectedROIPercent) * 100;
 
-const revenueVariance = ((actualRevenue - projectedRevenue) / projectedRevenue) * 100;
+const revenueVariance =
+  ((actualRevenue - projectedRevenue) / projectedRevenue) * 100;
 ```
 
 ### Calibration Architecture
@@ -553,18 +586,24 @@ const revenueVariance = ((actualRevenue - projectedRevenue) / projectedRevenue) 
 **Calibrated Parameters:**
 
 1. **weeklyFoodBudget** - Average weekly spending per participant
+
    ```typescript
-   const calibratedBudget = actualData.weeklySpending.reduce(
-     (sum, week) => sum + week.totalSpending, 0
-   ) / actualData.weeklySpending.length;
+   const calibratedBudget =
+     actualData.weeklySpending.reduce(
+       (sum, week) => sum + week.totalSpending,
+       0
+     ) / actualData.weeklySpending.length;
    ```
 
 2. **participationRate** - Active participants / total population
+
    ```typescript
-   const calibratedRate = actualData.participation.activeParticipants / totalPopulation;
+   const calibratedRate =
+     actualData.participation.activeParticipants / totalPopulation;
    ```
 
 3. **categoryDistribution** - Percentage breakdown by category
+
    ```typescript
    const calibratedDist = {
      groceries: actualData.categoryDistribution.groceries,
@@ -575,8 +614,8 @@ const revenueVariance = ((actualRevenue - projectedRevenue) / projectedRevenue) 
 
 4. **groupPurchaseSavings** - Validated based on spending volatility
    ```typescript
-   const cv = stdDev / mean;  // Coefficient of Variation
-   const calibratedSavings = cv < 0.2 ? 0.15 : (cv < 0.4 ? 0.10 : 0.05);
+   const cv = stdDev / mean; // Coefficient of Variation
+   const calibratedSavings = cv < 0.2 ? 0.15 : cv < 0.4 ? 0.1 : 0.05;
    ```
 
 ---
@@ -691,18 +730,43 @@ const revenueVariance = ((actualRevenue - projectedRevenue) / projectedRevenue) 
    └→ weekly-comparison.csv (week-by-week comparison)
 ```
 
+### Simulation Export Data Flow
+
+```
+1. User runs npm run firefly:export-sim
+   ↓
+2. ProjectionValidator.runSimulation()
+   └→ Run 52-week baseline simulation
+   ↓
+3. Select Representative Agents
+   ├→ Average Member (1.0x spending)
+   ├→ High Spender (1.5x spending)
+   └→ Saver (0.7x spending)
+   ↓
+4. FireflyClient.createAccount()
+   └→ Create Asset Account for each agent
+   ↓
+5. Generate Transactions
+   ├→ De-aggregate weekly simulation data
+   ├→ Create Income transactions (Deposit)
+   └→ Create Expense transactions (Withdrawal)
+   ↓
+6. FireflyClient.createTransaction()
+   └→ Batch upload to Firefly API
+```
+
 ---
 
 ## Testing Strategy
 
 ### Test Coverage Targets
 
-| Component | Target | Actual |
-|-----------|--------|--------|
-| Event Bus | 100% | 100% |
-| Contract Models | 95% | 95%+ |
-| Projection Validator | 90% | 90%+ |
-| Firefly Integration | 85% | Mock testing |
+| Component            | Target | Actual       |
+| -------------------- | ------ | ------------ |
+| Event Bus            | 100%   | 100%         |
+| Contract Models      | 95%    | 95%+         |
+| Projection Validator | 90%    | 90%+         |
+| Firefly Integration  | 85%    | Mock testing |
 
 ### Testing Pyramid
 
@@ -726,7 +790,7 @@ const revenueVariance = ((actualRevenue - projectedRevenue) / projectedRevenue) 
 **Example: GroTokenDistribution**
 
 ```typescript
-describe('GroTokenDistribution', () => {
+describe("GroTokenDistribution", () => {
   let distribution: GroTokenDistribution;
 
   beforeEach(() => {
@@ -737,15 +801,15 @@ describe('GroTokenDistribution', () => {
     });
   });
 
-  it('should initialize holders correctly', () => {
-    const addresses = ['0xABC...', '0xDEF...'];
+  it("should initialize holders correctly", () => {
+    const addresses = ["0xABC...", "0xDEF..."];
     distribution.initializeHolders(addresses);
 
     const stats = distribution.getStatistics();
     expect(stats.totalHolders).toBe(2);
   });
 
-  it('should distribute tokens with correct probability', () => {
+  it("should distribute tokens with correct probability", () => {
     const addresses = generateAddresses(100);
     distribution.initializeHolders(addresses);
 
@@ -756,7 +820,7 @@ describe('GroTokenDistribution', () => {
     expect(events.length).toBeLessThan(70);
   });
 
-  it('should use Gaussian distribution for amounts', () => {
+  it("should use Gaussian distribution for amounts", () => {
     // Test that distribution follows normal curve
   });
 });
@@ -767,7 +831,7 @@ describe('GroTokenDistribution', () => {
 **Example: ContractCoordinator**
 
 ```typescript
-describe('ContractCoordinator Integration', () => {
+describe("ContractCoordinator Integration", () => {
   let coordinator: ContractCoordinator;
 
   beforeEach(() => {
@@ -779,7 +843,7 @@ describe('ContractCoordinator Integration', () => {
     coordinator.initialize(population);
   });
 
-  it('should process a complete week', async () => {
+  it("should process a complete week", async () => {
     const budgets = new Map();
     for (let i = 0; i < 100; i++) {
       budgets.set(`0x${i}`, { foodBudget: 150, totalIncome: 1000 });
@@ -803,14 +867,14 @@ describe('ContractCoordinator Integration', () => {
 **Example: Full Validation**
 
 ```typescript
-describe('Projection Validation E2E', () => {
-  it('should validate AI-Enhanced Local Service model', async () => {
+describe("Projection Validation E2E", () => {
+  it("should validate AI-Enhanced Local Service model", async () => {
     const validator = new ProjectionValidator();
 
     const report = await validator.validate(AI_ENHANCED_LOCAL_SERVICE);
 
     // Verify report structure
-    expect(report.model).toBe('AI-Enhanced Local Service Business');
+    expect(report.model).toBe("AI-Enhanced Local Service Business");
     expect(report.actual.revenue).toBeGreaterThan(0);
     expect(report.actual.roi).toBeGreaterThan(0);
 
@@ -819,8 +883,10 @@ describe('Projection Validation E2E', () => {
     expect(report.variance.roiVariance).toBeDefined();
 
     // Verify risk assessment
-    expect(['LOW', 'MEDIUM', 'HIGH']).toContain(report.riskAssessment.riskLevel);
-  }, 120000);  // 2-minute timeout for full simulation
+    expect(["LOW", "MEDIUM", "HIGH"]).toContain(
+      report.riskAssessment.riskLevel
+    );
+  }, 120000); // 2-minute timeout for full simulation
 });
 ```
 
@@ -831,7 +897,12 @@ describe('Projection Validation E2E', () => {
 ```typescript
 export function generateMockTransactions(days: number): Transaction[] {
   const transactions: Transaction[] = [];
-  const categories = ['Groceries', 'Restaurants', 'Fast Food', 'Farmers Market'];
+  const categories = [
+    "Groceries",
+    "Restaurants",
+    "Fast Food",
+    "Farmers Market",
+  ];
 
   for (let day = 0; day < days; day++) {
     const date = new Date();
@@ -843,7 +914,7 @@ export function generateMockTransactions(days: number): Transaction[] {
     for (let i = 0; i < dailyCount; i++) {
       transactions.push({
         id: `txn_${day}_${i}`,
-        amount: 10 + Math.random() * 90,  // $10-$100
+        amount: 10 + Math.random() * 90, // $10-$100
         category: categories[Math.floor(Math.random() * categories.length)],
         date: date.toISOString(),
         description: `Food purchase ${day}-${i}`,
@@ -874,7 +945,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '18'
+          node-version: "18"
 
       - name: Install dependencies
         run: |
@@ -924,6 +995,7 @@ main
 ```
 
 **Branch Naming:**
+
 - `feature/` - New features
 - `bugfix/` - Bug fixes
 - `refactor/` - Code refactoring
@@ -942,6 +1014,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 
 **Types:**
+
 - `feat:` - New feature
 - `fix:` - Bug fix
 - `docs:` - Documentation
@@ -951,6 +1024,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - `chore:` - Maintenance
 
 **Examples:**
+
 ```bash
 git commit -m "feat(firefly): add custom category mapping support"
 git commit -m "fix(validator): correct ROI calculation (percentage vs decimal)"
@@ -996,7 +1070,8 @@ function calculateROI(profit: number, investment: number): number {
 }
 
 // Bad
-function calculateROI(profit, investment) {  // Implicit any
+function calculateROI(profit, investment) {
+  // Implicit any
   return (profit / investment) * 100;
 }
 ```
@@ -1005,7 +1080,7 @@ function calculateROI(profit, investment) {  // Implicit any
 
 ```typescript
 function isTransaction(obj: any): obj is Transaction {
-  return obj && typeof obj.id === 'string' && typeof obj.amount === 'number';
+  return obj && typeof obj.id === "string" && typeof obj.amount === "number";
 }
 
 if (isTransaction(data)) {
@@ -1024,7 +1099,8 @@ interface EventData {
 }
 
 // Bad
-function handleEvent(data: any): void {  // Use specific type instead
+function handleEvent(data: any): void {
+  // Use specific type instead
   //...
 }
 ```
@@ -1033,7 +1109,7 @@ function handleEvent(data: any): void {  // Use specific type instead
 
 **1. JSDoc for Public APIs:**
 
-```typescript
+````typescript
 /**
  * Validates a projection model against simulated results
  *
@@ -1050,7 +1126,7 @@ function handleEvent(data: any): void {  // Use specific type instead
 async validate(model: ProjectionModel): Promise<ValidationReport> {
   // ...
 }
-```
+````
 
 **2. Inline Comments for Complex Logic:**
 
@@ -1058,12 +1134,14 @@ async validate(model: ProjectionModel): Promise<ValidationReport> {
 // Convert projected ROI from decimal (13.66) to percentage (1366%)
 // to match actualROI format before variance calculation
 const projectedROIPercent = model.projectedRiskAdjustedROI * 100;
-const roiVariance = ((actualROI - projectedROIPercent) / projectedROIPercent) * 100;
+const roiVariance =
+  ((actualROI - projectedROIPercent) / projectedROIPercent) * 100;
 ```
 
 **3. README per Module:**
 
 Each phase has its own README:
+
 - `integrations/event-bus/README.md`
 - `integrations/contracts/README.md`
 - `integrations/projections/README.md`
@@ -1072,22 +1150,28 @@ Each phase has its own README:
 ### Naming Conventions
 
 **Files:**
+
 - `kebab-case.ts` for source files
 - `PascalCase.test.ts` for test files
 
 **Classes:**
+
 - `PascalCase` (e.g., `ProjectionValidator`, `FireflyClient`)
 
 **Interfaces:**
+
 - `PascalCase` (e.g., `ProjectionModel`, `ValidationReport`)
 
 **Functions/Methods:**
+
 - `camelCase` (e.g., `calculateROI`, `getStatistics`)
 
 **Constants:**
+
 - `UPPER_SNAKE_CASE` (e.g., `DEFAULT_CONFIG`, `MAX_RETRIES`)
 
 **Private Members:**
+
 - Prefix with `private` keyword (TypeScript enforces)
 
 ---
@@ -1096,11 +1180,11 @@ Each phase has its own README:
 
 ### Benchmark Results
 
-| Operation | Duration | Optimizations |
-|-----------|----------|---------------|
-| Single model validation | ~60s | Acceptable |
-| Full validation (5 models) | ~5-6min | Sequential (prevents race conditions) |
-| Firefly calibration | ~2-3min | HTTP caching, batch processing |
+| Operation                  | Duration | Optimizations                         |
+| -------------------------- | -------- | ------------------------------------- |
+| Single model validation    | ~60s     | Acceptable                            |
+| Full validation (5 models) | ~5-6min  | Sequential (prevents race conditions) |
+| Firefly calibration        | ~2-3min  | HTTP caching, batch processing        |
 
 ### Optimization Techniques
 
@@ -1109,7 +1193,7 @@ Each phase has its own README:
 ```typescript
 // Before: Parallel execution causes state pollution
 const reports = await Promise.all(
-  models.map(model => validator.validate(model))
+  models.map((model) => validator.validate(model))
 );
 
 // After: Sequential execution ensures clean state
@@ -1169,12 +1253,12 @@ for (let i = 0; i < transactions.length; i += batchSize) {
 const transactions = await response.json();
 
 if (!Array.isArray(transactions)) {
-  throw new Error('Invalid response: expected array');
+  throw new Error("Invalid response: expected array");
 }
 
 for (const txn of transactions) {
   if (!isTransaction(txn)) {
-    console.warn('Skipping invalid transaction:', txn);
+    console.warn("Skipping invalid transaction:", txn);
     continue;
   }
 }
@@ -1183,12 +1267,12 @@ for (const txn of transactions) {
 **2. Sanitize File Paths:**
 
 ```typescript
-import path from 'path';
+import path from "path";
 
 function exportToFile(filename: string, data: string): void {
   // Prevent directory traversal
   const safePath = path.basename(filename);
-  const fullPath = path.join('./output', safePath);
+  const fullPath = path.join("./output", safePath);
 
   fs.writeFileSync(fullPath, data);
 }
@@ -1210,13 +1294,13 @@ echo "FIREFLY_API_TOKEN=your-token" >> .env
 
 ```typescript
 const config = {
-  baseUrl: process.env.FIREFLY_URL || 'https://localhost:8080',  // HTTPS default
+  baseUrl: process.env.FIREFLY_URL || "https://localhost:8080", // HTTPS default
   apiToken: process.env.FIREFLY_API_TOKEN,
 };
 
 // Validate HTTPS
-if (!config.baseUrl.startsWith('https://')) {
-  console.warn('Warning: Using HTTP instead of HTTPS');
+if (!config.baseUrl.startsWith("https://")) {
+  console.warn("Warning: Using HTTP instead of HTTPS");
 }
 ```
 
@@ -1229,17 +1313,17 @@ if (!config.baseUrl.startsWith('https://')) {
 console.log(`Processing ${transactions.length} transactions`);
 
 // Bad
-console.log(`Processing transactions for user ${email}`);  // Logs PII
+console.log(`Processing transactions for user ${email}`); // Logs PII
 ```
 
 **2. Anonymize Addresses:**
 
 ```typescript
 // Use deterministic hashing for reproducibility
-import { createHash } from 'crypto';
+import { createHash } from "crypto";
 
 function anonymizeAddress(address: string): string {
-  return createHash('sha256').update(address).digest('hex').slice(0, 10);
+  return createHash("sha256").update(address).digest("hex").slice(0, 10);
 }
 ```
 
@@ -1262,20 +1346,24 @@ function anonymizeAddress(address: string): string {
 
 ```markdown
 ## Description
+
 Brief description of changes
 
 ## Type of Change
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Breaking change
 - [ ] Documentation update
 
 ## Testing
+
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
 - [ ] All tests passing
 
 ## Checklist
+
 - [ ] TypeScript strict mode compliance
 - [ ] No `any` types
 - [ ] Documentation updated
@@ -1285,6 +1373,7 @@ Brief description of changes
 ### Code Review Guidelines
 
 **Reviewers should check:**
+
 - Correctness of business logic
 - Test coverage
 - Performance impact

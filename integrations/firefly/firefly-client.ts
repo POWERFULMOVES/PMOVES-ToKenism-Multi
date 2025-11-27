@@ -333,6 +333,82 @@ export class FireflyClient {
       return false;
     }
   }
+  /**
+   * Create a new account
+   */
+  async createAccount(data: {
+    name: string;
+    type: string;
+    balance?: number;
+  }): Promise<any> {
+    try {
+      const response = await this.client.post('/accounts', {
+        name: data.name,
+        type: data.type,
+        opening_balance: data.balance?.toString() || '0',
+        opening_balance_date: new Date().toISOString().split('T')[0],
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('[FireflyClient] Failed to create account:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new transaction
+   */
+  async createTransaction(data: {
+    type: 'withdrawal' | 'deposit' | 'transfer';
+    date: Date;
+    amount: number;
+    description: string;
+    sourceId?: string;
+    destinationId?: string;
+    sourceName?: string;
+    destinationName?: string;
+    category?: string;
+    budget?: string;
+  }): Promise<any> {
+    try {
+      const payload: any = {
+        type: data.type,
+        date: data.date.toISOString().split('T')[0],
+        amount: data.amount.toString(),
+        description: data.description,
+      };
+
+      if (data.sourceId) payload.source_id = data.sourceId;
+      if (data.destinationId) payload.destination_id = data.destinationId;
+      if (data.sourceName) payload.source_name = data.sourceName;
+      if (data.destinationName) payload.destination_name = data.destinationName;
+      if (data.category) payload.category_name = data.category;
+      if (data.budget) payload.budget_name = data.budget;
+
+      const response = await this.client.post('/transactions', {
+        transactions: [payload],
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('[FireflyClient] Failed to create transaction:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all accounts
+   */
+  async getAccounts(type: string = 'asset'): Promise<any[]> {
+    try {
+      const response = await this.client.get('/accounts', {
+        params: { type },
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('[FireflyClient] Failed to get accounts:', error);
+      throw error;
+    }
+  }
 }
 
 export default FireflyClient;
