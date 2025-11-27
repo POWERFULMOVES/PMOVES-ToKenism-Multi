@@ -25,19 +25,19 @@ if (!FIREFLY_API_TOKEN) {
 const AGENTS = [
   {
     name: 'Sim Agent: Average Member',
-    type: 'Asset account',
+    type: 'asset',
     spendingMultiplier: 1.0,
     incomeMultiplier: 1.0,
   },
   {
     name: 'Sim Agent: High Spender',
-    type: 'Asset account',
+    type: 'asset',
     spendingMultiplier: 1.5,
     incomeMultiplier: 1.2,
   },
   {
     name: 'Sim Agent: Saver',
-    type: 'Asset account',
+    type: 'asset',
     spendingMultiplier: 0.7,
     incomeMultiplier: 1.0,
   },
