@@ -34,6 +34,29 @@ describe('FireflyClient exportTransactionsCSV', () => {
     jest.clearAllMocks();
   });
 
+  it('initializes axios with configured base URL, headers, and timeout', () => {
+    const client = new FireflyClient({
+      baseUrl: 'https://firefly.example',
+      apiToken: 'secure-token',
+      apiVersion: 'v2',
+      timeout: 10_000,
+    });
+
+    expect(mockedAxios.create).toHaveBeenCalledWith({
+      baseURL: 'https://firefly.example/api/v2',
+      timeout: 10_000,
+      headers: {
+        Authorization: 'Bearer secure-token',
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+    });
+
+    expect(mockAxiosInstance.interceptors.response.use).toHaveBeenCalled();
+    // Use the instance to avoid unused variable lint complaints in stricter configs
+    expect(client).toBeTruthy();
+  });
+
   it('requests CSV export with correct parameters and returns CSV data', async () => {
     const startDate = new Date('2024-01-01');
     const endDate = new Date('2024-01-31');
