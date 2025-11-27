@@ -18,8 +18,8 @@
     "example:contracts": "ts-node --project tsconfig.run.json contracts/example-contract-simulation.ts",
     "validate:projections": "ts-node --project tsconfig.run.json projections/run-validation.ts",
     "validate:quick": "ts-node --project tsconfig.run.json projections/run-validation.ts --quick",
-    "firefly:calibrate": "ts-node integrations/firefly/run-integration.ts",
-    "firefly:export-sim": "ts-node firefly/export_sim_to_firefly.ts"
+    "firefly:calibrate": "ts-node --project tsconfig.run.json firefly/run-integration.ts",
+    "firefly:export-sim": "ts-node --project tsconfig.run.json firefly/export_sim_to_firefly.ts"
   },
   "keywords": [
     "pmoves",
