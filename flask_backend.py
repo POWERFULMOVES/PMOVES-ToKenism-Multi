@@ -807,6 +807,14 @@ def run_simulation(params: Dict[str, Any], *, validated: bool = False) -> Dict[s
 
 @app.route("/run_simulation", methods=["POST"])
 def handle_simulation() -> Tuple[Any, int]:
+    """Execute economic simulation with user-provided parameters.
+
+    Validates input parameters and runs a multi-week simulation comparing
+    cooperative (Scenario B) vs existing (Scenario A) economic models.
+
+    Returns:
+        JSON response containing simulation history, metrics, and narrative summary.
+    """
     if not request.is_json: return jsonify({"error": "Request must be JSON"}), 400
     params = request.get_json()
     if params is None:
@@ -835,6 +843,14 @@ def handle_simulation() -> Tuple[Any, int]:
 
 @app.route("/get_current_metrics")
 def get_current_metrics() -> Tuple[Any, int]:
+    """Retrieve current economic health metrics and trends.
+
+    Provides real-time indicators including health score, market efficiency,
+    resilience score, and detailed metrics with trend analysis.
+
+    Returns:
+        JSON response with current metrics, trends, warnings, and recommendations.
+    """
     try:
         return jsonify(
             {
@@ -866,6 +882,14 @@ def get_current_metrics() -> Tuple[Any, int]:
 
 @app.route("/run_scenario", methods=["POST"])
 def run_scenario() -> Tuple[Any, int]:
+    """Run a named scenario simulation with preset parameters.
+
+    Executes a predefined or custom scenario and provides comparative analysis
+    with outcome metrics and recommendations.
+
+    Returns:
+        JSON response with scenario results, comparative analysis, and recommendations.
+    """
     scenario_data = request.json or {}
     app.logger.info("Running scenario: %s", scenario_data.get("name", "Custom"))
     try:
@@ -901,6 +925,14 @@ def run_scenario() -> Tuple[Any, int]:
 
 @app.route("/test_shock", methods=["POST"])
 def test_shock() -> Tuple[Any, int]:
+    """Test economic resilience under shock conditions.
+
+    Simulates an economic shock (e.g., income reduction, market disruption)
+    and evaluates system resilience and recovery metrics.
+
+    Returns:
+        JSON response with shock results, recovery metrics, and recommendations.
+    """
     shock_params = request.json or {}
     app.logger.info("Testing shock: %s", shock_params)
     try:
@@ -934,6 +966,11 @@ def test_shock() -> Tuple[Any, int]:
 
 @app.route("/")
 def index() -> str:
+    """Serve the main application interface.
+
+    Returns:
+        Rendered HTML template for the token economy simulator dashboard.
+    """
     return render_template("index.html")
 
 
