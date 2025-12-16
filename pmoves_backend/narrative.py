@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 def safe_format(value: Optional[float], format_spec: str, fallback: str = "N/A") -> str:
@@ -15,7 +15,7 @@ def safe_format(value: Optional[float], format_spec: str, fallback: str = "N/A")
         return fallback
 
 
-def generate_narrative_summary(history: List[Dict[str, float]], events: List[Dict[str, object]]):
+def generate_narrative_summary(history: List[Dict[str, float]], events: List[Dict[str, object]]) -> Dict[str, Any]:
     if not history:
         return {"title": "Error", "overview": "No simulation history data available."}
     first_period = history[0]
@@ -110,7 +110,7 @@ def generate_narrative_summary(history: List[Dict[str, float]], events: List[Dic
     return narrative
 
 
-def analyze_economic_phases(history: List[Dict[str, float]]):
+def analyze_economic_phases(history: List[Dict[str, float]]) -> List[Dict[str, Any]]:
     if len(history) < 9:
         return []
     phase_length = len(history) // 3
@@ -183,7 +183,7 @@ def analyze_economic_phases(history: List[Dict[str, float]]):
     return analyzed_phases
 
 
-def generate_conclusion(history: List[Dict[str, float]]):
+def generate_conclusion(history: List[Dict[str, float]]) -> str:
     if not history:
         return "No simulation data to generate conclusion."
     first_period = history[0]

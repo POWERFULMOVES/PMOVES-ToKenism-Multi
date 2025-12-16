@@ -8,13 +8,13 @@ import math
 import os
 import random
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
 
-def _ensure_real_flask():
+def _ensure_real_flask() -> Optional[Any]:
     """Return a Flask module with a fully featured ``Flask`` class."""
 
     module = sys.modules.get("flask")
@@ -184,7 +184,7 @@ class ParameterValidationError(ValueError):
         super().__init__(message)
 
 
-def _coerce_numeric(value: Any, expected_type: type) -> float:
+def _coerce_numeric(value: Any, expected_type: type) -> Union[int, float]:
     """Coerce JSON values into numeric types while rejecting invalid inputs."""
 
     if value is None:
@@ -272,7 +272,7 @@ def validate_simulation_params(raw_params: Dict[str, Any]) -> Dict[str, Any]:
     return cleaned
 
 # --- Helper Functions ---
-def calculate_gini(wealth_distribution):
+def calculate_gini(wealth_distribution: List[float]) -> float:
     wealth_non_negative = np.maximum(0, np.array(wealth_distribution))
     wealth = np.sort(wealth_non_negative)
     n = len(wealth)
@@ -284,7 +284,7 @@ def calculate_gini(wealth_distribution):
 
 # --- Member Representation ---
 class SimMember:
-    def __init__(self, member_id, initial_wealth, params):
+    def __init__(self, member_id: str, initial_wealth: float, params: Dict[str, Any]) -> None:
         self.id = member_id
         self.wealth_scenario_A = max(0, initial_wealth)
         self.wealth_scenario_B = max(0, initial_wealth)
@@ -311,23 +311,23 @@ class SimMember:
 # --- Economic Metrics Class ---
 # (Copied exactly from flask_backend.txt - includes advanced metrics)
 class EconomicMetrics:
-    def __init__(self, members, params):
+    def __init__(self, members: List[SimMember], params: Dict[str, Any]) -> None:
         self.members = members
         self.params = params
-        self.previous_metrics = None
+        self.previous_metrics: Optional[Dict[str, Any]] = None
         self.current_week = 0 # Add week tracking
         self.initial_wealth_percentiles = self._compute_percentile_ranks(
             {member.id: getattr(member, 'initial_wealth', member.wealth_scenario_B) for member in members}
         )
 
-    def _compute_percentile_ranks(self, values_by_member):
+    def _compute_percentile_ranks(self, values_by_member: Dict[str, float]) -> Dict[str, float]:
         """Return percentile ranks (0-1) for a mapping of member ids to values."""
         if not values_by_member:
             return {}
         series = pd.Series(values_by_member)
         return series.rank(method='average', pct=True).to_dict()
 
-    def calculate_metrics(self, wealth_A_list, wealth_B_list, week):
+    def calculate_metrics(self, wealth_A_list: List[float], wealth_B_list: List[float], week: int) -> Dict[str, Any]:
         self.current_week = week # Update current week
         # Basic wealth distribution analysis
         wealth_quintiles_A = np.percentile(wealth_A_list, [20, 40, 60, 80]) if wealth_A_list else []
@@ -386,12 +386,12 @@ class EconomicMetrics:
         return metrics
 
     # --- Calculation methods (copied from flask_backend.txt) ---
-    def calculate_poverty_rate(self, wealth_list):
+    def calculate_poverty_rate(self, wealth_list: List[float]) -> float:
         poverty_line = self.params.get("WEEKLY_FOOD_BUDGET_AVG", 75) * 4
         if not wealth_list: return 0.0
-        return np.mean([1 if w < poverty_line else 0 for w in wealth_list])
+        return float(np.mean([1 if w < poverty_line else 0 for w in wealth_list]))
 
-    def calculate_wealth_mobility(self):
+    def calculate_wealth_mobility(self) -> float:
         """Average absolute shift in each member's wealth percentile relative to their initial position.
 
         Assumptions:
@@ -411,16 +411,16 @@ class EconomicMetrics:
             deltas.append(abs(current - initial))
         return float(np.mean(deltas)) if deltas else 0.0
 
-    def calculate_local_economy_strength(self):
+    def calculate_local_economy_strength(self) -> float:
         if not self.members: return 0.0
-        return np.mean([m.propensity_to_spend_internal for m in self.members])
+        return float(np.mean([m.propensity_to_spend_internal for m in self.members]))
 
-    def calculate_community_resilience(self):
+    def calculate_community_resilience(self) -> float:
         # Placeholder: Combines safety net and maybe wealth stability
         safety_net = self.calculate_social_safety_net()
         return safety_net
 
-    def calculate_wealth_gap(self, wealth_list):
+    def calculate_wealth_gap(self, wealth_list: List[float]) -> float:
         if len(wealth_list) < 5: return float('inf')
         try:
             top_20_idx = int(len(wealth_list) * 0.8); bottom_20_idx = int(len(wealth_list) * 0.2)
@@ -430,7 +430,7 @@ class EconomicMetrics:
             return top_20_mean / bottom_20_mean if bottom_20_mean > 1e-6 else float('inf')
         except: return float('inf')
 
-    def calculate_bottom_20_pct_share(self, wealth_list):
+    def calculate_bottom_20_pct_share(self, wealth_list: List[float]) -> float:
         if len(wealth_list) < 5: return 0.0
         try:
             total_wealth = np.sum(np.maximum(0, wealth_list))
@@ -438,10 +438,10 @@ class EconomicMetrics:
             sorted_wealth = np.sort(np.maximum(0, wealth_list))
             bottom_20_idx = int(len(wealth_list) * 0.2)
             bottom_20_wealth = np.sum(sorted_wealth[:bottom_20_idx])
-            return bottom_20_wealth / total_wealth
+            return float(bottom_20_wealth / total_wealth)
         except: return 0.0
 
-    def calculate_economic_velocity(self):
+    def calculate_economic_velocity(self) -> float:
         """Velocity of cooperative wealth measured as recent total spending over current wealth stock.
 
         Assumptions:
@@ -457,30 +457,30 @@ class EconomicMetrics:
             return 0.0
         return float(total_spending / total_wealth)
 
-    def calculate_social_safety_net(self):
+    def calculate_social_safety_net(self) -> float:
         poverty_line = self.params.get("WEEKLY_FOOD_BUDGET_AVG", 75) * 4
         if not self.members: return 0.0
         below_poverty = len([m for m in self.members if m.wealth_scenario_B < poverty_line])
         return 1.0 - (below_poverty / len(self.members))
 
-    def calculate_innovation_index(self):
+    def calculate_innovation_index(self) -> float:
         # Placeholder
         if not self.members: return 0.0
         grotoken_adoption = np.mean([1 if m.grotoken_balance > 0 else 0 for m in self.members])
         local_prod_strength = self.calculate_local_economy_strength()
-        return (grotoken_adoption + local_prod_strength) / 2
+        return float((grotoken_adoption + local_prod_strength) / 2)
 
-    def calculate_sustainability_score(self):
+    def calculate_sustainability_score(self) -> float:
         # Placeholder
         resilience = self.calculate_community_resilience()
         return resilience
 
-    def calculate_community_engagement(self):
+    def calculate_community_engagement(self) -> float:
         # Placeholder
         if not self.members: return 0.0
-        return np.mean([m.propensity_to_spend_internal for m in self.members])
+        return float(np.mean([m.propensity_to_spend_internal for m in self.members]))
 
-    def calculate_trends(self, current_metrics):
+    def calculate_trends(self, current_metrics: Dict[str, Any]) -> Dict[str, float]:
         trends = {}
         # Add more keys if needed
         trend_keys = ['AvgWealth_B', 'Gini_B', 'PovertyRate_B', 'LocalEconomyStrength',
@@ -500,7 +500,7 @@ class EconomicMetrics:
         return trends
 
     # --- Placeholder methods for unimplemented advanced metrics ---
-    def calculate_market_efficiency(self):
+    def calculate_market_efficiency(self) -> float:
         """Ratio of realised internal cooperative spending to the effective internal demand.
 
         Assumptions:
@@ -520,7 +520,7 @@ class EconomicMetrics:
         efficiency = realised_internal / effective_internal
         return float(max(0.0, min(1.0, efficiency)))
 
-    def calculate_innovation_adoption(self):
+    def calculate_innovation_adoption(self) -> float:
         """Share of cooperative wealth held in GroTokens, representing token adoption intensity.
 
         Assumptions:
@@ -536,7 +536,7 @@ class EconomicMetrics:
             return 0.0
         return float(token_value / total_wealth)
 
-    def calculate_wealth_mobility_score(self):
+    def calculate_wealth_mobility_score(self) -> float:
         """Average upward percentile movement relative to the initial Scenario B wealth distribution.
 
         Assumptions:
@@ -558,7 +558,7 @@ class EconomicMetrics:
                 upward_changes.append(delta)
         return float(np.mean(upward_changes)) if upward_changes else 0.0
 
-    def calculate_economic_diversity(self):
+    def calculate_economic_diversity(self) -> float:
         """Simpson diversity index (scaled 0-1) of internal vs. external cooperative spending.
 
         Assumptions:
@@ -578,16 +578,16 @@ class EconomicMetrics:
         simpson = 1.0 - (internal_share ** 2 + external_share ** 2)
         return float(max(0.0, min(1.0, simpson * 2)))
 
-    def calculate_risk_resilience(self):
+    def calculate_risk_resilience(self) -> float:
         """Placeholder combining social safety net and wealth stability."""
         safety_net = self.calculate_social_safety_net()
         wealth_B = [m.wealth_scenario_B for m in self.members]
         mean_wealth = np.mean(wealth_B) if wealth_B else 0
         std_dev = np.std(wealth_B) if wealth_B else 0
         stability = 1.0 - (std_dev / mean_wealth) if mean_wealth > 1e-6 else 0
-        return (safety_net + stability) / 2.0
+        return float((safety_net + stability) / 2.0)
 
-    def calculate_advanced_metrics(self):
+    def calculate_advanced_metrics(self) -> Dict[str, float]:
         """Aggregate the advanced metrics exposed to the UI."""
         return {
             'MarketEfficiency': self.calculate_market_efficiency(),
@@ -598,15 +598,15 @@ class EconomicMetrics:
         }
 
     # --- Placeholder methods for shock testing (copied) ---
-    def run_simulation_period(self, duration):
+    def run_simulation_period(self, duration: int) -> Dict[str, float]:
         app.logger.warning("run_simulation_period is a placeholder.")
         return {'placeholder_metric': random.random()}
 
-    def calculate_recovery_metrics(self):
+    def calculate_recovery_metrics(self) -> Dict[str, float]:
         app.logger.warning("calculate_recovery_metrics is a placeholder.")
         return {'recovery_rate': random.random() * 0.1, 'resilience_score': random.random()}
 
-    def simulate_economic_shock(self, shock_type, magnitude, duration):
+    def simulate_economic_shock(self, shock_type: str, magnitude: float, duration: int) -> Dict[str, Any]:
         app.logger.warning("simulate_economic_shock is a placeholder.")
         shock_metrics = self.run_simulation_period(duration)
         recovery_metrics = self.calculate_recovery_metrics()
@@ -618,7 +618,7 @@ class EconomicMetrics:
 
 # --- Narrative Generation Functions ---
 # (Copied exactly from flask_backend.txt)
-def generate_narrative_summary(history, events):
+def generate_narrative_summary(history: List[Dict[str, Any]], events: List[Dict[str, Any]]) -> Dict[str, Any]:
     if not history: return {"title": "Error", "overview": "No simulation history data available."}
     first_period = history[0]; last_period = history[-1]
     mid_period_index = len(history) // 2; mid_period = history[mid_period_index] if mid_period_index < len(history) else last_period
@@ -652,7 +652,7 @@ def generate_narrative_summary(history, events):
     }
     return narrative
 
-def analyze_economic_phases(history):
+def analyze_economic_phases(history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     if len(history) < 9: return []
     phase_length = len(history) // 3
     phases_data = [history[:phase_length], history[phase_length:2*phase_length], history[2*phase_length:]]
@@ -674,7 +674,7 @@ def analyze_economic_phases(history):
     for phase in analyzed_phases: del phase['raw_growth']
     return analyzed_phases
 
-def generate_conclusion(history):
+def generate_conclusion(history: List[Dict[str, Any]]) -> str:
     if not history: return "No simulation data to generate conclusion."
     first_period = history[0]; last_period = history[-1]
     wealth_change_B = ((last_period['TotalWealth_B'] - first_period['TotalWealth_B']) / first_period['TotalWealth_B'] if first_period['TotalWealth_B'] > 1e-6 else 0)
@@ -696,7 +696,7 @@ def generate_conclusion(history):
 
 
 # --- Core Simulation Function (Modified to return summary/events) ---
-def run_simulation(params, *, validated=False):
+def run_simulation(params: Dict[str, Any], *, validated: bool = False) -> Dict[str, Any]:
     """ Runs the economic comparison simulation with given parameters. """
     if not validated:
         params = validate_simulation_params(params)
@@ -806,7 +806,7 @@ def run_simulation(params, *, validated=False):
 
 
 @app.route("/run_simulation", methods=["POST"])
-def handle_simulation():
+def handle_simulation() -> Tuple[Any, int]:
     if not request.is_json: return jsonify({"error": "Request must be JSON"}), 400
     params = request.get_json()
     if params is None:
@@ -834,7 +834,7 @@ def handle_simulation():
 
 
 @app.route("/get_current_metrics")
-def get_current_metrics():
+def get_current_metrics() -> Tuple[Any, int]:
     try:
         return jsonify(
             {
@@ -865,7 +865,7 @@ def get_current_metrics():
 
 
 @app.route("/run_scenario", methods=["POST"])
-def run_scenario():
+def run_scenario() -> Tuple[Any, int]:
     scenario_data = request.json or {}
     app.logger.info("Running scenario: %s", scenario_data.get("name", "Custom"))
     try:
@@ -900,7 +900,7 @@ def run_scenario():
 
 
 @app.route("/test_shock", methods=["POST"])
-def test_shock():
+def test_shock() -> Tuple[Any, int]:
     shock_params = request.json or {}
     app.logger.info("Testing shock: %s", shock_params)
     try:
@@ -933,12 +933,12 @@ def test_shock():
 
 
 @app.route("/")
-def index():
+def index() -> str:
     return render_template("index.html")
 
 
 @app.route("/healthz")
-def healthz():
+def healthz() -> Any:
     """Health check endpoint for PMOVES.AI integration."""
     return jsonify({
         "status": "healthy",
@@ -948,13 +948,13 @@ def healthz():
 
 
 @app.route("/readyz")
-def readyz():
+def readyz() -> Any:
     """Readiness check endpoint for Kubernetes/Docker."""
     return jsonify({"status": "ready"})
 
 
 @app.route("/metrics")
-def metrics():
+def metrics() -> Any:
     """Basic metrics endpoint for observability."""
     return jsonify({
         "service": "pmoves-tokenism-multi",

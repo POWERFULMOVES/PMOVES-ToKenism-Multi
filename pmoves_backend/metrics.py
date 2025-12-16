@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Dict, Iterable, List, Optional
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from .models import SimMember
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +31,7 @@ def calculate_gini(wealth_distribution: Iterable[float]) -> float:
 class EconomicMetrics:
     """Calculates metrics describing the simulated economy."""
 
-    def __init__(self, members: List[object], params: Dict[str, float]):
+    def __init__(self, members: List[SimMember], params: Dict[str, float]) -> None:
         self.members = members
         self.params = params
         self.previous_metrics: Optional[Dict[str, float]] = None
