@@ -1,6 +1,9 @@
-# Phase 4: Firefly-iii Real Data Integration & Calibration
+> **ARCHIVED**: This PR description is historical. Phase 4 has been merged.
+> See [PHASE4_IMPLEMENTATION.md](PHASE4_IMPLEMENTATION.md) for current documentation.
 
-## 🎯 Overview
+# Phase 4: Firefly-iii Real Data Integration & Calibration (PR Description)
+
+## Overview
 
 This PR implements **Phase 4** of the PMOVES Token Economy Simulator: **Firefly-iii Data Integration**. This closes the feedback loop between real user behavior and simulated token economy models by calibrating projections with actual financial data.
 
