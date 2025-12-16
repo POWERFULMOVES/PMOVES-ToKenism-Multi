@@ -8,6 +8,7 @@
  */
 
 import { EventEmitter } from "events";
+import { connect, NatsConnection, StringCodec, Subscription } from "nats";
 
 /**
  * NATS connection configuration
@@ -91,6 +92,9 @@ export interface SimulationResultEvent {
 export class NATSClient extends EventEmitter {
   private config: NATSConfig;
   private connected: boolean = false;
+  private nc: NatsConnection | null = null;
+  private sc = StringCodec();
+  private subscriptions: Map<string, Subscription> = new Map();
 
   /** NATS subjects for PMOVES.AI integration */
   static readonly SUBJECTS = {
@@ -120,28 +124,92 @@ export class NATSClient extends EventEmitter {
    * @throws Error if connection fails after max attempts
    */
   async connect(): Promise<void> {
-    // TODO: Implement actual NATS connection using nats.ws or nats package
-    // For now, this is a stub that logs the connection attempt
+    if (this.connected && this.nc) {
+      console.log("[NATS] Already connected");
+      return;
+    }
 
     console.log(`[NATS] Connecting to ${this.config.url}...`);
     console.log(`[NATS] Client: ${this.config.clientName}`);
     console.log(`[NATS] JetStream: ${this.config.jetstream ? "enabled" : "disabled"}`);
 
-    // Stub: Simulate connection
-    this.connected = true;
-    this.emit("connect");
+    try {
+      this.nc = await connect({
+        servers: this.config.url,
+        name: this.config.clientName,
+        maxReconnectAttempts: this.config.maxReconnectAttempts,
+      });
 
-    console.log("[NATS] Connected (stub mode - implement nats package for production)");
+      this.connected = true;
+      this.emit("connect");
+
+      console.log("[NATS] Connected successfully");
+
+      // Handle connection events
+      this.setupConnectionHandlers();
+    } catch (error) {
+      console.error("[NATS] Connection failed:", error);
+      throw new Error(`Failed to connect to NATS: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Setup connection event handlers
+   */
+  private setupConnectionHandlers(): void {
+    if (!this.nc) return;
+
+    (async () => {
+      for await (const status of this.nc!.status()) {
+        switch (status.type) {
+          case "disconnect":
+            console.log("[NATS] Disconnected");
+            this.emit("disconnect");
+            break;
+          case "reconnect":
+            console.log("[NATS] Reconnected");
+            this.emit("reconnect");
+            break;
+          case "error":
+            console.error("[NATS] Error:", status.data);
+            this.emit("error", status.data);
+            break;
+        }
+      }
+    })().catch((err) => {
+      console.error("[NATS] Status handler error:", err);
+    });
   }
 
   /**
    * Disconnect from NATS server
    */
   async disconnect(): Promise<void> {
-    if (!this.connected) return;
+    if (!this.connected || !this.nc) return;
 
     console.log("[NATS] Disconnecting...");
+
+    // Close all subscriptions
+    for (const [subject, sub] of this.subscriptions.entries()) {
+      try {
+        await sub.drain();
+        console.log(`[NATS] Drained subscription: ${subject}`);
+      } catch (error) {
+        console.error(`[NATS] Error draining subscription ${subject}:`, error);
+      }
+    }
+    this.subscriptions.clear();
+
+    // Close NATS connection
+    try {
+      await this.nc.drain();
+      console.log("[NATS] Connection drained");
+    } catch (error) {
+      console.error("[NATS] Error draining connection:", error);
+    }
+
     this.connected = false;
+    this.nc = null;
     this.emit("disconnect");
   }
 
@@ -160,7 +228,7 @@ export class NATSClient extends EventEmitter {
    * @param correlationId - Optional correlation ID for tracing
    */
   async publish<T>(subject: string, data: T, correlationId?: string): Promise<void> {
-    if (!this.connected) {
+    if (!this.connected || !this.nc) {
       throw new Error("NATS client not connected");
     }
 
@@ -172,10 +240,21 @@ export class NATSClient extends EventEmitter {
       source: this.config.clientName,
     };
 
-    // TODO: Implement actual NATS publish
-    console.log(`[NATS] Publishing to ${subject}:`, JSON.stringify(event, null, 2).slice(0, 200) + "...");
+    try {
+      const payload = this.sc.encode(JSON.stringify(event));
+      this.nc.publish(subject, payload);
 
-    this.emit("publish", event);
+      console.log(`[NATS] Published to ${subject}:`, {
+        correlationId: event.correlationId,
+        timestamp: event.timestamp,
+        dataPreview: JSON.stringify(event.data).slice(0, 100) + "...",
+      });
+
+      this.emit("publish", event);
+    } catch (error) {
+      console.error(`[NATS] Failed to publish to ${subject}:`, error);
+      throw new Error(`Failed to publish message: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**
@@ -194,14 +273,50 @@ export class NATSClient extends EventEmitter {
    * @param handler - Callback function for received messages
    */
   subscribe<T>(subject: string, handler: (event: PMOVESEvent<T>) => void): void {
-    if (!this.connected) {
+    if (!this.connected || !this.nc) {
       throw new Error("NATS client not connected");
     }
 
-    // TODO: Implement actual NATS subscription
-    console.log(`[NATS] Subscribed to ${subject}`);
+    // Check if already subscribed
+    if (this.subscriptions.has(subject)) {
+      console.log(`[NATS] Already subscribed to ${subject}`);
+      return;
+    }
 
-    this.on(`message:${subject}`, handler);
+    try {
+      const sub = this.nc.subscribe(subject);
+      this.subscriptions.set(subject, sub);
+
+      console.log(`[NATS] Subscribed to ${subject}`);
+
+      // Process messages asynchronously
+      (async () => {
+        for await (const msg of sub) {
+          try {
+            const payload = this.sc.decode(msg.data);
+            const event: PMOVESEvent<T> = JSON.parse(payload);
+
+            console.log(`[NATS] Received message on ${subject}:`, {
+              correlationId: event.correlationId,
+              timestamp: event.timestamp,
+              source: event.source,
+            });
+
+            handler(event);
+            this.emit(`message:${subject}`, event);
+          } catch (error) {
+            console.error(`[NATS] Error processing message on ${subject}:`, error);
+            this.emit("error", error);
+          }
+        }
+      })().catch((err) => {
+        console.error(`[NATS] Subscription handler error for ${subject}:`, err);
+        this.subscriptions.delete(subject);
+      });
+    } catch (error) {
+      console.error(`[NATS] Failed to subscribe to ${subject}:`, error);
+      throw new Error(`Failed to subscribe: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**
