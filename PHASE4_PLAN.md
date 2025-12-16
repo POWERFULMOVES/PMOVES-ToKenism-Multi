@@ -1,4 +1,7 @@
-# Phase 4: Firefly-iii Data Integration
+> **ARCHIVED**: This planning document is superseded by [PHASE4_IMPLEMENTATION.md](PHASE4_IMPLEMENTATION.md).
+> Phase 4 implementation is complete. See the implementation guide for current documentation.
+
+# Phase 4: Firefly-iii Data Integration (Planning Document)
 
 **Goal:** Validate and calibrate PMOVES business projections using real financial data from Firefly-iii
 

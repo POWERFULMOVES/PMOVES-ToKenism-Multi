@@ -385,7 +385,56 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 📞 Support
+## PMOVES.AI Integration
+
+This repository is part of the [PMOVES.AI](https://github.com/POWERFULMOVES/PMOVES.AI) multi-agent orchestration platform.
+
+### Integration Points
+
+| Service | Purpose | Status |
+|---------|---------|--------|
+| **NATS** | Event bus for simulation results | Stub ready |
+| **TensorZero** | LLM gateway for insights | Planned |
+| **Supabase** | Results persistence | Planned |
+| **Agent Zero** | Task orchestration | Planned |
+
+### Health Endpoints
+
+The Flask backend exposes health check endpoints:
+
+```bash
+# Health check
+curl http://localhost:5000/healthz
+
+# Readiness probe
+curl http://localhost:5000/readyz
+
+# Basic metrics
+curl http://localhost:5000/metrics
+```
+
+### Event Publishing
+
+Simulation results can be published to NATS:
+
+```typescript
+import { natsClient } from './integrations/nats/nats-client';
+
+await natsClient.connect();
+await natsClient.publishSimulationResult({
+  simulationId: 'sim-123',
+  scenario: 'baseline',
+  weeklyHistory: [...],
+  finalMetrics: {...},
+  parameters: {...}
+});
+```
+
+See [integrations/nats/README.md](integrations/nats/README.md) for details.
+
+---
+
+## Support
 
 - **Documentation:** See [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)
 - **Issues:** [GitHub Issues](https://github.com/POWERFULMOVES/PMOVEStokensim/issues)

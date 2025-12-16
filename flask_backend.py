@@ -800,9 +800,9 @@ def run_simulation(params, *, validated=False):
         "summary": summary,
     }
 
-app = Flask(__name__)
-CORS(app)
-logging.basicConfig(level=logging.INFO)
+
+# --- Flask Routes ---
+# Note: Flask app is initialized at the top of this file (line ~49)
 
 
 @app.route("/run_simulation", methods=["POST"])
@@ -935,6 +935,32 @@ def test_shock():
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/healthz")
+def healthz():
+    """Health check endpoint for PMOVES.AI integration."""
+    return jsonify({
+        "status": "healthy",
+        "service": "pmoves-tokenism-multi",
+        "version": "1.0.0",
+    })
+
+
+@app.route("/readyz")
+def readyz():
+    """Readiness check endpoint for Kubernetes/Docker."""
+    return jsonify({"status": "ready"})
+
+
+@app.route("/metrics")
+def metrics():
+    """Basic metrics endpoint for observability."""
+    return jsonify({
+        "service": "pmoves-tokenism-multi",
+        "uptime_seconds": 0,  # TODO: Track actual uptime
+        "requests_total": 0,  # TODO: Track request count
+    })
 
 
 if __name__ == "__main__":
