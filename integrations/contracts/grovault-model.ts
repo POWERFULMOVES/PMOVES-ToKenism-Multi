@@ -298,7 +298,7 @@ export class GroVaultModel {
   accrueInterest(week: number): void {
     this.currentWeek = week;
 
-    for (const [_address, position] of this.locks) {
+    for (const [, position] of this.locks) {
       if (week >= position.unlockTime) {
         continue; // No interest after unlock
       }

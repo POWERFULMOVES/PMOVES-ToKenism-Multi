@@ -224,7 +224,7 @@ export class FireflyDataTransformer {
     startDate.setDate(startDate.getDate() + offset);
 
     const weeks: WeeklySpending[] = [];
-    let currentWeekStart = new Date(startDate);
+    const currentWeekStart = new Date(startDate);
     let weekNumber = 1;
 
     while (currentWeekStart <= lastDate) {

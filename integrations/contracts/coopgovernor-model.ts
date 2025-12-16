@@ -23,6 +23,12 @@ export interface Proposal {
   forVotes: number;
   againstVotes: number;
   voters: Set<string>;
+  // Computed properties for backward compatibility
+  votingDeadline: number;
+  status: 'active' | 'executed' | 'expired';
+  votesFor: number;
+  votesAgainst: number;
+  voterCount: number;
 }
 
 export interface Vote {
@@ -43,6 +49,8 @@ export interface ProposalResult {
   totalVotes: number;
   participationRate: number;
   quorumMet: boolean;
+  executed: boolean;
+  reason?: string;
 }
 
 export class CoopGovernorModel {
@@ -95,6 +103,11 @@ export class CoopGovernorModel {
       forVotes: 0,
       againstVotes: 0,
       voters: new Set(),
+      votingDeadline: endWeek,
+      status: 'active',
+      votesFor: 0,
+      votesAgainst: 0,
+      voterCount: 0,
     };
 
     this.proposals.set(proposalId, proposal);
@@ -170,11 +183,14 @@ export class CoopGovernorModel {
     // Update proposal tally
     if (support) {
       proposal.forVotes += rawVotes;
+      proposal.votesFor += rawVotes;
     } else {
       proposal.againstVotes += rawVotes;
+      proposal.votesAgainst += rawVotes;
     }
 
     proposal.voters.add(voter);
+    proposal.voterCount = proposal.voters.size;
 
     // Update spent voting power
     this.spentVotingPower.get(proposalId)!.set(voter, totalNeeded);
@@ -223,6 +239,7 @@ export class CoopGovernorModel {
 
     // Mark as executed
     proposal.executed = true;
+    proposal.status = 'executed';
 
     const result: ProposalResult = {
       proposalId,
@@ -232,6 +249,8 @@ export class CoopGovernorModel {
       totalVotes,
       participationRate: totalVotingPower > 0 ? totalVotes / totalVotingPower : 0,
       quorumMet,
+      executed: true,
+      reason: !quorumMet ? 'Quorum not met' : !passed ? 'Proposal did not pass' : undefined,
     };
 
     // console.log(
@@ -308,6 +327,7 @@ export class CoopGovernorModel {
     uniqueVoters: number;
     averageParticipationRate: number;
     averageQuorum: number;
+    proposalsByCategory: Record<string, number>;
   } {
     const allProposals = Array.from(this.proposals.values());
     const active = this.getActiveProposals(this._currentWeek);
@@ -318,6 +338,12 @@ export class CoopGovernorModel {
     let passedCount = 0;
 
     const stats = this.vault.getStatistics();
+
+    // Count proposals by category
+    const proposalsByCategory: Record<string, number> = {};
+    for (const proposal of allProposals) {
+      proposalsByCategory[proposal.category] = (proposalsByCategory[proposal.category] || 0) + 1;
+    }
 
     for (const proposal of executed) {
       const totalVotes = proposal.forVotes + proposal.againstVotes;
@@ -355,6 +381,7 @@ export class CoopGovernorModel {
       averageParticipationRate:
         executed.length > 0 ? totalParticipation / executed.length : 0,
       averageQuorum: executed.length > 0 ? totalQuorum / executed.length : 0,
+      proposalsByCategory,
     };
   }
 
@@ -420,6 +447,7 @@ export class CoopGovernorModel {
     config: GovernanceConfig;
     proposals: Proposal[];
     votes: Vote[];
+    totalProposals: number;
     statistics: {
       totalProposals: number;
       activeProposals: number;
@@ -430,6 +458,7 @@ export class CoopGovernorModel {
       uniqueVoters: number;
       averageParticipationRate: number;
       averageQuorum: number;
+      proposalsByCategory: Record<string, number>;
     };
     engagement: {
       voterTurnout: number;
@@ -438,6 +467,7 @@ export class CoopGovernorModel {
       averageVotesPerVoter: number;
     };
   } {
+    const stats = this.getStatistics();
     return {
       config: this.config,
       proposals: Array.from(this.proposals.values()).map((p) => ({
@@ -445,7 +475,8 @@ export class CoopGovernorModel {
         voters: new Set(p.voters),
       })),
       votes: [...this.votes],
-      statistics: this.getStatistics(),
+      totalProposals: stats.totalProposals,
+      statistics: stats,
       engagement: this.analyzeDemocraticEngagement(),
     };
   }

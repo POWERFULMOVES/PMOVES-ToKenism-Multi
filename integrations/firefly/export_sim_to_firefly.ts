@@ -117,7 +117,7 @@ async function main() {
     // Generate Transactions
     console.log(`      generating transactions...`);
     const transactions = [];
-    let currentDate = new Date();
+    const currentDate = new Date();
     currentDate.setFullYear(currentDate.getFullYear() - 1); // Start 1 year ago
 
     for (let i = 0; i < results.weeklyRevenue.length; i++) {
