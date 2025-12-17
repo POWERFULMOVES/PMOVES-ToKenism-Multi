@@ -338,13 +338,79 @@ Recommendations:
 - [x] Document complete usage and API reference
 - [x] Create runnable examples
 
+## Phase 4.5: Export & NATS Integration (2025-12-17)
+
+### New Features
+
+#### 1. Simulation Export to Firefly ✅
+**File:** `integrations/firefly/export_sim_to_firefly.ts`
+- Runs simulation and exports transactions TO Firefly-iii
+- Creates representative agent accounts (Average, High Spender, Saver)
+- Generates weekly income deposits and grocery withdrawals
+- Supports `--dry-run` mode for testing without Firefly connection
+- Supports `--nats` flag for event publishing
+
+**Usage:**
+```bash
+# Export simulation data to Firefly
+npm run firefly:export-sim
+
+# Dry run (no Firefly connection required)
+npm run firefly:export-sim -- --dry-run
+
+# With NATS publishing
+npm run firefly:export-sim -- --nats
+```
+
+#### 2. NATS Event Bus Integration ✅
+**Files:**
+- `integrations/nats/nats-client.ts` - Production NATS client
+- `integrations/firefly/firefly-integration.ts` - NATS publishing on calibration
+
+**NATS Subjects:**
+| Subject | Description |
+|---------|-------------|
+| `tokenism.simulation.result.v1` | Simulation results |
+| `tokenism.calibration.result.v1` | Calibration results |
+| `tokenism.export.result.v1` | Export to Firefly results |
+
+#### 3. 3-Way Integration Tests ✅
+**File:** `integrations/__tests__/integration.test.ts`
+- 29 comprehensive tests covering:
+  - ToKenism → PMOVES-Wealth (Firefly) flow
+  - ToKenism → PMOVES-DoX flow
+  - NATS Event Bus publishing/subscribing
+  - End-to-end integration scenarios
+
+#### 4. Simulation Fixes ✅
+- Fixed balance exhaustion at week 7 (floating point tolerance)
+- Fresh ContractCoordinator per simulation run (state isolation)
+- Added `account_role` for Firefly asset account creation
+
+### Export Results (Example)
+
+```
+📊 Export Summary
+─────────────────
+   Simulation Weeks: 52
+   Final Revenue: $14,434.64
+   Agents Processed: 3
+   Transactions Exported: 312
+   Transactions Failed: 0
+```
+
+**Accounts Created:**
+- Sim Agent: Average Member (1.0x multiplier)
+- Sim Agent: High Spender (1.5x spending, 1.2x income)
+- Sim Agent: Saver (0.7x spending)
+
 ## Next Steps
 
-### Immediate (Optional Enhancements)
-1. Add npm script for easy execution (`npm run firefly:calibrate`)
-2. Create sample/mock Firefly data for testing
-3. Add unit tests for calibration algorithms
-4. Create visualization charts for reports
+### Completed (Phase 4.5)
+- ✅ Export simulation data TO Firefly-iii
+- ✅ NATS event publishing for cross-service communication
+- ✅ 3-way integration tests (ToKenism ↔ Wealth ↔ DoX)
+- ✅ Simulation balance fixes
 
 ### Future (Phase 5?)
 1. Real-time data sync (webhook integration)
