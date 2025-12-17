@@ -47,7 +47,17 @@ from flask_cors import CORS
 
 # --- Flask App Setup ---
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+
+# Security: Restrict CORS to allowed origins (default to localhost only)
+allowed_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173').split(',')
+CORS(app, origins=[origin.strip() for origin in allowed_origins])
+
+# Security: Set secret key for session management (required for CSRF protection)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24).hex())
+
+# Security: Limit request size to prevent DoS
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
+
 logging.basicConfig(level=logging.INFO)  # Basic logging
 
 
@@ -1001,6 +1011,8 @@ def metrics() -> Any:
 
 
 if __name__ == "__main__":
-    debug_mode = os.environ.get("FLASK_DEBUG", "True").lower() == "true"
+    # Security: Default debug mode to False in production
+    debug_mode = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
     host_ip = "127.0.0.1"
-    app.run(debug=debug_mode, host=host_ip, port=5000)
+    port = int(os.environ.get("FLASK_PORT", "5000"))
+    app.run(debug=debug_mode, host=host_ip, port=port)
