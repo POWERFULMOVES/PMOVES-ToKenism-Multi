@@ -12,7 +12,7 @@
 import { ProjectionValidator } from '../projections/projection-validator';
 import { AI_ENHANCED_LOCAL_SERVICE } from '../projections/scenario-configs';
 import FireflyClient from './firefly-client';
-import { natsClient, NATSClient } from '../nats/nats-client';
+import { natsClient } from '../nats/nats-client';
 import * as dotenv from 'dotenv';
 
 // Load environment variables

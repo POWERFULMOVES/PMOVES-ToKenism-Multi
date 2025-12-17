@@ -3,7 +3,7 @@
  * Tests for the production NATS client with JetStream support
  */
 
-import { NATSClient, NATSConfig, NATSEvent } from './nats-client';
+import { NATSClient, NATSConfig, PMOVESEvent } from './nats-client';
 
 // Mock nats module
 jest.mock('nats', () => ({
@@ -17,9 +17,10 @@ jest.mock('nats', () => ({
 describe('NATSClient', () => {
   let client: NATSClient;
   const mockConfig: Partial<NATSConfig> = {
-    servers: ['nats://localhost:4222'],
+    url: 'nats://localhost:4222',
     clientName: 'test-client',
-    reconnect: true,
+    jetstream: true,
+    maxReconnectAttempts: 10,
   };
 
   beforeEach(() => {
@@ -185,7 +186,7 @@ describe('NATSClient', () => {
       await client.publish('test.subject', { test: 'payload' }, 'custom-correlation-id');
 
       expect(publishedData).toBeDefined();
-      const event = JSON.parse(publishedData!) as NATSEvent<{ test: string }>;
+      const event = JSON.parse(publishedData!) as PMOVESEvent<{ test: string }>;
 
       expect(event).toMatchObject({
         correlationId: expect.any(String),
@@ -216,7 +217,7 @@ describe('NATSClient', () => {
       await client.connect();
       await client.publish('test.subject', { data: 'test' }, 'my-correlation-id');
 
-      const event = JSON.parse(publishedData!) as NATSEvent<unknown>;
+      const event = JSON.parse(publishedData!) as PMOVESEvent<unknown>;
       expect(event.correlationId).toBe('my-correlation-id');
     });
   });
