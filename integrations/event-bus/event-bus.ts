@@ -38,6 +38,7 @@ export class EventBus extends EventEmitter {
   private subscriptions: Map<string, Set<Subscription>> = new Map();
   private metrics: Map<string, number> = new Map();
   private retryQueues: Map<string, EventEnvelope[]> = new Map();
+  private retryTimers: Set<NodeJS.Timeout> = new Set();
 
   constructor(config: Partial<EventBusConfig> = {}) {
     super();
@@ -195,10 +196,13 @@ export class EventBus extends EventEmitter {
 
       this.retryQueues.get(event.topic)!.push(event);
 
-      // Schedule retry
-      setTimeout(() => {
+      // Schedule retry with timer tracking
+      const timer = setTimeout(() => {
+        this.retryTimers.delete(timer);
         this.retryEvent(event);
-      }, this.config.retryDelay * Math.pow(2, retryCount)); // Exponential backoff
+      }, this.config.retryDelay * Math.pow(2, retryCount)).unref(); // Exponential backoff with unref to prevent hanging
+
+      this.retryTimers.add(timer);
 
       console.log(
         `[EventBus] Scheduled retry ${retryCount + 1}/${
@@ -275,6 +279,13 @@ export class EventBus extends EventEmitter {
    */
   async shutdown(): Promise<void> {
     console.log('[EventBus] Shutting down...');
+
+    // Clear all pending retry timers
+    console.log(`[EventBus] Clearing ${this.retryTimers.size} pending retry timers`);
+    for (const timer of this.retryTimers) {
+      clearTimeout(timer);
+    }
+    this.retryTimers.clear();
 
     // Process remaining retry queues
     for (const [topic, queue] of this.retryQueues) {

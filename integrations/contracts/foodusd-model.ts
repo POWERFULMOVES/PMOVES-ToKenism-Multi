@@ -38,7 +38,7 @@ export interface SpendingTransaction {
 export class FoodUSDModel {
   private config: FoodUSDConfig;
   private holders: Map<string, FoodUSDHolder> = new Map();
-  private totalSupply: number = 0;
+  private _totalSupply: number = 0;
   private transactions: SpendingTransaction[] = [];
   private currentWeek: number = 0;
 
@@ -100,7 +100,7 @@ export class FoodUSDModel {
     // Mint tokens
     holder.balance += amount;
     holder.totalMinted += amount;
-    this.totalSupply += amount;
+    this._totalSupply += amount;
 
     // console.log(`[FoodUSD] Minted ${amount} FUSD to ${to}`);
 
@@ -113,13 +113,17 @@ export class FoodUSDModel {
   burn(from: string, amount: number): boolean {
     const holder = this.holders.get(from);
 
-    if (!holder || holder.balance < amount) {
-      return false;
+    if (!holder) {
+      throw new Error('Holder not found');
+    }
+
+    if (holder.balance < amount) {
+      throw new Error('Insufficient balance');
     }
 
     holder.balance -= amount;
     holder.totalBurned += amount;
-    this.totalSupply -= amount;
+    this._totalSupply -= amount;
 
     // console.log(`[FoodUSD] Burned ${amount} FUSD from ${from}`);
 
@@ -133,8 +137,12 @@ export class FoodUSDModel {
     const fromHolder = this.holders.get(from);
     const toHolder = this.holders.get(to);
 
-    if (!fromHolder || !toHolder || fromHolder.balance < amount) {
-      return false;
+    if (!fromHolder || !toHolder) {
+      throw new Error('Holder not found');
+    }
+
+    if (fromHolder.balance < amount) {
+      throw new Error('Insufficient balance');
     }
 
     fromHolder.balance -= amount;
@@ -149,8 +157,8 @@ export class FoodUSDModel {
   recordSpending(
     week: number,
     from: string,
-    amount: number,
     category: string,
+    amount: number,
     description: string = ''
   ): SpendingTransaction {
     this.currentWeek = week;
@@ -164,6 +172,10 @@ export class FoodUSDModel {
 
     if (!holder) {
       throw new Error('Holder not found');
+    }
+
+    if (holder.balance < amount) {
+      throw new Error('Insufficient balance');
     }
 
     // Update spending stats
@@ -215,8 +227,8 @@ export class FoodUSDModel {
         const tx = this.recordSpending(
           week,
           address,
-          amount,
           category,
+          amount,
           `Weekly ${category} spending`
         );
 
@@ -225,6 +237,13 @@ export class FoodUSDModel {
     }
 
     return transactions;
+  }
+
+  /**
+   * Get total supply of FoodUSD tokens
+   */
+  totalSupply(): number {
+    return this._totalSupply;
   }
 
   /**
@@ -267,6 +286,28 @@ export class FoodUSDModel {
   }
 
   /**
+   * Get spending for a holder (alias for getHolderStats for backward compatibility)
+   */
+  getHolderSpending(address: string): {
+    total: number;
+    byCategory: Record<string, number>;
+  } {
+    const holder = this.holders.get(address);
+
+    if (!holder) {
+      return {
+        total: 0,
+        byCategory: {},
+      };
+    }
+
+    return {
+      total: holder.totalSpent,
+      byCategory: { ...holder.spendingByCategory },
+    };
+  }
+
+  /**
    * Get overall statistics
    */
   getStatistics(): {
@@ -275,6 +316,7 @@ export class FoodUSDModel {
     totalBurned: number;
     totalSpent: number;
     holders: number;
+    totalHolders: number;
     transactions: number;
     spendingByCategory: Record<string, number>;
     averageSpendingPerHolder: number;
@@ -302,11 +344,12 @@ export class FoodUSDModel {
     }
 
     return {
-      totalSupply: this.totalSupply,
+      totalSupply: this._totalSupply,
       totalMinted,
       totalBurned,
       totalSpent,
       holders: holders.length,
+      totalHolders: holders.length,
       transactions: this.transactions.length,
       spendingByCategory,
       averageSpendingPerHolder: totalSpent / holders.length,
@@ -397,6 +440,7 @@ export class FoodUSDModel {
    */
   exportData(): {
     config: FoodUSDConfig;
+    totalSupply: number;
     holders: FoodUSDHolder[];
     transactions: SpendingTransaction[];
     statistics: {
@@ -405,6 +449,7 @@ export class FoodUSDModel {
       totalBurned: number;
       totalSpent: number;
       holders: number;
+      totalHolders: number;
       transactions: number;
       spendingByCategory: Record<string, number>;
       averageSpendingPerHolder: number;
@@ -412,6 +457,7 @@ export class FoodUSDModel {
   } {
     return {
       config: this.config,
+      totalSupply: this._totalSupply,
       holders: Array.from(this.holders.values()),
       transactions: [...this.transactions],
       statistics: this.getStatistics(),

@@ -158,7 +158,7 @@ export class GroTokenDistribution {
     }
 
     if (fromHolder.balance < amount) {
-      return false; // Insufficient balance
+      throw new Error('Insufficient balance');
     }
 
     fromHolder.balance -= amount;
@@ -181,6 +181,13 @@ export class GroTokenDistribution {
     this.currentSupply -= amount;
 
     return true;
+  }
+
+  /**
+   * Get total supply of tokens
+   */
+  totalSupply(): number {
+    return this.currentSupply;
   }
 
   /**
@@ -239,6 +246,7 @@ export class GroTokenDistribution {
    */
   calculateWealthImpact(holderAddress: string): {
     tokenBalance: number;
+    balance: number;
     dollarValue: number;
     totalReceived: number;
     totalReceivedValue: number;
@@ -252,6 +260,7 @@ export class GroTokenDistribution {
 
     return {
       tokenBalance: holder.balance,
+      balance: holder.balance,
       dollarValue: holder.balance * this.config.tokenValue,
       totalReceived: holder.totalReceived,
       totalReceivedValue: holder.totalReceived * this.config.tokenValue,
@@ -264,6 +273,7 @@ export class GroTokenDistribution {
    */
   exportData(): {
     config: GroTokenConfig;
+    totalSupply: number;
     holders: TokenHolder[];
     history: DistributionEvent[];
     statistics: {
@@ -278,6 +288,7 @@ export class GroTokenDistribution {
   } {
     return {
       config: this.config,
+      totalSupply: this.currentSupply,
       holders: this.getHolders(),
       history: this.getDistributionHistory(),
       statistics: this.getStatistics(),

@@ -11,16 +11,19 @@ export interface GroVaultConfig {
   minLockDurationYears: number; // Minimum lock duration (1 year)
   maxLockDurationYears: number; // Maximum lock duration (4 years)
   compoundingFrequency: 'weekly' | 'monthly' | 'yearly'; // How often interest compounds
+  compoundingPeriod?: 'weekly' | 'monthly' | 'yearly'; // Alias for compoundingFrequency (deprecated)
 }
 
 export interface LockPosition {
   address: string;
   amount: number;
   unlockTime: number; // Timestamp
+  unlockWeek: number; // Week number when unlock happens
   durationYears: number;
   createdWeek: number;
   interestAccrued: number;
   votingPower: number;
+  effectiveAPR: number; // Effective annual percentage rate
 }
 
 export interface StakingEvent {
@@ -46,13 +49,16 @@ export class GroVaultModel {
   ) {
     this.groToken = groToken;
 
+    // Handle compoundingPeriod alias
+    const compoundingFrequency = (config.compoundingPeriod || config.compoundingFrequency || 'weekly') as 'weekly' | 'monthly' | 'yearly';
+
     this.config = {
       baseInterestRate: 0.02, // 2% APR
       lockBonusMultiplier: 0.5, // 50% bonus per year of lock
       minLockDurationYears: 1,
       maxLockDurationYears: 4,
-      compoundingFrequency: 'weekly',
       ...config,
+      compoundingFrequency, // Ensure compoundingFrequency is set even if compoundingPeriod was used
     };
   }
 
@@ -96,15 +102,20 @@ export class GroVaultModel {
     // Calculate initial voting power
     const votingPower = this.calculateVotingPower(amount, durationYears);
 
+    // Calculate effective APR (base + lock bonus)
+    const effectiveAPR = this.config.baseInterestRate * (1 + this.config.lockBonusMultiplier * (durationYears - 1));
+
     // Create lock position
     const position: LockPosition = {
       address,
       amount,
       unlockTime,
+      unlockWeek: unlockTime,
       durationYears,
       createdWeek: week,
       interestAccrued: 0,
       votingPower,
+      effectiveAPR,
     };
 
     this.locks.set(address, position);
@@ -411,18 +422,24 @@ export class GroVaultModel {
    */
   calculateWealthAccumulation(address: string): {
     principalLocked: number;
+    locked: number;
     interestEarned: number;
+    interestAccrued: number;
     totalValue: number;
     annualizedReturn: number;
+    effectiveAPR: number;
   } {
     const position = this.locks.get(address);
 
     if (!position) {
       return {
         principalLocked: 0,
+        locked: 0,
         interestEarned: 0,
+        interestAccrued: 0,
         totalValue: 0,
         annualizedReturn: 0,
+        effectiveAPR: 0,
       };
     }
 
@@ -434,9 +451,12 @@ export class GroVaultModel {
 
     return {
       principalLocked: position.amount,
+      locked: position.amount,
       interestEarned: position.interestAccrued,
+      interestAccrued: position.interestAccrued,
       totalValue: position.amount + position.interestAccrued,
       annualizedReturn,
+      effectiveAPR: position.effectiveAPR,
     };
   }
 
@@ -445,6 +465,7 @@ export class GroVaultModel {
    */
   exportData(): {
     config: GroVaultConfig;
+    totalLocked: number;
     locks: LockPosition[];
     events: StakingEvent[];
     statistics: {
@@ -459,6 +480,7 @@ export class GroVaultModel {
   } {
     return {
       config: this.config,
+      totalLocked: this.totalLocked,
       locks: Array.from(this.locks.values()),
       events: [...this.events],
       statistics: this.getStatistics(),

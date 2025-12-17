@@ -143,7 +143,7 @@ describe('GroupPurchaseModel', () => {
       const balanceBefore1 = foodUSD.balanceOf('0xMEMBER1');
       const balanceBefore2 = foodUSD.balanceOf('0xMEMBER2');
 
-      const result = groupPurchase.executeOrder(orderId);
+      void groupPurchase.executeOrder(orderId);
 
       // Savings should be refunded proportionally
       const balanceAfter1 = foodUSD.balanceOf('0xMEMBER1');

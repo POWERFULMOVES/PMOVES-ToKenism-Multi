@@ -20,7 +20,9 @@ export interface GroupOrder {
   totalContributed: number;
   deadline: number; // Timestamp
   executed: boolean;
+  status: 'pending' | 'executed' | 'failed';
   participants: Map<string, number>; // address => contribution
+  participantCount: number;
   category: string;
   week: number;
 }
@@ -35,8 +37,11 @@ export interface Contribution {
 
 export interface SavingsResult {
   orderId: number;
+  executed: boolean;
   totalSpent: number;
   totalSaved: number;
+  savingsAmount: number;
+  finalCost: number;
   savingsRate: number;
   participantCount: number;
   perParticipantSavings: number;
@@ -95,7 +100,9 @@ export class GroupPurchaseModel {
       totalContributed: 0,
       deadline,
       executed: false,
+      status: 'pending',
       participants: new Map(),
+      participantCount: 0,
       category,
       week,
     };
@@ -144,6 +151,7 @@ export class GroupPurchaseModel {
     const currentContribution = order.participants.get(contributor) || 0;
     order.participants.set(contributor, currentContribution + amount);
     order.totalContributed += amount;
+    order.participantCount = order.participants.size;
 
     // Record contribution
     const contribution: Contribution = {
@@ -194,6 +202,7 @@ export class GroupPurchaseModel {
 
     // Mark as executed
     order.executed = true;
+    order.status = 'executed';
 
     // Calculate savings
     const totalBeforeSavings = order.totalContributed;
@@ -219,8 +228,11 @@ export class GroupPurchaseModel {
     // Record savings result
     const savingsResult: SavingsResult = {
       orderId,
+      executed: true,
       totalSpent: totalAfterSavings,
       totalSaved: savingsAmount,
+      savingsAmount,
+      finalCost: totalAfterSavings,
       savingsRate: this.config.savingsRate,
       participantCount: order.participants.size,
       perParticipantSavings: savingsAmount / order.participants.size,
@@ -360,8 +372,10 @@ export class GroupPurchaseModel {
     executedOrders: number;
     failedOrders: number;
     activeOrders: number;
+    pendingOrders: number;
     totalSaved: number;
     totalSpent: number;
+    totalVolume: number;
     averageSavingsRate: number;
     totalParticipants: number;
     averageParticipantsPerOrder: number;
@@ -371,6 +385,7 @@ export class GroupPurchaseModel {
     const active = allOrders.filter(
       (o) => !o.executed && Date.now() <= o.deadline
     );
+    const pending = allOrders.filter((o) => !o.executed);
     const failed = allOrders.filter(
       (o) => !o.executed && Date.now() > o.deadline
     );
@@ -381,6 +396,10 @@ export class GroupPurchaseModel {
     );
     const totalSpent = this.savingsHistory.reduce(
       (sum, s) => sum + s.totalSpent,
+      0
+    );
+    const totalVolume = allOrders.reduce(
+      (sum, o) => sum + o.totalContributed,
       0
     );
 
@@ -403,8 +422,10 @@ export class GroupPurchaseModel {
       executedOrders: executed.length,
       failedOrders: failed.length,
       activeOrders: active.length,
+      pendingOrders: pending.length,
       totalSaved,
       totalSpent,
+      totalVolume,
       averageSavingsRate: totalSpent > 0 ? totalSaved / (totalSpent + totalSaved) : 0,
       totalParticipants: uniqueParticipants.size,
       averageParticipantsPerOrder:
@@ -442,6 +463,8 @@ export class GroupPurchaseModel {
    */
   exportData(): {
     config: GroupPurchaseConfig;
+    totalOrders: number;
+    executedOrders: number;
     orders: GroupOrder[];
     contributions: Contribution[];
     savings: SavingsResult[];
@@ -450,22 +473,27 @@ export class GroupPurchaseModel {
       executedOrders: number;
       failedOrders: number;
       activeOrders: number;
+      pendingOrders: number;
       totalSaved: number;
       totalSpent: number;
+      totalVolume: number;
       averageSavingsRate: number;
       totalParticipants: number;
       averageParticipantsPerOrder: number;
     };
   } {
+    const stats = this.getStatistics();
     return {
       config: this.config,
+      totalOrders: stats.totalOrders,
+      executedOrders: stats.executedOrders,
       orders: Array.from(this.orders.values()).map((order) => ({
         ...order,
         participants: new Map(order.participants),
       })),
       contributions: [...this.contributions],
       savings: [...this.savingsHistory],
-      statistics: this.getStatistics(),
+      statistics: stats,
     };
   }
 }
