@@ -340,14 +340,22 @@ export class FireflyClient {
     name: string;
     type: string;
     balance?: number;
+    accountRole?: string;
   }): Promise<any> {
     try {
-      const response = await this.client.post('/accounts', {
+      const payload: any = {
         name: data.name,
         type: data.type,
         opening_balance: data.balance?.toString() || '0',
         opening_balance_date: new Date().toISOString().split('T')[0],
-      });
+      };
+
+      // Asset accounts require an account_role
+      if (data.type === 'asset') {
+        payload.account_role = data.accountRole || 'defaultAsset';
+      }
+
+      const response = await this.client.post('/accounts', payload);
       return response.data.data;
     } catch (error) {
       console.error('[FireflyClient] Failed to create account:', error);
