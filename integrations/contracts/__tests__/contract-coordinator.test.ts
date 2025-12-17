@@ -47,7 +47,8 @@ describe('ContractCoordinator', () => {
       const stats = coordinator.getComprehensiveStats();
 
       expect(stats.groToken.totalHolders).toBe(50);
-      expect(stats.foodUSD.totalHolders).toBe(50);
+      // FoodUSD includes contract addresses (GroupPurchase, Supplier)
+      expect(stats.foodUSD.totalHolders).toBe(52);
     });
   });
 
@@ -119,12 +120,19 @@ describe('ContractCoordinator', () => {
       const householdBudgets = new Map();
       for (let i = 0; i < 50; i++) {
         householdBudgets.set(`0xMEMBER${i}`, {
-          foodBudget: 500,
-          totalIncome: 1000,
+          foodBudget: 1000,
+          totalIncome: 1500,
         });
       }
 
       coordinator.processWeek(1, householdBudgets);
+
+      // Fund accounts with additional FoodUSD for group contributions
+      // (processWeek funds then spends, so we need extra for contributions)
+      const models = coordinator.getModels();
+      for (let i = 0; i < 10; i++) {
+        models.foodUSD.fundAccount(`0xMEMBER${i}`, 500);
+      }
     });
 
     it('should create and execute group orders', () => {
@@ -132,8 +140,8 @@ describe('ContractCoordinator', () => {
 
       expect(orderId).toBe(1);
 
-      // Get contributions
-      for (let i = 1; i <= 6; i++) {
+      // Get contributions (5 participants * 100 = 500 = target, auto-executes)
+      for (let i = 1; i <= 5; i++) {
         coordinator.contributeToOrder(1, orderId, `0xMEMBER${i}`, 100);
       }
 

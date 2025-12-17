@@ -47,9 +47,8 @@ describe('NATSClient', () => {
 
     it('accepts custom configuration', () => {
       const customClient = new NATSClient({
-        servers: ['nats://custom:4222'],
+        url: 'nats://custom:4222',
         clientName: 'custom-client',
-        reconnect: false,
         maxReconnectAttempts: 5,
       });
       expect(customClient).toBeDefined();
@@ -129,10 +128,10 @@ describe('NATSClient', () => {
   });
 
   describe('subscribe', () => {
-    it('throws error when not connected', async () => {
-      await expect(
-        client.subscribe('test.subject', jest.fn())
-      ).rejects.toThrow('NATS client not connected');
+    it('throws error when not connected', () => {
+      expect(() => {
+        client.subscribe('test.subject', jest.fn());
+      }).toThrow('NATS client not connected');
     });
   });
 
@@ -174,7 +173,7 @@ describe('NATSClient', () => {
             next: () => Promise.resolve({ done: true }),
           }),
         }),
-        publish: jest.fn((subject: string, data: Uint8Array) => {
+        publish: jest.fn((_subject: string, data: Uint8Array) => {
           publishedData = data.toString();
         }),
         drain: jest.fn().mockResolvedValue(undefined),
@@ -206,7 +205,7 @@ describe('NATSClient', () => {
             next: () => Promise.resolve({ done: true }),
           }),
         }),
-        publish: jest.fn((subject: string, data: Uint8Array) => {
+        publish: jest.fn((_subject: string, data: Uint8Array) => {
           publishedData = data.toString();
         }),
         drain: jest.fn().mockResolvedValue(undefined),

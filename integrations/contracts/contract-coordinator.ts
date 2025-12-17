@@ -75,8 +75,13 @@ export class ContractCoordinator {
     // Initialize GroToken holders
     this.groToken.initializeHolders(population.addresses);
 
-    // Initialize FoodUSD holders
-    this.foodUSD.initializeHolders(population.addresses);
+    // Initialize FoodUSD holders including contract addresses
+    const foodUsdAddresses = [
+      ...population.addresses,
+      '0xGROUPPURCHASE_CONTRACT', // Group purchase escrow
+      '0xSUPPLIER', // Generic supplier address
+    ];
+    this.foodUSD.initializeHolders(foodUsdAddresses);
 
     this.initialized = true;
 

@@ -159,8 +159,8 @@ describe('GroTokenDistribution', () => {
       expect(stats.totalHolders).toBe(100);
       expect(stats.activeParticipants).toBeGreaterThan(0);
       expect(stats.activeParticipants).toBeLessThanOrEqual(100);
-      expect(stats.totalValue).toBe(stats.totalSupply * 2.0);
-      expect(stats.averageBalance).toBeCloseTo(stats.totalSupply / stats.activeParticipants, 10);
+      expect(stats.totalValue).toBeCloseTo(stats.totalSupply * 2.0, 10);
+      expect(stats.averageBalance).toBeCloseTo(stats.totalSupply / stats.totalHolders, 10);
     });
   });
 

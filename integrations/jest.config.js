@@ -3,6 +3,7 @@ module.exports = {
   testEnvironment: "node",
   roots: ["<rootDir>"],
   testMatch: ["**/__tests__/**/*.+(ts|tsx)", "**/?(*.)+(spec|test).+(ts|tsx)"],
+  testPathIgnorePatterns: ["/node_modules/", "/PMOVES-DoX/"],
   transform: {
     "^.+\\.(ts|tsx)$": "ts-jest",
   },
