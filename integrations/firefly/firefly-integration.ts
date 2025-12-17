@@ -15,6 +15,7 @@ import FireflyDataTransformer, { TransformedData } from './data-transformer';
 import { ProjectionValidator } from '../projections/projection-validator';
 import CalibrationEngine, { CalibrationReport } from '../projections/calibration-engine';
 import { ProjectionModel, SimulationResults } from '../projections/projection-validator';
+import { natsClient, NATSClient } from '../nats/nats-client';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -32,6 +33,10 @@ export interface IntegrationConfig {
     directory: string;
     generateCSV: boolean;
     generateMarkdown: boolean;
+  };
+  nats?: {
+    enabled: boolean;
+    publishResults: boolean;
   };
 }
 
@@ -421,6 +426,88 @@ export class FireflyIntegration {
   }
 
   /**
+   * Publish calibration and simulation results to NATS
+   */
+  private async publishToNATS(result: IntegrationResult): Promise<void> {
+    console.log('\n📡 Publishing results to NATS...');
+
+    try {
+      await natsClient.connect();
+
+      // Extract calibrated parameters
+      const calibratedParams: Record<string, number> = {};
+      result.calibrated.calibration.parameterAdjustments.forEach((adj) => {
+        calibratedParams[adj.parameter] = adj.calibrated;
+      });
+
+      // 1. Publish calibration result
+      await natsClient.publish(NATSClient.SUBJECTS.CALIBRATION_RESULT, {
+        calibration: {
+          modelName: result.calibrated.calibration.modelName,
+          confidenceLevel: result.calibrated.calibration.overallAccuracy.confidenceLevel,
+          confidenceScore: result.calibrated.calibration.overallAccuracy.confidenceScore,
+          averageVariance: result.calibrated.calibration.overallAccuracy.averageVariance,
+          parameterAdjustments: result.calibrated.calibration.parameterAdjustments.map((adj) => ({
+            parameter: adj.parameter,
+            baseline: adj.baseline,
+            calibrated: adj.calibrated,
+            adjustmentPercent: adj.adjustmentPercent,
+            confidence: adj.confidence,
+            reasoning: adj.reasoning,
+          })),
+          categoryComparison: result.calibrated.calibration.categoryComparison,
+          dataSource: {
+            periodStart: result.calibrated.calibration.dataSource.periodStart,
+            periodEnd: result.calibrated.calibration.dataSource.periodEnd,
+            weeksAnalyzed: result.calibrated.calibration.dataSource.weeksAnalyzed,
+            totalTransactions: result.calibrated.calibration.dataSource.totalTransactions,
+          },
+        },
+        parameters: calibratedParams,
+        timestamp: new Date().toISOString(),
+        source: 'firefly-integration',
+      });
+
+      console.log('   ✅ Published calibration result');
+
+      // 2. Publish simulation result
+      const simulationHistory = result.calibrated.results.weeklyRevenue.map(
+        (revenue, index) => ({
+          week: index + 1,
+          revenue,
+          cumulativeRevenue: result.calibrated.results.cumulativeRevenue[index],
+          activeParticipants: result.calibrated.results.weeklyParticipants?.[index] || 0,
+        })
+      );
+
+      await natsClient.publishSimulationResult({
+        simulationId: `calibrated-${Date.now()}`,
+        scenario: 'calibrated-from-firefly',
+        weeklyHistory: simulationHistory.map((week) => ({
+          week: week.week,
+          avgWealth: week.cumulativeRevenue,
+          gini: 0, // Not calculated in this simulation
+          povertyRate: 0, // Not calculated in this simulation
+        })),
+        finalMetrics: {
+          totalWealth: result.calibrated.results.cumulativeRevenue[
+            result.calibrated.results.cumulativeRevenue.length - 1
+          ],
+          wealthGap: 0, // Not calculated in this simulation
+          economicVelocity: result.calibrated.results.weeklyRevenue.reduce((sum, r) => sum + r, 0) /
+                           result.calibrated.results.weeklyRevenue.length,
+        },
+        parameters: calibratedParams,
+      });
+
+      console.log('   ✅ Published simulation result');
+    } catch (error) {
+      console.warn('[NATS] Failed to publish (non-fatal):', error);
+      console.warn('[NATS] Integration will continue without NATS publishing');
+    }
+  }
+
+  /**
    * Run complete integration pipeline
    */
   async run(model: ProjectionModel): Promise<IntegrationResult> {
@@ -460,6 +547,11 @@ export class FireflyIntegration {
           calibration,
         },
       };
+
+      // Step 4.5: Publish to NATS (if enabled)
+      if (this.config.nats?.enabled && this.config.nats?.publishResults) {
+        await this.publishToNATS(result);
+      }
 
       // Step 5: Generate reports
       await this.generateReports(result);
