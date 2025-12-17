@@ -89,6 +89,18 @@ export class FireflyClient {
       async (error) => {
         const config = error.config as AxiosRequestConfig & { retryCount?: number };
 
+        // Security: Sanitize error logs to prevent API token exposure
+        const sanitizedConfig = {
+          url: config.url,
+          method: config.method,
+          baseURL: config.baseURL,
+        };
+        console.error('[FireflyClient] Request failed:', {
+          ...sanitizedConfig,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+        });
+
         if (!config.retryCount) {
           config.retryCount = 0;
         }
