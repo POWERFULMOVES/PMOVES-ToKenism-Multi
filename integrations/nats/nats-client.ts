@@ -178,6 +178,8 @@ export class NATSClient extends EventEmitter {
       }
     })().catch((err) => {
       console.error("[NATS] Status handler error:", err);
+      // Security: Emit error instead of swallowing it
+      this.emit("error", err);
     });
   }
 
@@ -312,6 +314,9 @@ export class NATSClient extends EventEmitter {
       })().catch((err) => {
         console.error(`[NATS] Subscription handler error for ${subject}:`, err);
         this.subscriptions.delete(subject);
+        // Security: Emit error instead of swallowing it
+        this.emit("error", err);
+        this.emit("subscription_error", { subject, error: err });
       });
     } catch (error) {
       console.error(`[NATS] Failed to subscribe to ${subject}:`, error);
