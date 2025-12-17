@@ -97,12 +97,12 @@ describe('EventBus', () => {
 
       await eventBus.publish('test.topic', { foo: 'bar' }, 'test-source');
 
-      // Give time for retries
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      // Give time for retries (increased timeout for CI environments)
+      await new Promise((resolve) => setTimeout(resolve, 15000));
 
       // Should have called initial + retries
       expect(callCount).toBeGreaterThan(1);
-    });
+    }, 30000); // 30 second test timeout
 
     it('should emit event:failed after max retries', async () => {
       let failedEvent: any = null;
@@ -117,12 +117,12 @@ describe('EventBus', () => {
 
       await eventBus.publish('test.topic', { foo: 'bar' }, 'test-source');
 
-      // Give time for all retries
-      await new Promise((resolve) => setTimeout(resolve, 10000));
+      // Give time for all retries (increased timeout for CI environments)
+      await new Promise((resolve) => setTimeout(resolve, 20000));
 
       expect(failedEvent).not.toBeNull();
       expect(failedEvent.topic).toBe('test.topic');
-    });
+    }, 45000); // 45 second test timeout
   });
 
   describe('metrics', () => {

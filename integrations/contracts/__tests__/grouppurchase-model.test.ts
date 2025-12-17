@@ -15,15 +15,17 @@ describe('GroupPurchaseModel', () => {
     groupPurchase = new GroupPurchaseModel(foodUSD, {
       savingsRate: 0.15, // 15% savings
       minimumParticipants: 5,
+      categories: ['groceries', 'dining', 'prepared_food', 'farmers_market'],
     });
 
-    // Initialize holders
+    // Initialize holders (include contract address)
     const addresses = Array.from({ length: 20 }, (_, i) => `0xMEMBER${i}`);
+    addresses.push('0xSUPPLIER', '0xGROUPPURCHASE_CONTRACT');
     foodUSD.initializeHolders(addresses);
 
     // Fund all accounts
-    for (const address of addresses) {
-      foodUSD.fundAccount(address, 1000);
+    for (let i = 0; i < 20; i++) {
+      foodUSD.fundAccount(`0xMEMBER${i}`, 1000);
     }
   });
 
@@ -84,13 +86,13 @@ describe('GroupPurchaseModel', () => {
     it('should fail contribution with insufficient balance', () => {
       expect(() => {
         groupPurchase.contribute(1, orderId, '0xMEMBER1', 2000);
-      }).toThrow('Insufficient balance');
+      }).toThrow('Insufficient FoodUSD balance');
     });
 
     it('should fail contribution to non-existent order', () => {
       expect(() => {
         groupPurchase.contribute(1, 999, '0xMEMBER1', 100);
-      }).toThrow('Order not found');
+      }).toThrow('Order 999 not found');
     });
 
     it('should fail contribution to executed order', () => {

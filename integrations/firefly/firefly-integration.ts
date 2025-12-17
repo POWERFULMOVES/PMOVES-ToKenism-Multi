@@ -476,7 +476,7 @@ export class FireflyIntegration {
           week: index + 1,
           revenue,
           cumulativeRevenue: result.calibrated.results.cumulativeRevenue[index],
-          activeParticipants: result.calibrated.results.weeklyParticipants?.[index] || 0,
+          activeParticipants: result.calibrated.results.tokenMetrics?.activeParticipants || 0,
         })
       );
 
