@@ -105,11 +105,14 @@ export interface ValidationReport {
  * Projection Validator
  */
 export class ProjectionValidator {
-  private coordinator: ContractCoordinator;
+  private coordinator: ContractCoordinator | null = null;
 
-  constructor() {
-    // Initialize with default configuration
-    this.coordinator = new ContractCoordinator({
+  /**
+   * Create a fresh ContractCoordinator for each simulation run
+   * This prevents state pollution between simulation runs
+   */
+  private createCoordinator(): ContractCoordinator {
+    return new ContractCoordinator({
       groToken: {
         distributionMean: 0.5,
         distributionStd: 0.2,
@@ -135,6 +138,10 @@ export class ProjectionValidator {
     });
   }
 
+  constructor() {
+    // Coordinator is created fresh for each simulation run
+  }
+
   /**
    * Run 5-year simulation for a projection model
    */
@@ -142,6 +149,10 @@ export class ProjectionValidator {
     model: ProjectionModel,
     weeks: number = 260 // 5 years
   ): Promise<SimulationResults> {
+    // Create a fresh coordinator for this simulation run
+    // This ensures no state pollution between simulation runs
+    this.coordinator = this.createCoordinator();
+
     // Initialize population
     const addresses = Array.from(
       { length: model.populationSize },

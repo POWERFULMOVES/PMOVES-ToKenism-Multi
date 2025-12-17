@@ -174,11 +174,18 @@ export class FoodUSDModel {
       throw new Error('Holder not found');
     }
 
-    if (holder.balance < amount) {
+    // Use small epsilon for floating point comparison to avoid accumulation errors
+    // After many transactions, floating point errors can cause balance to be
+    // 149.9999999 instead of 150, causing spurious "insufficient balance" errors
+    const EPSILON = 0.01; // 1 cent tolerance
+    if (holder.balance + EPSILON < amount) {
       throw new Error('Insufficient balance');
     }
 
-    // Update spending stats
+    // Clamp spending to available balance to handle floating point edge cases
+    const actualAmount = Math.min(amount, holder.balance);
+
+    // Update spending stats (use requested amount for accounting accuracy)
     holder.totalSpent += amount;
 
     if (!holder.spendingByCategory[category]) {
@@ -187,7 +194,8 @@ export class FoodUSDModel {
     holder.spendingByCategory[category] += amount;
 
     // Burn tokens (spending removes from circulation)
-    this.burn(from, amount);
+    // Use actualAmount for the balance deduction to prevent negative balance
+    this.burn(from, actualAmount);
 
     // Record transaction
     const transaction: SpendingTransaction = {
