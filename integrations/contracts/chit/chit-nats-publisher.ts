@@ -10,7 +10,7 @@
 import { NATSClient } from '../../nats/nats-client';
 import { CHIT_NATS_SUBJECTS } from './index';
 import type { SwarmMeta, ToKenismMetrics } from './swarm-attribution';
-import type { AttributionAction, AttributionProof } from './shape-attribution';
+import type { AttributionRecord } from './shape-attribution';
 import type { CGPDocument } from './cgp-generator';
 
 /**
@@ -68,7 +68,7 @@ export interface CGPWeeklyPayload {
  * await publisher.publishSwarmPopulation(swarmMeta);
  *
  * // Publish attribution recorded
- * await publisher.publishAttributionRecorded(action, chitId);
+ * await publisher.publishAttributionRecorded(attributionRecord);
  *
  * // Publish weekly CGP
  * await publisher.publishWeeklyCGP(week, cgpDocument, metrics);
@@ -134,9 +134,7 @@ export class CHITNATSPublisher {
    * Subject: tokenism.attribution.recorded.v1
    */
   async publishAttributionRecorded(
-    action: AttributionAction,
-    chitId: string,
-    proof?: AttributionProof
+    record: AttributionRecord
   ): Promise<void> {
     if (!this.canPublish()) {
       console.log('[CHIT] Skipping attribution publish (disabled or disconnected)');
@@ -144,13 +142,13 @@ export class CHITNATSPublisher {
     }
 
     const payload: AttributionRecordedPayload = {
-      chit_id: chitId,
-      address: action.address,
-      action: action.action,
-      amount: action.amount,
-      week: action.week,
-      category: action.category,
-      merkle_root: proof?.root,
+      chit_id: record.chitId,
+      address: record.address,
+      action: record.action,
+      amount: record.amount,
+      week: record.week,
+      category: record.category,
+      merkle_root: record.proof?.merkleRoot,
       timestamp: new Date().toISOString(),
     };
 
@@ -159,7 +157,7 @@ export class CHITNATSPublisher {
         CHIT_NATS_SUBJECTS.attributionRecorded,
         payload
       );
-      console.log(`[CHIT] Published attribution recorded: ${chitId} (${action.action})`);
+      console.log(`[CHIT] Published attribution recorded: ${record.chitId} (${record.action})`);
     } catch (error) {
       console.error('[CHIT] Failed to publish attribution:', error);
       // Best-effort: don't throw
