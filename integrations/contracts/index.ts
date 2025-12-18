@@ -45,6 +45,24 @@ export {
   ProposalResult,
 } from './coopgovernor-model';
 
+// RewardsPool (Phase 5)
+export {
+  RewardsPoolModel,
+  RewardsPoolConfig,
+  RewardsClaim,
+  RewardsPoolStats,
+  RewardsEvent,
+} from './rewardspool-model';
+
+// LoyaltyPoints (Phase 5)
+export {
+  LoyaltyPointsModel,
+  LoyaltyConfig,
+  LoyaltyAccount,
+  LoyaltyEvent,
+  LoyaltyStats,
+} from './loyaltypoints-model';
+
 // Contract Coordinator
 export {
   ContractCoordinator,
