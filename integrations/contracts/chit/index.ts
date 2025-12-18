@@ -88,6 +88,15 @@ export {
   SpectralAnalysis,
 } from './zeta-filter';
 
+// CHIT NATS Publisher - GEOMETRY BUS integration
+export {
+  CHITNATSPublisher,
+  createCHITPublisher,
+  SwarmPopulationPayload,
+  AttributionRecordedPayload,
+  CGPWeeklyPayload,
+} from './chit-nats-publisher';
+
 /**
  * Create a fully configured CHIT attribution system
  *
