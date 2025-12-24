@@ -9,16 +9,18 @@ import { ProjectionValidator } from '../projections/projection-validator';
 import { AI_ENHANCED_LOCAL_SERVICE } from '../projections/scenario-configs';
 import FireflyClient from './firefly-client';
 import * as dotenv from 'dotenv';
+import * as path from 'path';
 
 // Load environment variables
-dotenv.config();
+dotenv.config(); // Load from current dir if exists
+dotenv.config({ path: path.resolve(__dirname, '../../PMOVES-Firefly-iii/.env') }); // Load from submodule (relative to script file)
+dotenv.config({ path: path.resolve(__dirname, '../../.env') }); // Load from root
 
 const FIREFLY_URL = process.env.FIREFLY_URL || 'http://localhost:8080';
 const FIREFLY_API_TOKEN = process.env.FIREFLY_API_TOKEN;
 
 if (!FIREFLY_API_TOKEN) {
-  console.error('❌ Error: FIREFLY_API_TOKEN environment variable is not set.');
-  process.exit(1);
+  console.warn('⚠️  FIREFLY_API_TOKEN not set. Running in DRY RUN mode (no export).');
 }
 
 // Agent profiles for representative data generation
@@ -61,16 +63,21 @@ async function main() {
   console.log(`   Final Revenue: $${results.finalRevenue.toLocaleString()}`);
 
   // 2. Initialize Firefly Client
-  const client = new FireflyClient({
-    baseUrl: FIREFLY_URL,
-    apiToken: FIREFLY_API_TOKEN,
-  });
+  let client: FireflyClient | null = null;
+  if (FIREFLY_API_TOKEN) {
+    client = new FireflyClient({
+      baseUrl: FIREFLY_URL,
+      apiToken: FIREFLY_API_TOKEN,
+    });
 
-  // Test connection
-  const connected = await client.testConnection();
-  if (!connected) {
-    console.error('❌ Failed to connect to Firefly-iii');
-    process.exit(1);
+    // Test connection
+    const connected = await client.testConnection();
+    if (!connected) {
+      console.error('❌ Failed to connect to Firefly-iii. Switching to DRY RUN mode.');
+      client = null;
+    }
+  } else {
+    console.log('ℹ️  Skipping Firefly connection (Dry Run)');
   }
 
   // 3. Process Agents
@@ -81,37 +88,42 @@ async function main() {
 
     // Create Account
     let accountId: string;
-    try {
-      // Attempt to create account; if 422, search for existing account by name
-      const account = await client.createAccount({
-        name: agent.name,
-        type: agent.type,
-        balance: 1000, // Initial balance
-      });
-      accountId = account.id;
-      console.log(`      ✅ Created account (ID: ${accountId})`);
-    } catch (error: any) {
-      if (error.response?.status === 422) {
-        console.log(`      ⚠️  Account might already exist. Searching...`);
-        try {
-          const accounts = await client.getAccounts('asset');
-          const existingAccount = accounts.find((a: any) => a.attributes.name === agent.name);
-          
-          if (existingAccount) {
-            accountId = existingAccount.id;
-            console.log(`      ✅ Found existing account (ID: ${accountId})`);
-          } else {
-            console.error(`      ❌ Could not find existing account with name: ${agent.name}`);
+    if (client) {
+      try {
+        // Attempt to create account; if 422, search for existing account by name
+        const account = await client.createAccount({
+          name: agent.name,
+          type: agent.type,
+          balance: 1000, // Initial balance
+        });
+        accountId = account.id;
+        console.log(`      ✅ Created account (ID: ${accountId})`);
+      } catch (error: any) {
+        if (error.response?.status === 422) {
+          console.log(`      ⚠️  Account might already exist. Searching...`);
+          try {
+            const accounts = await client.getAccounts('asset');
+            const existingAccount = accounts.find((a: any) => a.attributes.name === agent.name);
+            
+            if (existingAccount) {
+              accountId = existingAccount.id;
+              console.log(`      ✅ Found existing account (ID: ${accountId})`);
+            } else {
+              console.error(`      ❌ Could not find existing account with name: ${agent.name}`);
+              continue;
+            }
+          } catch (searchError) {
+            console.error(`      ❌ Error searching for account:`, searchError);
             continue;
           }
-        } catch (searchError) {
-          console.error(`      ❌ Error searching for account:`, searchError);
+        } else {
+          console.error(`      ❌ Error creating account:`, error.message);
           continue;
         }
-      } else {
-        console.error(`      ❌ Error creating account:`, error.message);
-        continue;
       }
+    } else {
+       console.log(`      [DRY RUN] Would create/find account for: ${agent.name}`);
+       accountId = 'dry-run-id';
     }
 
     // Generate Transactions
@@ -120,6 +132,18 @@ async function main() {
     let currentDate = new Date();
     currentDate.setFullYear(currentDate.getFullYear() - 1); // Start 1 year ago
 
+    // Add Initial Balance Transaction to ensure validation baseline
+    transactions.push({
+      type: 'deposit',
+      date: new Date(currentDate),
+      amount: 1000.00,
+      description: 'Simulation Start Balance',
+      destinationId: accountId,
+      category: 'Initial Balance',
+      destinationName: agent.name,
+      sourceName: 'Opening Balance'
+    });
+
     for (let i = 0; i < results.weeklyRevenue.length; i++) {
       const weekRevenue = results.weeklyRevenue[i];
       const weekDate = new Date(currentDate);
@@ -127,6 +151,7 @@ async function main() {
 
       // Income (Deposit)
       const incomeAmount = (weekRevenue / AI_ENHANCED_LOCAL_SERVICE.populationSize) * agent.incomeMultiplier;
+      
       if (incomeAmount > 0) {
         transactions.push({
           type: 'deposit',
@@ -155,18 +180,24 @@ async function main() {
     }
 
     // Export in batches
-    console.log(`      📤 Exporting ${transactions.length} transactions...`);
+    console.log(`      Generated ${transactions.length} transactions: ${transactions.filter((t: any) => t.type === 'deposit').length} deposits, ${transactions.filter((t: any) => t.type === 'withdrawal').length} withdrawals`);
+    console.log(`      📤 Exporting transactions...`);
     const BATCH_SIZE = 10;
-    for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
-      const batch = transactions.slice(i, i + BATCH_SIZE);
-      const results = await Promise.allSettled(batch.map(tx => client.createTransaction(tx as any)));
-      
-      results.forEach((result, index) => {
-        if (result.status === 'rejected') {
-          console.error(`\n      ❌ Failed to create transaction ${i + index}:`, result.reason?.message || result.reason);
-        }
-      });
-      process.stdout.write('.');
+    
+    if (client) {
+      for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
+        const batch = transactions.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(batch.map(tx => client!.createTransaction(tx as any)));
+        
+        results.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.error(`\n      ❌ Failed to create transaction ${i + index}:`, result.reason?.message || result.reason);
+          }
+        });
+        process.stdout.write('.');
+      }
+    } else {
+       console.log(`      [DRY RUN] Would export ${transactions.length} transactions`);
     }
     console.log('\n      ✅ Done');
   }
