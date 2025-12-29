@@ -29,6 +29,18 @@ interface SankeyDiagramProps {
   height?: number;
 }
 
+function EmptyChartState({ message = "No data available" }: { message?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+      <svg className="h-12 w-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+      </svg>
+      <p className="text-sm">{message}</p>
+      <p className="text-xs mt-1">Run a simulation to see the economic flow diagram.</p>
+    </div>
+  );
+}
+
 export function SankeyDiagram({
   nodes,
   links,
@@ -36,6 +48,21 @@ export function SankeyDiagram({
   description,
   height = 500,
 }: SankeyDiagramProps) {
+  // Handle empty data
+  if (!nodes || nodes.length === 0 || !links || links.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+          {description && <CardDescription>{description}</CardDescription>}
+        </CardHeader>
+        <CardContent>
+          <EmptyChartState message="No flow data available" />
+        </CardContent>
+      </Card>
+    );
+  }
+
   // SVG dimensions
   const width = 900;
   const margin = { top: 20, right: 150, bottom: 20, left: 150 };

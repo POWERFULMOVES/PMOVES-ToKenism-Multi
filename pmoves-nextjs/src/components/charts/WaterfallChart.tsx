@@ -24,6 +24,18 @@ interface WaterfallChartProps {
   showConnectors?: boolean;
 }
 
+function EmptyChartState({ message = "No data available" }: { message?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+      <svg className="h-12 w-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+      <p className="text-sm">{message}</p>
+      <p className="text-xs mt-1">Run a simulation to see the wealth flow analysis.</p>
+    </div>
+  );
+}
+
 export function WaterfallChart({
   data,
   title = "Wealth Flow Analysis",
@@ -32,6 +44,21 @@ export function WaterfallChart({
   height = 400,
   showConnectors = true,
 }: WaterfallChartProps) {
+  // Handle empty data
+  if (!data || data.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+          {description && <CardDescription>{description}</CardDescription>}
+        </CardHeader>
+        <CardContent>
+          <EmptyChartState message="No wealth flow data available" />
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Calculate cumulative positions
   let runningTotal = 0;
   const chartData = data.map((point) => {

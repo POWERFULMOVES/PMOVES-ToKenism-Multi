@@ -7,22 +7,82 @@ import { formatCurrency, formatPercentage, formatNumber } from '@/lib/utils/form
 import { MetricTooltip } from '@/components/ui/metric-tooltip';
 import { metricTooltips } from '@/lib/tooltips';
 import { DocumentationDialog } from '@/components/ui/documentation-dialog';
-import { AlertCircle, TrendingUp, TrendingDown } from 'lucide-react';
+import { AlertCircle, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
 import { MathValidation } from '@/components/ui/math-validation';
 import { MathModelService } from '@/lib/services/math-model.service';
+import { Skeleton, SkeletonCard, SkeletonChart, SkeletonTable } from '@/components/ui/skeleton';
 
 interface SimulationResultsProps {
   results: SimResults | null;
   presetName?: string | null;
   simulationParams?: Record<string, number>;
+  isLoading?: boolean;
 }
 
 import { KeyMetricsTable } from './KeyMetricsTable';
 import { ValidationMetrics } from './ValidationMetrics';
 import { ExportDropdown, ExportSection } from './ExportButtons';
 
-export function SimulationResults({ results, presetName, simulationParams }: SimulationResultsProps) {
-  if (!results) return null;
+function ResultsLoadingSkeleton() {
+  return (
+    <div className="space-y-8">
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-7 w-64" />
+              <Skeleton className="h-4 w-96" />
+            </div>
+            <Skeleton className="h-10 w-24" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div>
+              <Skeleton className="h-6 w-32 mb-4" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+              </div>
+            </div>
+            <div>
+              <Skeleton className="h-6 w-32 mb-4" />
+              <SkeletonTable rows={4} />
+            </div>
+            <div>
+              <Skeleton className="h-6 w-40 mb-4" />
+              <SkeletonChart />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function EmptyResultsState() {
+  return (
+    <Card className="border-dashed">
+      <CardContent className="flex flex-col items-center justify-center py-16">
+        <BarChart3 className="h-16 w-16 text-muted-foreground/50 mb-4" />
+        <h3 className="text-lg font-semibold text-muted-foreground mb-2">No Simulation Results</h3>
+        <p className="text-sm text-muted-foreground text-center max-w-md">
+          Configure your simulation parameters and click "Run Simulation" to see the results here.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function SimulationResults({ results, presetName, simulationParams, isLoading = false }: SimulationResultsProps) {
+  if (isLoading) {
+    return <ResultsLoadingSkeleton />;
+  }
+
+  if (!results) {
+    return <EmptyResultsState />;
+  }
 
   const { history, summary, key_events } = results;
   const finalWeek = history[history.length - 1];
