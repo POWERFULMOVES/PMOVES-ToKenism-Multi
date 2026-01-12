@@ -7,6 +7,8 @@
 [submodule "integrations/PMOVES-DoX"]
 	path = integrations/PMOVES-DoX
 	url = https://github.com/POWERFULMOVES/PMOVES-DoX.git
+	branch = PMOVES.AI-Edition-Hardened
 [submodule "integrations/PMOVES-Firefly-iii"]
 	path = integrations/PMOVES-Firefly-iii
 	url = https://github.com/POWERFULMOVES/PMOVES-Firefly-iii.git
+	branch = PMOVES.AI-Edition-Hardened-Tokenism
