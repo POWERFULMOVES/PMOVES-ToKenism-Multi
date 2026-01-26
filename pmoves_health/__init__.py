@@ -38,11 +38,35 @@ Health Status Values:
 - unhealthy: One or more required checks failing
 """
 
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from functools import wraps
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
+import logging
 import os
 import asyncio
+
+# Configure module logger
+logger = logging.getLogger(__name__)
+
+__all__ = [
+    "HealthStatus",
+    "DependencyCheck",
+    "DatabaseCheck",
+    "HTTPCheck",
+    "NATSCheck",
+    "HealthChecker",
+    "health_check",
+    "health_check_router",
+    "create_health_app",
+    "get_health_status",
+    "add_database_check",
+    "add_http_check",
+    "add_nats_check",
+    "add_custom_check",
+]
 
 try:
     from fastapi import APIRouter, HTTPException
@@ -58,22 +82,31 @@ HEALTH_CHECK_TIMEOUT = 5.0
 
 
 class HealthStatus:
-    """Health status constants."""
+    """
+    Health status constants.
+
+    HEALTHY: All required checks passing
+    DEGRADED: Optional checks failing, required checks passing
+    UNHEALTHY: One or more required checks failing
+    """
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
 
 
-class DependencyCheck:
+class DependencyCheck(ABC):
     """Base class for dependency health checks."""
 
     def __init__(self, name: str, required: bool = True):
+        if not name or not name.strip():
+            raise ValueError("name must be non-empty")
         self.name = name
         self.required = required
 
+    @abstractmethod
     async def check(self) -> bool:
         """Check if dependency is healthy. Override in subclass."""
-        raise NotImplementedError
+        pass
 
     def status_key(self) -> str:
         """Return the status key for this check."""
@@ -83,62 +116,136 @@ class DependencyCheck:
 class DatabaseCheck(DependencyCheck):
     """Health check for database connections."""
 
-    def __init__(self, connect_fn: Callable, **kwargs):
-        super().__init__("database", kwargs.get("required", True))
+    def __init__(
+        self,
+        connect_fn: Callable[[], bool],
+        name: str = "database",
+        required: bool = True,
+    ):
+        super().__init__(name, required)
         self.connect_fn = connect_fn
 
     async def check(self) -> bool:
         try:
             return await asyncio.to_thread(self.connect_fn)
-        except Exception:
+        except (ConnectionRefusedError, TimeoutError) as e:
+            logger.warning(
+                "Database health check failed: connection error",
+                extra={"check_name": self.name, "error_type": type(e).__name__},
+            )
+            return False
+        except Exception as e:
+            logger.error(
+                "Database health check failed unexpectedly",
+                extra={"check_name": self.name, "error": str(e), "error_type": type(e).__name__},
+            )
             return False
 
 
 class HTTPCheck(DependencyCheck):
     """Health check for HTTP endpoints."""
 
-    def __init__(self, url: str, **kwargs):
-        name = kwargs.get("name", "service")
-        super().__init__(name, kwargs.get("required", True))
+    def __init__(self, url: str, name: str = "service", required: bool = True):
+        super().__init__(name, required)
         self.url = url
 
     async def check(self) -> bool:
         try:
             import httpx
+        except ImportError:
+            logger.error(
+                "httpx library not installed",
+                extra={"check_name": self.name},
+            )
+            return False
+
+        try:
             async with httpx.AsyncClient(timeout=2.0) as client:
                 response = await client.get(self.url)
+                if response.status_code != 200:
+                    logger.warning(
+                        "HTTP health check returned non-200",
+                        extra={
+                            "check_name": self.name,
+                            "url": self.url,
+                            "status_code": response.status_code,
+                        },
+                    )
                 return response.status_code == 200
-        except Exception:
+        except Exception as e:
+            # Import httpx exceptions if available
+            error_type = type(e).__name__
+            logger.warning(
+                "HTTP health check failed",
+                extra={
+                    "check_name": self.name,
+                    "url": self.url,
+                    "error_type": error_type,
+                },
+            )
             return False
 
 
 class NATSCheck(DependencyCheck):
     """Health check for NATS connection."""
 
-    def __init__(self, nats_url: str, **kwargs):
-        super().__init__("nats", kwargs.get("required", True))
+    def __init__(self, nats_url: str, name: str = "nats", required: bool = True):
+        super().__init__(name, required)
         self.nats_url = nats_url
 
     async def check(self) -> bool:
         nc = None
         try:
             from nats.aio.client import Client as NATS
-            nc = await NATS.connect(self.nats_url, connect_timeout=2)
+        except ImportError:
+            logger.error(
+                "NATS library not installed",
+                extra={"check_name": self.name},
+            )
+            return False
+
+        try:
+            # Correct NATS client instantiation
+            nc = NATS()
+            await nc.connect(self.nats_url, connect_timeout=2)
             return True
-        except Exception:
+        except asyncio.TimeoutError:
+            logger.warning(
+                "NATS health check timed out",
+                extra={"check_name": self.name, "nats_url": self.nats_url},
+            )
+            return False
+        except ConnectionRefusedError:
+            logger.warning(
+                "NATS server not available",
+                extra={"check_name": self.name, "nats_url": self.nats_url},
+            )
+            return False
+        except Exception as e:
+            logger.warning(
+                "NATS health check failed",
+                extra={
+                    "check_name": self.name,
+                    "nats_url": self.nats_url,
+                    "error_type": type(e).__name__,
+                },
+            )
             return False
         finally:
             if nc:
                 try:
                     await nc.close()
-                except Exception:
-                    pass
+                except Exception as close_error:
+                    logger.warning(
+                        "Failed to close NATS connection during health check",
+                        extra={"error_type": type(close_error).__name__},
+                    )
 
 
 class HealthChecker:
     """Health checker with multiple dependency checks."""
 
-    def __init__(self, service_name: str = None):
+    def __init__(self, service_name: Optional[str] = None):
         self.service_name = service_name or os.getenv("SERVICE_NAME", "unknown")
         self.checks: List[DependencyCheck] = []
         self.custom_checks: Dict[str, Callable] = {}
@@ -186,7 +293,17 @@ class HealthChecker:
                     else:
                         some_degraded = True
             except Exception as e:
+                logger.error(
+                    f"Health check '{check.name}' raised exception",
+                    extra={
+                        "check_name": check.name,
+                        "check_required": check.required,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    },
+                )
                 results[check.status_key()] = False
+                results[f"{check.status_key()}_error"] = str(e)
                 if check.required:
                     all_healthy = False
                 else:
@@ -199,8 +316,17 @@ class HealthChecker:
                 results[name] = bool(result)
                 if not result:
                     all_healthy = False
-            except Exception:
+            except Exception as e:
+                logger.error(
+                    f"Custom health check '{name}' failed",
+                    extra={
+                        "check_name": name,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    },
+                )
                 results[name] = False
+                results[f"{name}_error"] = str(e)
                 all_healthy = False
 
         # Determine overall status
