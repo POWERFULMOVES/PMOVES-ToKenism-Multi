@@ -38,18 +38,39 @@ NATS Subject: services.announce.v1
 Message Format: JSON with slug, name, url, health_check, tier, port, timestamp, metadata
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
+import logging
 import os
+import warnings
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
+
+# Configure module logger
+logger = logging.getLogger(__name__)
+
+__all__ = [
+    "ServiceTier",
+    "ServiceAnnouncement",
+    "ServiceAnnouncer",
+    "BackgroundAnnouncer",
+    "announce_service",
+]
 
 
 # Import ServiceTier from shared types if available, otherwise define locally
 try:
     from pmoves_common import ServiceTier
 except ImportError:
+    warnings.warn(
+        "pmoves_common not available, using local ServiceTier definition. "
+        "Install pmoves_common for consistency.",
+        ImportWarning,
+        stacklevel=2,
+    )
     from enum import Enum
 
     class ServiceTier(str, Enum):
@@ -98,10 +119,29 @@ class ServiceAnnouncement:
         return json.dumps(data)
 
     @classmethod
-    def from_json(cls, data: str | dict) -> "ServiceAnnouncement":
-        """Parse from JSON message."""
+    def from_json(cls, data: Union[str, dict]) -> "ServiceAnnouncement":
+        """Parse from JSON message.
+
+        Args:
+            data: JSON string or dictionary
+
+        Returns:
+            ServiceAnnouncement instance
+
+        Raises:
+            ValueError: If JSON is invalid or required fields are missing
+        """
         if isinstance(data, str):
-            data = json.loads(data)
+            try:
+                data = json.loads(data)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON in service announcement: {e}") from e
+
+        required_fields = ["slug", "name", "url", "health_check", "tier", "port"]
+        missing = [f for f in required_fields if f not in data]
+        if missing:
+            raise ValueError(f"Service announcement missing required fields: {missing}")
+
         return cls(
             slug=data["slug"],
             name=data["name"],
@@ -127,10 +167,10 @@ class ServiceAnnouncer:
         name: str,
         url: str,
         port: int,
-        tier: ServiceTier | str,
-        health_check: str = None,
-        nats_url: str = None,
-        metadata: Dict[str, Any] = None,
+        tier: Union[ServiceTier, str],
+        health_check: Optional[str] = None,
+        nats_url: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the service announcer.
@@ -145,13 +185,27 @@ class ServiceAnnouncer:
             nats_url: NATS server URL (defaults to NATS_URL env var)
             metadata: Additional service metadata
         """
+        # Input validation
+        if not slug or not isinstance(slug, str):
+            raise ValueError(f"slug must be a non-empty string, got: {slug!r}")
+        if not name or not isinstance(name, str):
+            raise ValueError(f"name must be a non-empty string, got: {name!r}")
+        if not url or not isinstance(url, str):
+            raise ValueError(f"url must be a non-empty string, got: {url!r}")
+        if not isinstance(port, int) or port < 1 or port > 65535:
+            raise ValueError(f"port must be an integer 1-65535, got: {port!r}")
+
         self.slug = slug
         self.name = name
         self.url = url
         self.port = port
 
         if isinstance(tier, str):
-            tier = ServiceTier(tier.lower())
+            try:
+                tier = ServiceTier(tier.lower())
+            except ValueError:
+                valid_tiers = [t.value for t in ServiceTier]
+                raise ValueError(f"Invalid tier '{tier}'. Must be one of: {valid_tiers}")
         self.tier = tier
 
         self.health_check = health_check or f"{url.rstrip('/')}/healthz"
@@ -178,23 +232,59 @@ class ServiceAnnouncer:
         Returns:
             True if announcement published successfully
         """
+        nc = None
         try:
             from nats.aio.client import Client as NATS
+        except ImportError as e:
+            logger.error(
+                "NATS library not installed",
+                extra={"service_slug": self.slug, "error": str(e)},
+            )
+            raise
 
+        try:
             announcement = self.create_announcement()
 
-            nc = await NATS.connect(self.nats_url, connect_timeout=5)
+            # Correct NATS client instantiation
+            nc = NATS()
+            await nc.connect(self.nats_url, connect_timeout=5)
             await nc.publish(
                 ServiceAnnouncement.SUBJECT,
                 announcement.to_json().encode(),
             )
             await nc.flush()
-            await nc.close()
-
+            logger.debug(
+                "Service announced successfully",
+                extra={"service_slug": self.slug, "nats_url": self.nats_url},
+            )
             return True
-        except Exception as e:
-            print(f"Failed to announce service: {e}")
+        except asyncio.TimeoutError:
+            logger.error(
+                "NATS connection timed out",
+                extra={"service_slug": self.slug, "nats_url": self.nats_url},
+            )
             return False
+        except ConnectionRefusedError:
+            logger.error(
+                "NATS server not available",
+                extra={"service_slug": self.slug, "nats_url": self.nats_url},
+            )
+            return False
+        except Exception as e:
+            logger.error(
+                "Failed to announce service",
+                extra={"service_slug": self.slug, "error": str(e), "error_type": type(e).__name__},
+            )
+            return False
+        finally:
+            if nc and nc.is_connected:
+                try:
+                    await nc.close()
+                except Exception as close_error:
+                    logger.warning(
+                        "Failed to close NATS connection",
+                        extra={"error": str(close_error)},
+                    )
 
     async def announce_with_retry(
         self, max_retries: int = 3, delay: float = 1.0
@@ -222,10 +312,10 @@ async def announce_service(
     name: str,
     url: str,
     port: int,
-    tier: ServiceTier | str,
-    health_check: str = None,
-    nats_url: str = None,
-    metadata: Dict[str, Any] = None,
+    tier: Union[ServiceTier, str],
+    health_check: Optional[str] = None,
+    nats_url: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> bool:
     """
     Convenience function to announce a service.
@@ -292,8 +382,33 @@ class BackgroundAnnouncer:
 
     async def _announce_loop(self):
         """Internal announcement loop."""
+        consecutive_failures = 0
         while self._running:
-            await self.announcer.announce()
+            success = await self.announcer.announce()
+            if not success:
+                consecutive_failures += 1
+                logger.warning(
+                    "Service announcement failed",
+                    extra={
+                        "service_slug": self.announcer.slug,
+                        "consecutive_failures": consecutive_failures,
+                    },
+                )
+                if consecutive_failures >= 5:
+                    logger.error(
+                        "Service announcement repeatedly failing",
+                        extra={
+                            "service_slug": self.announcer.slug,
+                            "consecutive_failures": consecutive_failures,
+                        },
+                    )
+            else:
+                if consecutive_failures > 0:
+                    logger.info(
+                        "Service announcement recovered",
+                        extra={"service_slug": self.announcer.slug},
+                    )
+                consecutive_failures = 0
             await asyncio.sleep(self.interval)
 
     async def start(self):

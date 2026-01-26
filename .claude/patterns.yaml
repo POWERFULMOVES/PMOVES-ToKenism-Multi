@@ -1,0 +1,83 @@
+# PMOVES-ToKenism-Multi Safety Patterns
+# Based on BoTZ Defense in Depth doctrine
+
+# Commands that are ALWAYS blocked (deterministic hooks)
+block:
+  - pattern: "rm -rf /"
+    reason: "Prevent root directory deletion"
+  - pattern: "rm -rf /*"
+    reason: "Prevent root deletion variant"
+  - pattern: "DROP TABLE"
+    reason: "Prevent catastrophic data loss"
+  - pattern: "DROP DATABASE"
+    reason: "Prevent database destruction"
+  - pattern: "git push --force origin main"
+    reason: "Prevent force push to main"
+  - pattern: "git push --force origin PMOVES.AI-Edition-Hardened"
+    reason: "Prevent force push to hardened branch"
+  - pattern: "chmod 777"
+    reason: "Prevent insecure permissions"
+  - pattern: "> /dev/sda"
+    reason: "Prevent disk overwrite"
+
+# Commands that require human confirmation (probabilistic hooks)
+ask:
+  - pattern: "git push"
+    reason: "Verify push target and content"
+  - pattern: "docker-compose down"
+    reason: "Confirm service shutdown"
+  - pattern: "docker system prune"
+    reason: "Confirm container cleanup"
+  - pattern: "npm publish"
+    reason: "Verify package publication"
+  - pattern: "pip install"
+    reason: "Verify package authenticity"
+  - pattern: "DELETE FROM"
+    reason: "Confirm data deletion"
+  - pattern: "TRUNCATE"
+    reason: "Confirm table truncation"
+  - pattern: "git reset --hard"
+    reason: "Confirm destructive reset"
+  - pattern: "gh pr merge"
+    reason: "Confirm PR merge"
+
+# Path-based protections
+paths:
+  # Read-only paths (no modifications allowed)
+  read_only:
+    - ".env"
+    - ".env.*"
+    - "secrets_manifest*.yaml"
+    - "*.pem"
+    - "*.key"
+    - "**/credentials.json"
+
+  # Protected from deletion
+  no_delete:
+    - "pmoves_*/**"
+    - "pmoves-nextjs/src/**"
+    - "integrations/**"
+    - ".git/**"
+    - "chit/**"
+    - "agents/**"
+    - "CLAUDE.md"
+
+  # Files that should never be committed
+  no_commit:
+    - ".env"
+    - ".env.local"
+    - "*.pem"
+    - "*.key"
+    - "**/node_modules/**"
+    - "**/__pycache__/**"
+
+# Audit logging for sensitive operations
+audit:
+  - pattern: "docker exec"
+    level: "info"
+  - pattern: "git commit"
+    level: "info"
+  - pattern: "npm run build"
+    level: "info"
+  - pattern: "pytest"
+    level: "info"
