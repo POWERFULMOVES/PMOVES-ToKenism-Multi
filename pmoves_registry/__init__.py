@@ -31,16 +31,39 @@ Environment Variables:
     {SERVICE_SLUG}_URL (e.g., HIRAG_V2_URL=http://hirag-v2:8086)
 """
 
+from __future__ import annotations
+
 import asyncio
+import logging
 import os
+import warnings
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, Union
+
+# Configure module logger
+logger = logging.getLogger(__name__)
+
+__all__ = [
+    "ServiceTier",
+    "ServiceInfo",
+    "ServiceNotFoundError",
+    "CommonServices",
+    "get_service_url",
+    "get_service_info",
+    "check_service_health",
+]
 
 
 # Import ServiceTier from shared types if available, otherwise define locally
 try:
     from pmoves_common import ServiceTier
 except ImportError:
+    warnings.warn(
+        "pmoves_common not available, using local ServiceTier definition. "
+        "Install pmoves_common for consistency.",
+        ImportWarning,
+        stacklevel=2,
+    )
     from enum import Enum
 
     class ServiceTier(str, Enum):
@@ -73,9 +96,9 @@ class ServiceInfo:
     name: str
     description: str
     health_check_url: str
-    default_port: int | None
+    default_port: Optional[int]
     tier: ServiceTier
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict = field(default_factory=dict)
 
     @property
     def base_url(self) -> str:
@@ -91,12 +114,12 @@ class ServiceInfo:
 class ServiceNotFoundError(Exception):
     """Raised when a service cannot be found."""
 
-    def __init__(self, slug: str, message: str | None = None):
+    def __init__(self, slug: str, message: Optional[str] = None):
         self.slug = slug
         super().__init__(message or f"Service '{slug}' not found in service catalog")
 
 
-def _get_env_url(slug: str) -> str | None:
+def _get_env_url(slug: str) -> Optional[str]:
     """
     Check for environment variable override.
 
@@ -171,8 +194,15 @@ async def get_service_info(
             tier=ServiceTier.API,  # Default tier
         )
 
-    # 2. Fallback to DNS-based URL
+    # 2. Fallback to DNS-based URL (with warning)
     fallback_url = _fallback_dns_url(slug, default_port)
+    logger.warning(
+        f"Service '{slug}' not found in environment, using DNS fallback",
+        extra={
+            "service_slug": slug,
+            "fallback_url": fallback_url,
+        },
+    )
     return ServiceInfo(
         slug=slug,
         name=f"{slug} (fallback)",
@@ -232,8 +262,25 @@ async def check_service_health(
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(info.health_check_url)
+            if response.status_code != 200:
+                logger.warning(
+                    "Service health check returned non-200",
+                    extra={
+                        "service_slug": slug,
+                        "url": info.health_check_url,
+                        "status_code": response.status_code,
+                    },
+                )
             return response.status_code == 200
-    except Exception:
+    except Exception as e:
+        logger.warning(
+            "Service health check failed",
+            extra={
+                "service_slug": slug,
+                "url": info.health_check_url,
+                "error_type": type(e).__name__,
+            },
+        )
         return False
 
 
@@ -264,9 +311,29 @@ class CommonServices:
     NATS = "nats://nats:4222"
 
     @classmethod
-    def get(cls, service: str) -> str:
-        """Get a common service URL by name."""
-        return getattr(cls, service.upper(), None)
+    def get(cls, service: str) -> Optional[str]:
+        """Get a common service URL by name.
+
+        Args:
+            service: Service name (case-insensitive)
+
+        Returns:
+            Service URL or None if not found
+
+        Note:
+            Logs a warning if service is not found.
+        """
+        url = getattr(cls, service.upper(), None)
+        if url is None:
+            available = [
+                name for name in dir(cls)
+                if not name.startswith('_') and name.isupper() and name != 'get'
+            ]
+            logger.warning(
+                f"Unknown service '{service}' requested from CommonServices",
+                extra={"available_services": available},
+            )
+        return url
 
 
 if __name__ == "__main__":
