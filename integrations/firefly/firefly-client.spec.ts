@@ -12,9 +12,7 @@ describe('FireflyClient exportTransactionsCSV', () => {
     status: 200,
     statusText: 'OK',
     headers: {},
-    config: {
-      headers: {} as any,
-    } as any,
+    config: {},
   });
 
   beforeEach(() => {
