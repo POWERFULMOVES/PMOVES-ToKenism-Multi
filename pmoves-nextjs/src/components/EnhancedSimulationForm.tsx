@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import type { SimulationParams } from '@/lib/simulation/types';
 import { formatCurrency, formatPercentage } from '@/lib/utils/formatters';
 import { ModelExplanation } from './ModelExplanation';
 import { ExpectedBenefits } from './ui/expected-benefits';
+import { useMemoizedCallback } from '@/hooks/useMemoizedCallback';
 
 // Preview charts
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -27,7 +28,7 @@ interface EnhancedSimulationFormProps {
   showPreview?: boolean;
 }
 
-export function EnhancedSimulationForm({
+export const EnhancedSimulationForm = memo(function EnhancedSimulationForm({
   params,
   onParamsChange,
   onSubmit,
@@ -41,6 +42,8 @@ export function EnhancedSimulationForm({
     week: number;
     wealthA: number;
     wealthB: number;
+    usdB: number;
+    grotokenValueUSD: number;
   }
 
   const [previewData, setPreviewData] = useState<PreviewDataPoint[]>([]);
@@ -51,41 +54,7 @@ export function EnhancedSimulationForm({
   }, [params]);
 
   // Generate preview data when parameters change
-  useEffect(() => {
-    generatePreviewData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localParams]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type } = e.target;
-    const parsedValue = type === 'number' ? Number.parseFloat(value) : value;
-
-    setLocalParams((prev) => ({
-      ...prev,
-      [name]: parsedValue,
-    }));
-  };
-
-  const handleSliderChange = (name: string, value: number[]) => {
-    setLocalParams((prev) => ({
-      ...prev,
-      [name]: value[0],
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Update global params with local params
-    onParamsChange(localParams);
-    onSubmit();
-  };
-
-  const handleReset = () => {
-    onReset();
-  };
-
-  // Generate simple preview data based on current parameters
-  const generatePreviewData = () => {
+  const generatePreviewData = useCallback(() => {
     const weeks = Math.min(52, localParams.SIMULATION_WEEKS); // Use simulation weeks but cap at 52 for preview
     const data = [];
 
@@ -138,7 +107,41 @@ export function EnhancedSimulationForm({
     }
 
     setPreviewData(data);
+  }, [localParams]);
+
+  // Generate preview data when parameters change
+  useEffect(() => {
+    generatePreviewData();
+  }, [generatePreviewData]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type } = e.target;
+    const parsedValue = type === 'number' ? Number.parseFloat(value) : value;
+
+    setLocalParams((prev) => ({
+      ...prev,
+      [name]: parsedValue,
+    } as SimulationParams));
   };
+
+  const handleSliderChange = (name: string, value: number[]) => {
+    setLocalParams((prev) => ({
+      ...prev,
+      [name]: value[0],
+    } as SimulationParams));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // Update global params with local params
+    onParamsChange(localParams);
+    onSubmit();
+  };
+
+  const handleReset = () => {
+    onReset();
+  };
+
 
   return (
     <TooltipProvider>
@@ -176,7 +179,13 @@ export function EnhancedSimulationForm({
                               Number of Members
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
+                                  <button
+                                    type="button"
+                                    aria-label="More information about number of members"
+                                    className="ml-1 text-muted-foreground cursor-help"
+                                  >
+                                    <InfoCircledIcon className="h-4 w-4" />
+                                  </button>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   <p className="max-w-xs">Total number of participants in the simulation. Larger communities may show different dynamics.</p>
@@ -192,6 +201,7 @@ export function EnhancedSimulationForm({
                             step={10}
                             value={[localParams.NUM_MEMBERS]}
                             onValueChange={(value) => handleSliderChange('NUM_MEMBERS', value)}
+                            aria-describedby="num-members-tooltip"
                           />
                         </div>
 
@@ -591,4 +601,4 @@ export function EnhancedSimulationForm({
       </div>
     </TooltipProvider>
   );
-}
+});

@@ -20,51 +20,51 @@ export async function GET(request: NextRequest) {
 
     // Calculate health score based on multiple factors
     const healthScore = (
-      (1 - latestMetrics.PovertyRate_B) * 0.4 + // Lower poverty = higher health
-      latestMetrics.SocialSafetyNet * 0.3 + // Better safety net = higher health
-      latestMetrics.CommunityResilience * 0.3 // Higher resilience = higher health
+      (1 - (latestMetrics.PovertyRate_B as number || 0)) * 0.4 + // Lower poverty = higher health
+      (latestMetrics.SocialSafetyNet as number || 0) * 0.3 + // Better safety net = higher health
+      (latestMetrics.CommunityResilience as number || 0) * 0.3 // Higher resilience = higher health
     );
 
     // Calculate market efficiency
     const marketEfficiency = (
-      latestMetrics.EconomicVelocity * 0.5 + // Higher velocity = more efficient
-      latestMetrics.MarketEfficiency * 0.3 + // Direct efficiency measure
-      (1 - Math.min(0.5, latestMetrics.Gini_B)) * 0.2 // Lower inequality = more efficient, capped
+      (latestMetrics.EconomicVelocity as number || 0) * 0.5 + // Higher velocity = more efficient
+      (latestMetrics.MarketEfficiency as number || 0) * 0.3 + // Direct efficiency measure
+      (1 - Math.min(0.5, latestMetrics.Gini_B as number || 0)) * 0.2 // Lower inequality = more efficient, capped
     );
 
     // Calculate resilience score
     const resilienceScore = (
-      latestMetrics.RiskResilience * 0.4 + // Direct resilience measure
-      latestMetrics.CommunityResilience * 0.3 + // Community resilience
-      latestMetrics.SocialSafetyNet * 0.3 // Safety net contributes to resilience
+      (latestMetrics.RiskResilience as number || 0) * 0.4 + // Direct resilience measure
+      (latestMetrics.CommunityResilience as number || 0) * 0.3 + // Community resilience
+      (latestMetrics.SocialSafetyNet as number || 0) * 0.3 // Safety net contributes to resilience
     );
 
     // Calculate growth rate
-    const growthRate = earlierMetrics.AvgWealth_B > 0 ?
-      (latestMetrics.AvgWealth_B - earlierMetrics.AvgWealth_B) / earlierMetrics.AvgWealth_B / (simulationResults.history.length - midPoint) * 52 : // Annualized
+    const growthRate = (earlierMetrics.AvgWealth_B as number || 0) > 0 ?
+      ((latestMetrics.AvgWealth_B as number || 0) - (earlierMetrics.AvgWealth_B as number || 0)) / (earlierMetrics.AvgWealth_B as number || 1) / (simulationResults.history.length - midPoint) * 52 : // Annualized
       0;
 
     // Calculate trends
-    const healthTrend = earlierMetrics.CommunityResilience > 0 ?
-      (latestMetrics.CommunityResilience - earlierMetrics.CommunityResilience) / earlierMetrics.CommunityResilience :
+    const healthTrend = (earlierMetrics.CommunityResilience as number || 0) > 0 ?
+      ((latestMetrics.CommunityResilience as number || 0) - (earlierMetrics.CommunityResilience as number || 0)) / (earlierMetrics.CommunityResilience as number || 1) :
       0;
 
-    const efficiencyTrend = earlierMetrics.EconomicVelocity > 0 ?
-      (latestMetrics.EconomicVelocity - earlierMetrics.EconomicVelocity) / earlierMetrics.EconomicVelocity :
+    const efficiencyTrend = (earlierMetrics.EconomicVelocity as number || 0) > 0 ?
+      ((latestMetrics.EconomicVelocity as number || 0) - (earlierMetrics.EconomicVelocity as number || 0)) / (earlierMetrics.EconomicVelocity as number || 1) :
       0;
 
-    const resilienceTrend = earlierMetrics.RiskResilience > 0 ?
-      (latestMetrics.RiskResilience - earlierMetrics.RiskResilience) / earlierMetrics.RiskResilience :
+    const resilienceTrend = (earlierMetrics.RiskResilience as number || 0) > 0 ?
+      ((latestMetrics.RiskResilience as number || 0) - (earlierMetrics.RiskResilience as number || 0)) / (earlierMetrics.RiskResilience as number || 1) :
       0;
 
     // Generate warnings based on actual metrics
     const warnings = [];
 
-    if (latestMetrics.Gini_B > 0.4) {
+    if ((latestMetrics.Gini_B as number || 0) > 0.4) {
       warnings.push('Moderate inequality detected');
     }
 
-    if (latestMetrics.PovertyRate_B > 0.15) {
+    if ((latestMetrics.PovertyRate_B as number || 0) > 0.15) {
       warnings.push('Elevated poverty rate');
     }
 
@@ -76,15 +76,15 @@ export async function GET(request: NextRequest) {
     const recommendations = [];
 
     // Check if internal spending (LocalEconomyStrength) is low
-    if (latestMetrics.LocalEconomyStrength < 0.5) {
+    if ((latestMetrics.LocalEconomyStrength as number || 0) < 0.5) {
       recommendations.push('Consider increasing internal spending');
     }
 
-    if (latestMetrics.Gini_B > 0.35) {
+    if ((latestMetrics.Gini_B as number || 0) > 0.35) {
       recommendations.push('Implement wealth redistribution mechanisms');
     }
 
-    if (latestMetrics.RiskResilience < 0.7) {
+    if ((latestMetrics.RiskResilience as number || 0) < 0.7) {
       recommendations.push('Build emergency reserves');
     }
 

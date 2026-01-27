@@ -8,14 +8,14 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
-interface WaterfallDataPoint {
+export interface WaterfallDataPoint {
   category: string;
   value: number;
   isTotal?: boolean;
   color?: string;
 }
 
-interface WaterfallChartProps {
+export interface WaterfallChartProps {
   data: WaterfallDataPoint[];
   title?: string;
   description?: string;

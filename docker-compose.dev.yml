@@ -13,4 +13,5 @@ services:
       - FLASK_ENV=development
       - FLASK_DEBUG=True
     restart: unless-stopped
+    entrypoint: []
     command: python flask_backend.py

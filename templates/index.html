@@ -561,7 +561,50 @@
                  if (element) element.textContent = text;
              };
 
-             updateElement('healthRadar', 'Requires Radar Chart JS Lib');
+             const healthRadarDiv = document.getElementById('healthRadar');
+             if (healthRadarDiv) {
+                 healthRadarDiv.innerHTML = '<canvas id="healthRadarChart"></canvas>';
+                 const radarCtx = document.getElementById('healthRadarChart')?.getContext('2d');
+                 if (radarCtx && final_state) {
+                     const data = {
+                         labels: ['Resilience', 'Safety Net', 'Innovation', 'Sustainability', 'Local Economy'],
+                         datasets: [{
+                             label: 'Community Health',
+                             data: [
+                                 final_state.CommunityResilience ?? 0,
+                                 final_state.SocialSafetyNet ?? 0,
+                                 final_state.InnovationIndex ?? 0,
+                                 final_state.SustainabilityScore ?? 0,
+                                 final_state.LocalEconomyStrength ?? 0
+                             ],
+                             backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                             borderColor: 'rgba(75, 192, 192, 1)',
+                             pointBackgroundColor: 'rgba(75, 192, 192, 1)',
+                             pointBorderColor: '#fff',
+                             pointHoverBackgroundColor: '#fff',
+                             pointHoverBorderColor: 'rgba(75, 192, 192, 1)'
+                         }]
+                     };
+                     chartInstances['healthRadarChart'] = new Chart(radarCtx, {
+                         type: 'radar',
+                         data: data,
+                         options: {
+                             responsive: true,
+                             maintainAspectRatio: false,
+                             scales: {
+                                 r: {
+                                     angleLines: { display: false },
+                                     suggestedMin: 0,
+                                     suggestedMax: 1
+                                 }
+                             },
+                             plugins: {
+                                 legend: { display: false }
+                             }
+                         }
+                     });
+                 }
+             }
              updateElement('wealthPyramid', 'Requires Custom Pyramid Viz');
              updateElement('mobilityMatrix', 'Requires Matrix Viz');
              updateElement('engagementFlow', 'Requires Flow Viz');
@@ -658,7 +701,7 @@
                         { label: config.labelA, data: historyData.map(d => d[config.dataKeyA]), borderColor: config.colorA, backgroundColor: config.colorA.replace(')', ', 0.1)').replace('rgb', 'rgba'), tension: 0.1, borderWidth: 1.5, pointRadius: 0 },
                         { label: config.labelB, data: historyData.map(d => d[config.dataKeyB]), borderColor: config.colorB, backgroundColor: config.colorB.replace(')', ', 0.1)').replace('rgb', 'rgba'), tension: 0.1, borderWidth: 1.5, pointRadius: 0 }
                     ]},
-                    options: { scales: { y: { beginAtZero: true, max: config.yMax, title: { display: true, text: config.yLabel } }, x: { title: { display: true, text: 'Week' } } }, responsive: true, maintainAspectRatio: false, animation: { duration: 300 } }
+                    options: { scales: { y: { beginAtZero: true, max: config.yMax !== undefined ? config.yMax : undefined, title: { display: true, text: config.yLabel } }, x: { title: { display: true, text: 'Week' } } }, responsive: true, maintainAspectRatio: false, animation: { duration: 300 } }
                 });
             });
         }

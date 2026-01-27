@@ -1,0 +1,282 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PMOVES Performance Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .summary-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .score {
+            font-size: 3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .score.good { color: #27ae60; }
+        .score.average { color: #f39c12; }
+        .score.poor { color: #e74c3c; }
+        
+        .metric-label {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .chart-container h3 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        
+        .recommendations {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .recommendation {
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #f39c12;
+            background: #fef9e7;
+        }
+        
+        .recommendation.high {
+            border-left-color: #e74c3c;
+            background: #fadbd8;
+        }
+        
+        .recommendation h4 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .recommendation ul {
+            margin-left: 20px;
+        }
+        
+        .timestamp {
+            text-align: center;
+            color: #7f8c8d;
+            margin-top: 30px;
+        }
+        
+        .device-toggle {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .device-toggle button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .device-toggle button:hover {
+            background: #2980b9;
+        }
+        
+        .device-toggle button.active {
+            background: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 PMOVES Performance Dashboard</h1>
+            <p>Performance monitoring for the PMOVES Token Simulator</p>
+            <p><strong>Last Updated:</strong> 11/10/2025, 2:14:29 AM</p>
+        </div>
+        
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="score poor">41</div>
+                <div class="metric-label">Desktop Performance</div>
+            </div>
+            <div class="summary-card">
+                <div class="score poor">48</div>
+                <div class="metric-label">Desktop Accessibility</div>
+            </div>
+            <div class="summary-card">
+                <div class="score poor">37</div>
+                <div class="metric-label">Mobile Performance</div>
+            </div>
+            <div class="summary-card">
+                <div class="score poor">48</div>
+                <div class="metric-label">Mobile Accessibility</div>
+            </div>
+        </div>
+        
+        <div class="device-toggle">
+            <button onclick="showDevice('desktop')" class="active" id="desktop-btn">Desktop</button>
+            <button onclick="showDevice('mobile')" id="mobile-btn">Mobile</button>
+        </div>
+        
+        <div class="chart-container">
+            <h3>Performance Trends</h3>
+            <canvas id="trendsChart" width="400" height="200"></canvas>
+        </div>
+        
+        <div class="recommendations">
+            <h3>📋 Recommendations</h3>
+            
+                <div class="recommendation high">
+                    <h4>Desktop performance is 81/100. Target: 90+</h4>
+                    <ul>
+                        <li>Optimize images and use modern formats</li><li>Implement code splitting</li><li>Reduce JavaScript bundle size</li><li>Optimize critical rendering path</li>
+                    </ul>
+                </div>
+            
+                <div class="recommendation high">
+                    <h4>Mobile performance is 73/100. Target: 85+</h4>
+                    <ul>
+                        <li>Implement mobile-first loading strategies</li><li>Reduce server response time</li><li>Enable text compression</li><li>Optimize for mobile network conditions</li>
+                    </ul>
+                </div>
+            
+        </div>
+        
+        <div class="timestamp">
+            <p>Generated on 11/10/2025, 2:14:29 AM</p>
+            <p>Total audits: 2</p>
+        </div>
+    </div>
+    
+    <script>
+        const data = {"summary":{"totalAudits":2,"dateRange":{"start":"2025-11-10T07:02:27.298Z","end":"2025-11-10T07:05:28.193Z"},"averageScores":{"desktop":{"performance":41,"accessibility":48,"bestPractices":50,"seo":50},"mobile":{"performance":37,"accessibility":48,"bestPractices":50,"seo":50}}},"trends":{"desktop":{"performance":[{"date":"11/10/2025","score":0},{"date":"11/10/2025","score":81}],"accessibility":[{"date":"11/10/2025","score":0},{"date":"11/10/2025","score":96}],"bestPractices":[{"date":"11/10/2025","score":0},{"date":"11/10/2025","score":100}],"seo":[{"date":"11/10/2025","score":0},{"date":"11/10/2025","score":100}]},"mobile":{"performance":[{"date":"11/10/2025","score":0},{"date":"11/10/2025","score":73}],"accessibility":[{"date":"11/10/2025","score":0},{"date":"11/10/2025","score":96}],"bestPractices":[{"date":"11/10/2025","score":0},{"date":"11/10/2025","score":100}],"seo":[{"date":"11/10/2025","score":0},{"date":"11/10/2025","score":100}]}},"recent":[{"filename":"audit-summary-2025-11-10T07-05-53-901Z.json","timestamp":"2025-11-10T07:05:28.193Z","url":"http://localhost:3000","results":{"timestamp":"2025-11-10T07:05:28.193Z","url":"http://localhost:3000","desktop":{"jsonPath":"c:\\Users\\russe\\Documents\\GitHub\\PMOVEStokensim\\pmoves-nextjs\\lighthouse-results\\lighthouse-report-desktop-2025-11-10T07-05-42-245Z.json","htmlPath":"c:\\Users\\russe\\Documents\\GitHub\\PMOVEStokensim\\pmoves-nextjs\\lighthouse-results\\lighthouse-report-desktop-2025-11-10T07-05-42-245Z.html","scores":{"performance":81,"accessibility":96,"bestPractices":100,"seo":100,"overall":94}},"mobile":{"jsonPath":"c:\\Users\\russe\\Documents\\GitHub\\PMOVEStokensim\\pmoves-nextjs\\lighthouse-results\\lighthouse-report-mobile-2025-11-10T07-05-53-896Z.json","htmlPath":"c:\\Users\\russe\\Documents\\GitHub\\PMOVEStokensim\\pmoves-nextjs\\lighthouse-results\\lighthouse-report-mobile-2025-11-10T07-05-53-896Z.html","scores":{"performance":73,"accessibility":96,"bestPractices":100,"seo":100,"overall":92}}}},{"filename":"audit-summary-2025-11-10T07-02-50-906Z.json","timestamp":"2025-11-10T07:02:27.298Z","url":"http://localhost:3000","results":{"timestamp":"2025-11-10T07:02:27.298Z","url":"http://localhost:3000","desktop":{"jsonPath":"c:\\Users\\russe\\Documents\\GitHub\\PMOVEStokensim\\pmoves-nextjs\\lighthouse-results\\lighthouse-report-desktop-2025-11-10T07-02-43-438Z.json","htmlPath":"c:\\Users\\russe\\Documents\\GitHub\\PMOVEStokensim\\pmoves-nextjs\\lighthouse-results\\lighthouse-report-desktop-2025-11-10T07-02-43-438Z.html","scores":{"performance":0,"accessibility":0,"bestPractices":0,"seo":0,"overall":0}},"mobile":{"jsonPath":"c:\\Users\\russe\\Documents\\GitHub\\PMOVEStokensim\\pmoves-nextjs\\lighthouse-results\\lighthouse-report-mobile-2025-11-10T07-02-50-902Z.json","htmlPath":"c:\\Users\\russe\\Documents\\GitHub\\PMOVEStokensim\\pmoves-nextjs\\lighthouse-results\\lighthouse-report-mobile-2025-11-10T07-02-50-902Z.html","scores":{"performance":0,"accessibility":0,"bestPractices":0,"seo":0,"overall":0}}}}],"recommendations":[{"priority":"high","category":"desktop-performance","message":"Desktop performance is 81/100. Target: 90+","suggestions":["Optimize images and use modern formats","Implement code splitting","Reduce JavaScript bundle size","Optimize critical rendering path"]},{"priority":"high","category":"mobile-performance","message":"Mobile performance is 73/100. Target: 85+","suggestions":["Implement mobile-first loading strategies","Reduce server response time","Enable text compression","Optimize for mobile network conditions"]}],"performance":[]};
+        let currentDevice = 'desktop';
+        let trendsChart;
+        
+        function showDevice(device) {
+            currentDevice = device;
+            document.getElementById('desktop-btn').classList.toggle('active', device === 'desktop');
+            document.getElementById('mobile-btn').classList.toggle('active', device === 'mobile');
+            updateTrendsChart();
+        }
+        
+        function updateTrendsChart() {
+            const ctx = document.getElementById('trendsChart').getContext('2d');
+            
+            if (trendsChart) {
+                trendsChart.destroy();
+            }
+            
+            const trends = data.trends[currentDevice];
+            const labels = trends.performance.map(p => p.date);
+            
+            trendsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Performance',
+                            data: trends.performance.map(p => p.score),
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Accessibility',
+                            data: trends.accessibility.map(p => p.score),
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Best Practices',
+                            data: trends.bestPractices.map(p => p.score),
+                            borderColor: '#27ae60',
+                            backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'SEO',
+                            data: trends.seo.map(p => p.score),
+                            borderColor: '#f39c12',
+                            backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Initialize chart
+        updateTrendsChart();
+    </script>
+</body>
+</html>

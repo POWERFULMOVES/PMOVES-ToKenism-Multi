@@ -133,7 +133,7 @@ export default function Home() {
           {results ? (
             <div className="grid grid-cols-1 gap-6">
               <ComparisonResults results={results} />
-              <SimulationResults results={results} presetName={presetName} simulationParams={params} />
+              <SimulationResults results={results} presetName={presetName} simulationParams={params as Record<string, number>} />
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-64 p-12 text-center border rounded-lg border-dashed">

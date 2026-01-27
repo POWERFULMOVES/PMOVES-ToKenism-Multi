@@ -6,10 +6,8 @@
 // Heatmap
 export {
   HeatmapChart,
-  matrixToHeatmapData,
-  correlationMatrixToHeatmap,
 } from './HeatmapChart';
-export type { HeatmapData, HeatmapChartProps } from './HeatmapChart';
+export type { HeatmapChartProps } from './HeatmapChart';
 
 // Violin Plot
 export {

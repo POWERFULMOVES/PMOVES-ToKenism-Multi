@@ -1,80 +1,47 @@
 /**
  * Heatmap Chart Component
- * Displays parameter sensitivity or correlation matrices
+ * Displays parameter sensitivity analysis in a heatmap format
  */
 
 'use client';
 
 import React from 'react';
-import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, Cell, CartesianGrid } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ResponsiveContainer } from 'recharts';
 
-interface HeatmapData {
-  x: string | number;
-  y: string | number;
-  value: number;
-  label?: string;
-}
-
-interface HeatmapChartProps {
-  data: HeatmapData[];
+export interface HeatmapChartProps {
+  data: Array<{
+    parameter: string;
+    value: number;
+    impact: 'low' | 'medium' | 'high';
+  }>;
   title?: string;
-  description?: string;
-  xLabel?: string;
-  yLabel?: string;
-  colorScale?: 'sequential' | 'diverging';
-  valueRange?: [number, number];
+  height?: number;
+  className?: string;
 }
 
-export function HeatmapChart({
-  data,
-  title = "Heatmap",
-  description,
-  xLabel = "X Axis",
-  yLabel = "Y Axis",
-  colorScale = 'sequential',
-  valueRange,
+export function HeatmapChart({ 
+  data, 
+  title = "Parameter Sensitivity", 
+  height = 400,
+  className 
 }: HeatmapChartProps) {
-  // Get unique x and y values
-  const xValues = Array.from(new Set(data.map(d => d.x))).sort();
-  const yValues = Array.from(new Set(data.map(d => d.y))).sort();
-
-  // Calculate value range if not provided
-  const values = data.map(d => d.value);
-  const minValue = valueRange ? valueRange[0] : Math.min(...values);
-  const maxValue = valueRange ? valueRange[1] : Math.max(...values);
-  const valueSpan = maxValue - minValue;
-
-  // Color scale function
-  const getColor = (value: number): string => {
-    if (colorScale === 'diverging') {
-      // Diverging scale: blue (negative) → white (0) → red (positive)
-      const normalized = (value - minValue) / valueSpan;
-      if (normalized < 0.5) {
-        // Blue to white
-        const intensity = Math.round((1 - normalized * 2) * 255);
-        return `rgb(${intensity}, ${intensity}, 255)`;
-      } else {
-        // White to red
-        const intensity = Math.round((1 - (normalized - 0.5) * 2) * 255);
-        return `rgb(255, ${intensity}, ${intensity})`;
-      }
-    } else {
-      // Sequential scale: light blue → dark blue
-      const normalized = (value - minValue) / valueSpan;
-      const intensity = Math.round((1 - normalized) * 200 + 55);
-      return `rgb(${intensity}, ${intensity}, 255)`;
+  const getColor = (impact: string) => {
+    switch (impact) {
+      case 'high': return '#ef4444';
+      case 'medium': return '#f59e0b';
+      case 'low': return '#22c55e';
+      default: return '#e5e7eb';
     }
   };
 
-  // Custom tooltip
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-white dark:bg-gray-800 p-3 border border-gray-300 dark:border-gray-600 rounded shadow-lg">
-          <p className="font-semibold">{data.label || `${data.x} × ${data.y}`}</p>
-          <p className="text-sm">Value: {data.value.toFixed(4)}</p>
+        <div className="bg-background border border-border rounded-md p-3 shadow-lg">
+          <p className="font-medium">{data.parameter}</p>
+          <p className="text-sm text-muted-foreground">Impact: {data.impact}</p>
+          <p className="text-sm">Value: {data.value.toFixed(2)}</p>
         </div>
       );
     }
@@ -82,113 +49,55 @@ export function HeatmapChart({
   };
 
   return (
-    <Card>
-      {(title || description) && (
-        <CardHeader>
-          {title && <CardTitle>{title}</CardTitle>}
-          {description && <CardDescription>{description}</CardDescription>}
-        </CardHeader>
+    <div className={className}>
+      {title && (
+        <h3 className="text-lg font-semibold mb-4">{title}</h3>
       )}
-      <CardContent>
-        <ResponsiveContainer width="100%" height={400}>
-          <ScatterChart
-            margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              type="category"
-              dataKey="x"
-              name={xLabel}
-              angle={-45}
-              textAnchor="end"
-              height={60}
-            />
-            <YAxis
-              type="category"
-              dataKey="y"
-              name={yLabel}
-              width={60}
-            />
-            <ZAxis type="number" dataKey="value" range={[400, 400]} />
-            <Tooltip content={<CustomTooltip />} />
-            <Scatter data={data} shape="square">
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={getColor(entry.value)} />
-              ))}
-            </Scatter>
-          </ScatterChart>
-        </ResponsiveContainer>
-
-        {/* Legend */}
-        <div className="mt-4 flex items-center justify-center gap-4">
-          <span className="text-sm text-muted-foreground">Low</span>
-          <div className="flex gap-1">
-            {Array.from({ length: 10 }, (_, i) => {
-              const value = minValue + (i / 9) * valueSpan;
-              return (
-                <div
-                  key={i}
-                  className="w-8 h-4"
-                  style={{ backgroundColor: getColor(value) }}
-                  title={value.toFixed(2)}
-                />
-              );
-            })}
+      <div 
+        className="grid gap-1 p-4 bg-card rounded-lg border"
+        style={{ 
+          height: `${height}px`,
+          gridTemplateColumns: `repeat(${Math.ceil(Math.sqrt(data.length))}, 1fr)`
+        }}
+      >
+        {data.map((item, index) => (
+          <div
+            key={index}
+            className="relative group cursor-pointer rounded transition-all hover:scale-105"
+            style={{
+              backgroundColor: getColor(item.impact),
+              aspectRatio: '1',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '0.75rem'
+            }}
+            >
+            <div className="text-center w-full h-full flex flex-col items-center justify-center">
+              <div className="text-xs">{item.parameter}</div>
+              <div className="text-lg">{item.value.toFixed(1)}</div>
+            </div>
           </div>
-          <span className="text-sm text-muted-foreground">High</span>
+        ))}
+      </div>
+      
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 mt-4 text-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#22c55e' }} />
+          <span>Low Impact</span>
         </div>
-
-        <div className="mt-2 text-center text-xs text-muted-foreground">
-          Range: {minValue.toFixed(4)} to {maxValue.toFixed(4)}
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#f59e0b' }} />
+          <span>Medium Impact</span>
         </div>
-      </CardContent>
-    </Card>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#ef4444' }} />
+          <span>High Impact</span>
+        </div>
+      </div>
+    </div>
   );
-}
-
-/**
- * Helper function to create heatmap data from a matrix
- */
-export function matrixToHeatmapData(
-  matrix: number[][],
-  xLabels: string[],
-  yLabels: string[]
-): HeatmapData[] {
-  const data: HeatmapData[] = [];
-
-  for (let y = 0; y < matrix.length; y++) {
-    for (let x = 0; x < matrix[y].length; x++) {
-      data.push({
-        x: xLabels[x],
-        y: yLabels[y],
-        value: matrix[y][x],
-        label: `${yLabels[y]} × ${xLabels[x]}`
-      });
-    }
-  }
-
-  return data;
-}
-
-/**
- * Helper function to create correlation matrix heatmap data
- */
-export function correlationMatrixToHeatmap(
-  correlations: Record<string, Record<string, number>>
-): HeatmapData[] {
-  const data: HeatmapData[] = [];
-  const keys = Object.keys(correlations);
-
-  for (const yKey of keys) {
-    for (const xKey of keys) {
-      data.push({
-        x: xKey,
-        y: yKey,
-        value: correlations[yKey][xKey],
-        label: `${yKey} × ${xKey}: ${correlations[yKey][xKey].toFixed(3)}`
-      });
-    }
-  }
-
-  return data;
 }

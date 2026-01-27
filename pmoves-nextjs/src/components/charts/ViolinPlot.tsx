@@ -8,13 +8,13 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
-interface ViolinData {
+export interface ViolinData {
   category: string;
   values: number[];
   color?: string;
 }
 
-interface ViolinPlotProps {
+export interface ViolinPlotProps {
   data: ViolinData[];
   title?: string;
   description?: string;

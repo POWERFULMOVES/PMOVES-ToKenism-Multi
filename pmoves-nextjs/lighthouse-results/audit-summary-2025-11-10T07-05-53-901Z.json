@@ -1,0 +1,26 @@
+{
+  "timestamp": "2025-11-10T07:05:28.193Z",
+  "url": "http://localhost:3000",
+  "desktop": {
+    "jsonPath": "c:\\Users\\russe\\Documents\\GitHub\\PMOVEStokensim\\pmoves-nextjs\\lighthouse-results\\lighthouse-report-desktop-2025-11-10T07-05-42-245Z.json",
+    "htmlPath": "c:\\Users\\russe\\Documents\\GitHub\\PMOVEStokensim\\pmoves-nextjs\\lighthouse-results\\lighthouse-report-desktop-2025-11-10T07-05-42-245Z.html",
+    "scores": {
+      "performance": 81,
+      "accessibility": 96,
+      "bestPractices": 100,
+      "seo": 100,
+      "overall": 94
+    }
+  },
+  "mobile": {
+    "jsonPath": "c:\\Users\\russe\\Documents\\GitHub\\PMOVEStokensim\\pmoves-nextjs\\lighthouse-results\\lighthouse-report-mobile-2025-11-10T07-05-53-896Z.json",
+    "htmlPath": "c:\\Users\\russe\\Documents\\GitHub\\PMOVEStokensim\\pmoves-nextjs\\lighthouse-results\\lighthouse-report-mobile-2025-11-10T07-05-53-896Z.html",
+    "scores": {
+      "performance": 73,
+      "accessibility": 96,
+      "bestPractices": 100,
+      "seo": 100,
+      "overall": 92
+    }
+  }
+}

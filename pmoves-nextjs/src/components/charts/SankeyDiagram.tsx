@@ -8,20 +8,20 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
-interface SankeyNode {
+export interface SankeyNode {
   id: string;
   label: string;
   color?: string;
 }
 
-interface SankeyLink {
+export interface SankeyLink {
   source: string;
   target: string;
   value: number;
   color?: string;
 }
 
-interface SankeyDiagramProps {
+export interface SankeyDiagramProps {
   nodes: SankeyNode[];
   links: SankeyLink[];
   title?: string;

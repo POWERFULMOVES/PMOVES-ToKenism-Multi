@@ -533,7 +533,7 @@ cd PMOVES-DoX
 cp .env.example .env
 docker compose -f docker-compose.cpu.yml up --build -d
 ```
-- Backend: http://localhost:8000
+- Backend: http://localhost:8001
 - Frontend: http://localhost:3000
 - datavzrd: http://localhost:5173
 

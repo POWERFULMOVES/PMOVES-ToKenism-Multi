@@ -64,8 +64,8 @@ export default function SensitivityPage() {
     }
     
     return analysisResults.parameterResults[paramName]
-      .filter(result => !('avgSensitivity' in result))
-      .map(result => ({
+      .filter((result: any) => !('avgSensitivity' in result))
+      .map((result: any) => ({
         paramValue: result.paramValue,
         wealthDiff: result.wealthDiff,
         percentChange: result.percentChange * 100 // Convert to percentage

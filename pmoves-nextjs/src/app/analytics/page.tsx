@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   HeatmapChart,
-  matrixToHeatmapData,
   ViolinPlot,
   prepareWealthDistributionData,
   WaterfallChart,
@@ -216,11 +215,7 @@ export default function AnalyticsPage() {
           <HeatmapChart
             data={simulationData.heatmapData}
             title="Parameter Correlation Matrix"
-            description="Statistical correlations between economic variables"
-            xLabel="Variable"
-            yLabel="Variable"
-            colorScale="diverging"
-            valueRange={[-1, 1]}
+            height={400}
           />
 
           <Card>

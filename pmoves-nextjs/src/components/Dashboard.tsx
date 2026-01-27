@@ -1,18 +1,19 @@
+/**
+ * Dashboard Component (Refactored)
+ * Main dashboard with modular architecture and improved maintainability
+ */
+
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
-import { formatPercentage } from '@/lib/utils/formatters';
-import { InfoCircledIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
-import { TooltipProvider, Tooltip as UITooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ModelExplanation } from './ModelExplanation';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { DashboardHeader } from './dashboard/DashboardHeader';
+import { LoadingState } from './dashboard/LoadingState';
+import { NoMetricsFallback } from './dashboard/NoMetricsFallback';
+import { DashboardOverview } from './dashboard/DashboardOverview';
 import { PRESET_SCENARIOS } from '@/lib/presets';
-import { Badge } from '@/components/ui/badge';
+import { formatPercentage } from '@/lib/utils/formatters';
 
 interface ScenarioData {
   id?: string;
@@ -51,9 +52,6 @@ export function Dashboard({ onRunScenario, onTestShock }: DashboardProps) {
   const [loading, setLoading] = useState(false);
   const [scenarioName, setScenarioName] = useState('Custom Scenario');
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
-  const [shockType, setShockType] = useState('income_reduction');
-  const [shockMagnitude, setShockMagnitude] = useState(0.2);
-  const [shockDuration, setShockDuration] = useState(4);
 
   useEffect(() => {
     fetchCurrentMetrics();
@@ -79,7 +77,7 @@ export function Dashboard({ onRunScenario, onTestShock }: DashboardProps) {
   function handleRunScenario() {
     // If a preset is selected, use that
     if (selectedPresetId) {
-      const selectedPreset = PRESET_SCENARIOS.find(p => p.id === selectedPresetId);
+      const selectedPreset = PRESET_SCENARIOS.find((p: any) => p.id === selectedPresetId);
       if (selectedPreset) {
         onRunScenario({
           id: selectedPresetId,
@@ -96,16 +94,17 @@ export function Dashboard({ onRunScenario, onTestShock }: DashboardProps) {
   }
 
   function handleTestShock() {
+    // Default shock parameters for testing
     const shockParams = {
-      type: shockType,
-      magnitude: Number.parseFloat(shockMagnitude.toString()),
-      duration: Number.parseInt(shockDuration.toString())
+      type: 'income_reduction',
+      magnitude: 0.2,
+      duration: 4
     };
 
     onTestShock(shockParams);
 
     // Show toast with shock details
-    const shockTypeDisplay = shockType.replace('_', ' ');
+    const shockTypeDisplay = shockParams.type.replace('_', ' ');
     toast.success(
       `Testing ${shockTypeDisplay} shock (${formatPercentage(shockParams.magnitude)} magnitude, ${shockParams.duration} weeks)...`,
       { duration: 3000 }
@@ -115,443 +114,22 @@ export function Dashboard({ onRunScenario, onTestShock }: DashboardProps) {
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6">
-          <h3 className="text-lg font-semibold mb-2 text-blue-800 flex items-center">
-            Economic Dashboard
-            <UITooltip>
-              <TooltipTrigger asChild>
-                <InfoCircledIcon className="h-4 w-4 ml-2 text-blue-600 cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-md">
-                <p>This dashboard provides real-time metrics on the economic system, allows you to run custom scenarios, and test economic shocks.</p>
-              </TooltipContent>
-            </UITooltip>
-          </h3>
-          <p className="text-sm text-blue-700">
-            Monitor key economic indicators, run custom scenarios, and test system resilience to economic shocks.
-          </p>
-        </div>
-
+        <DashboardHeader />
+        
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-          </div>
+          <LoadingState />
         ) : currentMetrics ? (
-          <Card>
-            <CardContent className="p-6">
-              <Tabs defaultValue="overview">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
-                  <TabsTrigger value="shocks">Shock Testing</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="overview" className="space-y-6 pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex items-center">
-                          System Health
-                          <UITooltip>
-                            <TooltipTrigger asChild>
-                              <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs">A composite score (0-100%) measuring overall economic health based on wealth levels, distribution, and growth trends.</p>
-                            </TooltipContent>
-                          </UITooltip>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold mb-2">
-                          {formatPercentage(currentMetrics.health_score)}
-                          <span className={`text-sm ml-2 ${currentMetrics.trends.health_trend > 0 ? 'text-green-500' : currentMetrics.trends.health_trend < 0 ? 'text-red-500' : 'text-gray-500'}`}>
-                            {currentMetrics.trends.health_trend > 0 ? '↑' : currentMetrics.trends.health_trend < 0 ? '↓' : '→'}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          Overall economic system health
-                        </p>
-                        <div className="text-xs text-muted-foreground mt-2">
-                          <p>Calculated from: wealth levels, inequality, poverty rate, and resilience</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex items-center">
-                          Market Efficiency
-                          <UITooltip>
-                            <TooltipTrigger asChild>
-                              <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs">Measures how effectively resources are allocated within the economy. Higher values indicate better matching of resources to needs.</p>
-                            </TooltipContent>
-                          </UITooltip>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold mb-2">
-                          {formatPercentage(currentMetrics.market_efficiency)}
-                          <span className={`text-sm ml-2 ${currentMetrics.trends.efficiency_trend > 0 ? 'text-green-500' : currentMetrics.trends.efficiency_trend < 0 ? 'text-red-500' : 'text-gray-500'}`}>
-                            {currentMetrics.trends.efficiency_trend > 0 ? '↑' : currentMetrics.trends.efficiency_trend < 0 ? '↓' : '→'}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          Resource allocation efficiency
-                        </p>
-                        <div className="text-xs text-muted-foreground mt-2">
-                          <p>Calculated from: internal transaction volume, price stability, and distribution effectiveness</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex items-center">
-                          Resilience Score
-                          <UITooltip>
-                            <TooltipTrigger asChild>
-                              <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs">Measures the economy's ability to withstand and recover from economic shocks. Higher values indicate greater resilience.</p>
-                            </TooltipContent>
-                          </UITooltip>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold mb-2">
-                          {formatPercentage(currentMetrics.resilience_score)}
-                          <span className={`text-sm ml-2 ${currentMetrics.trends.resilience_trend > 0 ? 'text-green-500' : currentMetrics.trends.resilience_trend < 0 ? 'text-red-500' : 'text-gray-500'}`}>
-                            {currentMetrics.trends.resilience_trend > 0 ? '↑' : currentMetrics.trends.resilience_trend < 0 ? '↓' : '→'}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          Ability to withstand economic shocks
-                        </p>
-                        <div className="text-xs text-muted-foreground mt-2">
-                          <p>Calculated from: wealth reserves, diversity of income sources, and community support mechanisms</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Economic Indicators</CardTitle>
-                        <CardDescription>Key performance metrics</CardDescription>
-                      </CardHeader>
-                      <CardContent className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={[
-                            { name: 'Health', value: currentMetrics.health_score * 100 },
-                            { name: 'Efficiency', value: currentMetrics.market_efficiency * 100 },
-                            { name: 'Resilience', value: currentMetrics.resilience_score * 100 },
-                          ]}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis domain={[0, 100]} />
-                            <Tooltip formatter={(value) => [formatPercentage((value as number) / 100), '']} />
-                            <Bar dataKey="value" fill="#82ca9d" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">System Balance</CardTitle>
-                        <CardDescription>Economic system characteristics</CardDescription>
-                      </CardHeader>
-                      <CardContent className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RadarChart outerRadius={90} data={[
-                            { subject: 'Wealth', A: 65, B: 85 },
-                            { subject: 'Equality', A: 45, B: 75 },
-                            { subject: 'Resilience', A: 55, B: 80 },
-                            { subject: 'Efficiency', A: 70, B: 65 },
-                            { subject: 'Sustainability', A: 50, B: 85 },
-                          ]}>
-                            <PolarGrid />
-                            <PolarAngleAxis dataKey="subject" />
-                            <PolarRadiusAxis angle={30} domain={[0, 100]} />
-                            <Radar name="Traditional (A)" dataKey="A" stroke="#8884d8" fill="#8884d8" fillOpacity={0.2} />
-                            <Radar name="Cooperative (B)" dataKey="B" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.2} />
-                            <Legend />
-                          </RadarChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4">
-                    {currentMetrics.warnings && currentMetrics.warnings.length > 0 && (
-                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-                        <h4 className="font-medium text-amber-800 mb-1">Warnings</h4>
-                        <ul className="list-disc list-inside text-sm text-amber-700">
-                          {currentMetrics.warnings.map((warning: string) => (
-                            <li key={warning.substring(0, 20)}>{warning}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {currentMetrics.recommendations && currentMetrics.recommendations.length > 0 && (
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                        <h4 className="font-medium text-blue-800 mb-1">Recommendations</h4>
-                        <ul className="list-disc list-inside text-sm text-blue-700">
-                          {currentMetrics.recommendations.map((recommendation: string) => (
-                            <li key={recommendation.substring(0, 20)}>{recommendation}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="scenarios" className="space-y-6 pt-6">
-                  <div className="grid grid-cols-1 gap-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base flex items-center">
-                          Select Scenario
-                          <UITooltip>
-                            <TooltipTrigger asChild>
-                              <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs">Run a simulation with preset or custom parameters to test different economic conditions.</p>
-                            </TooltipContent>
-                          </UITooltip>
-                        </CardTitle>
-                        <CardDescription>Test different economic scenarios</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <Tabs defaultValue="presets" className="space-y-4">
-                          <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="presets">Preset Scenarios</TabsTrigger>
-                            <TabsTrigger value="custom">Custom Scenario</TabsTrigger>
-                          </TabsList>
-
-                          <TabsContent value="presets" className="space-y-4">
-                            <div className="grid grid-cols-1 gap-3">
-                              {PRESET_SCENARIOS.map(preset => (
-                                <div
-                                  key={preset.id}
-                                  className={`p-3 border rounded-md cursor-pointer transition-all ${selectedPresetId === preset.id ? 'border-primary bg-primary/5' : 'hover:border-primary/50'}`}
-                                  onClick={() => setSelectedPresetId(preset.id)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      setSelectedPresetId(preset.id);
-                                    }
-                                  }}
-                                  tabIndex={0}
-                                  role="button"
-                                  aria-pressed={selectedPresetId === preset.id}
-                                >
-                                  <div className="flex justify-between items-start">
-                                    <div>
-                                      <h4 className="font-medium text-sm">{preset.name}</h4>
-                                      <p className="text-xs text-muted-foreground mt-1">{preset.description}</p>
-                                    </div>
-                                    {selectedPresetId === preset.id && (
-                                      <Badge variant="outline" className="ml-2 bg-primary/10">Selected</Badge>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-wrap gap-1 mt-2">
-                                    {preset.tags.map(tag => (
-                                      <Badge key={tag} variant="secondary" className="text-xs">
-                                        {tag.replace('-', ' ')}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-
-                            <Button
-                              onClick={handleRunScenario}
-                              disabled={!selectedPresetId}
-                              className="w-full"
-                            >
-                              {selectedPresetId ? 'Run Selected Scenario' : 'Select a Scenario'}
-                            </Button>
-                          </TabsContent>
-
-                          <TabsContent value="custom" className="space-y-4">
-                            <div>
-                              <label htmlFor="scenario-name" className="block text-sm font-medium mb-1">Custom Scenario Name</label>
-                              <Input
-                                id="scenario-name"
-                                value={scenarioName}
-                                onChange={(e) => setScenarioName(e.target.value)}
-                                className="w-full"
-                                placeholder="Enter scenario name"
-                              />
-                            </div>
-                            <div className="bg-amber-50 p-3 rounded-md">
-                              <p className="text-xs text-amber-700">
-                                Custom scenarios use the parameters you've configured in the Custom Setup tab.
-                                Make sure to set up your parameters before running a custom scenario.
-                              </p>
-                            </div>
-                            <Button
-                              onClick={() => {
-                                setSelectedPresetId(null);
-                                handleRunScenario();
-                              }}
-                              className="w-full"
-                            >
-                              Run Custom Scenario
-                            </Button>
-                          </TabsContent>
-                        </Tabs>
-                      </CardContent>
-                    </Card>
-
-                    <ModelExplanation />
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="shocks" className="space-y-6 pt-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base flex items-center">
-                        Test Economic Shock
-                        <UITooltip>
-                          <TooltipTrigger asChild>
-                            <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs">Simulate sudden economic disruptions to test how well the system recovers.</p>
-                          </TooltipContent>
-                        </UITooltip>
-                      </CardTitle>
-                      <CardDescription>Evaluate system resilience to disruptions</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div>
-                          <label htmlFor="shock-type" className="block text-sm font-medium mb-1 flex items-center">
-                            Shock Type
-                            <UITooltip>
-                              <TooltipTrigger asChild>
-                                <QuestionMarkCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <div className="space-y-2 max-w-xs">
-                                  <p><strong>Income Reduction:</strong> Simulates job losses or wage cuts</p>
-                                  <p><strong>Spending Increase:</strong> Simulates rising costs of essential goods</p>
-                                  <p><strong>Market Disruption:</strong> Simulates supply chain or market access issues</p>
-                                </div>
-                              </TooltipContent>
-                            </UITooltip>
-                          </label>
-                          <select
-                            id="shock-type"
-                            className="w-full p-2 border rounded-md"
-                            value={shockType}
-                            onChange={(e) => setShockType(e.target.value)}
-                          >
-                            <option value="income_reduction">Income Reduction</option>
-                            <option value="spending_increase">Spending Increase</option>
-                            <option value="market_disruption">Market Disruption</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label htmlFor="shock-magnitude" className="block text-sm font-medium mb-1 flex items-center">
-                            Magnitude (0-1)
-                            <UITooltip>
-                              <TooltipTrigger asChild>
-                                <QuestionMarkCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="max-w-xs">The severity of the shock. 0.1 = mild (10% effect), 0.5 = severe (50% effect), 1.0 = extreme (100% effect).</p>
-                              </TooltipContent>
-                            </UITooltip>
-                          </label>
-                          <Input
-                            id="shock-magnitude"
-                            type="number"
-                            min="0"
-                            max="1"
-                            step="0.1"
-                            value={shockMagnitude}
-                            onChange={(e) => setShockMagnitude(Number.parseFloat(e.target.value))}
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="shock-duration" className="block text-sm font-medium mb-1 flex items-center">
-                            Duration (weeks)
-                            <UITooltip>
-                              <TooltipTrigger asChild>
-                                <QuestionMarkCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="max-w-xs">How long the shock lasts. Shorter durations (1-4 weeks) simulate temporary disruptions, longer durations (12+ weeks) simulate prolonged crises.</p>
-                              </TooltipContent>
-                            </UITooltip>
-                          </label>
-                          <Input
-                            id="shock-duration"
-                            type="number"
-                            min="1"
-                            max="52"
-                            value={shockDuration}
-                            onChange={(e) => setShockDuration(Number.parseInt(e.target.value))}
-                          />
-                        </div>
-                        <Button onClick={handleTestShock}>Test Shock</Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Understanding Economic Shocks</CardTitle>
-                      <CardDescription>How shocks affect the economic system</CardDescription>
-                    </CardHeader>
-                    <CardContent className="prose prose-sm max-w-none">
-                      <p>
-                        Economic shocks are sudden disruptions that test the resilience of an economic system.
-                        The simulator models three types of shocks:
-                      </p>
-                      <ul>
-                        <li>
-                          <strong>Income Reduction:</strong> Simulates events like job losses, wage cuts, or recession.
-                          This reduces the weekly income of community members for the specified duration.
-                        </li>
-                        <li>
-                          <strong>Spending Increase:</strong> Simulates events like inflation, supply shortages, or price gouging.
-                          This increases the essential spending needs of community members for the specified duration.
-                        </li>
-                        <li>
-                          <strong>Market Disruption:</strong> Simulates events like supply chain breakdowns, trade barriers, or market access issues.
-                          This affects both income and spending patterns for the specified duration.
-                        </li>
-                      </ul>
-                      <p>
-                        The shock test measures how quickly the economy recovers to pre-shock levels and calculates a resilience score.
-                        Higher resilience scores indicate better ability to withstand and recover from economic disruptions.
-                      </p>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+          <DashboardOverview
+            metrics={currentMetrics}
+            selectedPresetId={selectedPresetId}
+            onPresetSelect={setSelectedPresetId}
+            onRunScenario={handleRunScenario}
+            customScenarioName={scenarioName}
+            onCustomScenarioNameChange={setScenarioName}
+            onTestShock={handleTestShock}
+          />
         ) : (
-          <div className="flex flex-col items-center justify-center h-64 p-12 text-center border rounded-lg border-dashed">
-            <h3 className="text-lg font-medium mb-2">No metrics available</h3>
-            <p className="text-muted-foreground mb-4">
-              Unable to fetch current economic metrics.
-            </p>
-            <Button onClick={fetchCurrentMetrics}>Retry</Button>
-          </div>
+          <NoMetricsFallback onRetry={fetchCurrentMetrics} />
         )}
       </div>
     </TooltipProvider>

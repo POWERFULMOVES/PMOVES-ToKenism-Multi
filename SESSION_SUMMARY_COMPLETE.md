@@ -320,7 +320,7 @@ Automate the workflow: Simulate → Export → Upload to DoX → Analyze → Vis
 
 **Capabilities**:
 ```python
-dox = DoXIntegration("http://localhost:8000")
+dox = DoXIntegration("http://localhost:8001")
 
 # Health check
 dox.health_check()
@@ -537,7 +537,7 @@ Consistent across all components:
 
 **Prerequisites**:
 - PMOVES-DoX running: `docker compose -f docker-compose.cpu.yml up -d`
-- DoX available at: `http://localhost:8000`
+- DoX available at: `http://localhost:8001`
 
 **Test Steps**:
 1. Run simulation in PMOVEStokensim
@@ -588,7 +588,7 @@ docker compose -f docker-compose.cpu.yml up -d --build
 docker compose up -d --build
 
 # Access
-http://localhost:8000           # Backend API
+http://localhost:8001           # Backend API
 http://localhost:3000           # Frontend
 http://localhost:5173           # datavzrd dashboards
 http://localhost:5174           # schemavzrd schema docs
