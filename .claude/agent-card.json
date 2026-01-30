@@ -1,0 +1,133 @@
+{
+  "$schema": "https://schemas.anthropic.com/agent-card/v1",
+  "name": "PMOVES-ToKenism-Multi",
+  "version": "1.0.0",
+  "description": "Economic simulation and cooperative management agent for the PMOVES ecosystem",
+  "capabilities": [
+    "tokenism-simulation",
+    "firefly-export",
+    "chit-geometry",
+    "service-integration"
+  ],
+  "protocols": {
+    "a2a": {
+      "version": "1.0",
+      "supported": true,
+      "endpoints": {
+        "tasks": "/api/agent/tasks",
+        "status": "/api/agent/status",
+        "capabilities": "/.well-known/agent.json"
+      }
+    },
+    "mcp": {
+      "version": "1.0",
+      "supported": true,
+      "servers": [
+        "filesystem",
+        "postgres"
+      ]
+    }
+  },
+  "skills": {
+    "tokenism-analysis": {
+      "description": "Run economic simulations and analyze cooperative models",
+      "tools": [
+        "run-simulation",
+        "validate-params",
+        "export-metrics"
+      ],
+      "triggers": [
+        "simulation",
+        "economic analysis",
+        "gini coefficient",
+        "poverty rate"
+      ]
+    },
+    "firefly-export": {
+      "description": "Export simulation data to Firefly-III financial tracking",
+      "tools": [
+        "firefly-cli",
+        "csv-generator",
+        "api-health-check"
+      ],
+      "triggers": [
+        "firefly",
+        "export",
+        "financial tracking",
+        "csv"
+      ]
+    },
+    "chit-geometry": {
+      "description": "Work with CHIT Contextual Geometry Packets",
+      "tools": [
+        "cgp-validate",
+        "shape-visualize",
+        "merkle-verify"
+      ],
+      "triggers": [
+        "cgp",
+        "geometry",
+        "chit",
+        "merkle",
+        "attribution"
+      ]
+    },
+    "pmoves-integration": {
+      "description": "Monitor and manage PMOVES infrastructure",
+      "tools": [
+        "docker-health",
+        "nats-monitor",
+        "service-discovery"
+      ],
+      "triggers": [
+        "health check",
+        "docker",
+        "nats",
+        "service status"
+      ]
+    }
+  },
+  "thread_types": {
+    "B": {
+      "name": "Base Thread",
+      "description": "Standard prompt-response interaction",
+      "model": "sonnet"
+    },
+    "P": {
+      "name": "Parallel Thread",
+      "description": "Concurrent independent task execution",
+      "model": "haiku"
+    },
+    "C": {
+      "name": "Chained Thread",
+      "description": "Sequential dependent operations",
+      "model": "sonnet"
+    },
+    "F": {
+      "name": "Fusion Thread",
+      "description": "Multi-agent consensus via MACA",
+      "model": "opus"
+    },
+    "L": {
+      "name": "Big Thread",
+      "description": "Frontier model offloading via Venice.ai",
+      "model": "opus"
+    },
+    "Z": {
+      "name": "Zero-Touch Thread",
+      "description": "Fully automated workflows",
+      "model": "haiku"
+    }
+  },
+  "safety": {
+    "patterns_file": ".claude/patterns.yaml",
+    "expertise_dir": ".claude/expertise/",
+    "audit_enabled": true
+  },
+  "metadata": {
+    "repository": "PMOVES-DoX/PMOVES-ToKenism-Multi",
+    "branch": "PMOVES.AI-Edition-Hardened",
+    "maintainer": "PMOVES Engineering",
+    "last_updated": "2026-01-29"
+  }
+}

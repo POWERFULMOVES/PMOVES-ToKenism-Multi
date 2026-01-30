@@ -2,7 +2,24 @@
   "permissions": {
     "allow": [
       "Bash(gh pr create:*)",
-      "Bash(git checkout:*)"
+      "Bash(gh pr view:*)",
+      "Bash(gh issue:*)",
+      "Bash(git checkout:*)",
+      "Bash(git branch:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(docker-compose -f *pmoves*)",
+      "Bash(docker ps:*)",
+      "Bash(docker logs:*)",
+      "Bash(npm run:*)",
+      "Bash(npm test:*)",
+      "Bash(npm install:*)",
+      "Bash(pytest:*)",
+      "Bash(npx ts-node:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)"
     ]
   }
 }

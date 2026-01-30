@@ -81,3 +81,134 @@ audit:
     level: "info"
   - pattern: "pytest"
     level: "info"
+
+# Thread-Based Engineering (BoTZ Doctrine)
+# Defines patterns for different thread types
+threads:
+
+  # B-Thread: Base Thread (Standard prompt-response)
+  base:
+    symbol: "B"
+    description: "Standard single-turn prompt-response interaction"
+    model: "sonnet"
+    timeout_ms: 60000
+    patterns:
+      - "simple query"
+      - "single file edit"
+      - "documentation lookup"
+
+  # P-Thread: Parallel Thread (Concurrent independent tasks)
+  parallel:
+    symbol: "P"
+    description: "Fan-out execution of independent subtasks"
+    model: "haiku"
+    max_concurrent: 5
+    patterns:
+      - "batch processing"
+      - "multi-file search"
+      - "parallel validation"
+    orchestration:
+      - "Task tool with run_in_background: true"
+      - "Multiple independent tool calls"
+
+  # C-Thread: Chained Thread (Sequential dependent operations)
+  chained:
+    symbol: "C"
+    description: "Sequential pipeline where output feeds next step"
+    model: "sonnet"
+    patterns:
+      - "build -> test -> deploy"
+      - "validate -> transform -> export"
+      - "read -> modify -> write"
+    requires:
+      - "Previous step completion"
+      - "Output validation between steps"
+
+  # F-Thread: Fusion Thread (Multi-agent consensus via MACA)
+  fusion:
+    symbol: "F"
+    description: "Multi-Agent Consensus Alignment for critical decisions"
+    model: "opus"
+    min_agents: 3
+    consensus_threshold: 0.67
+    patterns:
+      - "architectural decisions"
+      - "security validations"
+      - "breaking changes"
+    maca_protocol:
+      - "Propose: Initial agent proposes solution"
+      - "Challenge: Other agents identify issues"
+      - "Resolve: Iterate until consensus reached"
+
+  # L-Thread: Big Thread (Frontier model offloading)
+  big:
+    symbol: "L"
+    description: "Offload to frontier models via Venice.ai"
+    model: "opus"
+    use_cases:
+      - "Novel problem solving"
+      - "Complex multi-step reasoning"
+      - "Architecture design"
+    offload_triggers:
+      - "Complexity exceeds Sonnet capability"
+      - "User requests deep analysis"
+      - "Multi-system debugging"
+
+  # Z-Thread: Zero-Touch Thread (Fully automated workflows)
+  zero_touch:
+    symbol: "Z"
+    description: "Automated CI/CD-style workflows"
+    model: "haiku"
+    requires_approval: false
+    patterns:
+      - "scheduled health checks"
+      - "automated testing"
+      - "metrics collection"
+    safety:
+      - "Only read operations by default"
+      - "Write operations require explicit approval"
+      - "Rollback capability required"
+
+# Thread selection rules
+thread_routing:
+  default: "base"
+  rules:
+    - condition: "task.complexity > 'high'"
+      thread: "big"
+    - condition: "task.type == 'batch'"
+      thread: "parallel"
+    - condition: "task.requires_consensus"
+      thread: "fusion"
+    - condition: "task.is_automated"
+      thread: "zero_touch"
+    - condition: "task.has_dependencies"
+      thread: "chained"
+
+# GEOMETRY BUS integration
+geometry_bus:
+  subjects:
+    attribution: "tokenism.attribution.recorded.v1"
+    cgp_weekly: "tokenism.cgp.weekly.v1"
+    cgp_ready: "tokenism.cgp.ready.v1"
+    geometry_event: "tokenism.geometry.event.v1"
+    swarm_population: "tokenism.swarm.population.v1"
+  connection:
+    url: "nats://localhost:4222"
+    reconnect_attempts: 5
+    reconnect_delay_ms: 1000
+
+# A2A Protocol support
+a2a:
+  version: "1.0"
+  task_format:
+    required_fields:
+      - "task_id"
+      - "type"
+      - "payload"
+    optional_fields:
+      - "priority"
+      - "deadline"
+      - "dependencies"
+  capability_discovery:
+    endpoint: "/.well-known/agent.json"
+    refresh_interval_ms: 300000

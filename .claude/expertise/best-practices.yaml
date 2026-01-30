@@ -1,0 +1,214 @@
+# PMOVES Best Practices
+# Domain knowledge and coding standards for consistent implementation
+# Last Updated: 2026-01-29
+
+version: "1.0"
+
+# --- Code Organization ---
+
+code_structure:
+  file_naming:
+    typescript:
+      - Use kebab-case for file names: "export-metrics.ts"
+      - Use PascalCase for React components: "SimulationForm.tsx"
+      - Use .spec.ts or .test.ts for tests
+    python:
+      - Use snake_case for modules: "flask_backend.py"
+      - Use snake_case for functions and variables
+      - Prefix private functions with underscore
+    schemas:
+      - Include version in filename: "cgp.v1.schema.json"
+      - Use namespace prefixes: "tokenism.", "chit."
+
+  directory_structure:
+    skills:
+      - Each skill has: tools/, cookbook/, and manifest.yaml
+      - Tools are standalone CLI scripts
+      - Cookbook provides progressive disclosure documentation
+    integrations:
+      - Group by external system: firefly/, contracts/
+      - Include .env.example for each integration
+      - Provide TypeScript and Python adapters
+
+# --- Simulation Best Practices ---
+
+simulation:
+  parameter_validation:
+    - Always validate before running simulations
+    - Use validate-params.ts tool
+    - Check business rule warnings, not just errors
+    - Document any parameter overrides
+
+  performance:
+    - Start with small member counts (<100) for testing
+    - Use 52-week simulations for quick validation
+    - Reserve 156+ weeks for production analysis
+    - Implement progress callbacks for long runs
+
+  reproducibility:
+    - Store parameters with results
+    - Use deterministic random seeds when possible
+    - Version the economic model code
+    - Archive successful parameter sets
+
+# --- CHIT Geometry Best Practices ---
+
+chit_geometry:
+  cgp_creation:
+    - Always normalize attribution weights to sum to 1.0
+    - Use negative curvature (-1) for standard hyperbolic space
+    - Keep Poincare ball positions with norm < 0.95
+    - Generate Merkle root before publishing
+
+  validation:
+    - Run cgp-validate.ts before any operations
+    - Check both errors and warnings
+    - Verify Merkle proofs after deserialization
+    - Validate schema version compatibility
+
+  geometry_bus:
+    - Use versioned subject names: "tokenism.*.v1"
+    - Include timestamp in all messages
+    - Implement idempotent consumers
+    - Handle message replay gracefully
+
+# --- Integration Best Practices ---
+
+integrations:
+  firefly:
+    - Always dry-run before live export
+    - Use consistent tags for PMOVES transactions
+    - Implement duplicate detection
+    - Archive generated CSVs for audit trail
+
+  nats:
+    - Use subject hierarchies: "tokenism.cgp.ready.v1"
+    - Implement reconnection with backoff
+    - Monitor slow consumers
+    - Use JetStream for persistence when needed
+
+  docker:
+    - Use health checks in all containers
+    - Set memory limits to prevent OOM
+    - Use non-root users in Dockerfiles
+    - Implement graceful shutdown handlers
+
+# --- Testing Best Practices ---
+
+testing:
+  unit_tests:
+    - Test pure functions in isolation
+    - Mock external dependencies
+    - Use descriptive test names
+    - Aim for >80% coverage on core logic
+
+  integration_tests:
+    - Use docker-compose for test environment
+    - Clean up test data after runs
+    - Test failure scenarios explicitly
+    - Include timeout tests
+
+  e2e_tests:
+    - Test complete user workflows
+    - Use realistic data volumes
+    - Include accessibility testing
+    - Run performance benchmarks
+
+# --- Documentation Best Practices ---
+
+documentation:
+  code_comments:
+    - Explain "why" not "what"
+    - Document non-obvious business rules
+    - Include examples for complex functions
+    - Keep comments up-to-date with code
+
+  readme_files:
+    - Include quick start section
+    - Document environment setup
+    - List common troubleshooting steps
+    - Provide example commands
+
+  api_documentation:
+    - Use OpenAPI/Swagger for REST APIs
+    - Include request/response examples
+    - Document error codes and meanings
+    - Version the API documentation
+
+# --- Security Best Practices ---
+
+security:
+  secrets_management:
+    - Never commit secrets to git
+    - Use environment variables or vault
+    - Rotate tokens periodically
+    - Audit token usage
+
+  input_validation:
+    - Validate all user input
+    - Sanitize data before database queries
+    - Use parameterized queries
+    - Implement rate limiting
+
+  container_security:
+    - Run as non-root user
+    - Use minimal base images
+    - Scan images for vulnerabilities
+    - Keep dependencies updated
+
+# --- Git Best Practices ---
+
+git:
+  commits:
+    - Write descriptive commit messages
+    - Use conventional commit format
+    - Keep commits atomic and focused
+    - Reference issues in commit messages
+
+  branches:
+    - Use feature branches for development
+    - Keep main branch stable
+    - Delete merged branches
+    - Use meaningful branch names
+
+  pull_requests:
+    - Include description of changes
+    - Add test plan
+    - Request appropriate reviewers
+    - Address all review comments
+
+# --- Error Handling Best Practices ---
+
+error_handling:
+  principles:
+    - Fail fast, fail loud
+    - Provide actionable error messages
+    - Log errors with context
+    - Implement graceful degradation
+
+  patterns:
+    - Use Result/Either types for expected failures
+    - Throw exceptions for unexpected failures
+    - Implement circuit breakers for external calls
+    - Provide retry logic with exponential backoff
+
+# --- Performance Best Practices ---
+
+performance:
+  frontend:
+    - Implement lazy loading
+    - Use memoization for expensive computations
+    - Optimize images and assets
+    - Monitor Core Web Vitals
+
+  backend:
+    - Use connection pooling
+    - Implement caching where appropriate
+    - Profile before optimizing
+    - Monitor response times
+
+  database:
+    - Index frequently queried columns
+    - Use appropriate data types
+    - Implement pagination for large datasets
+    - Monitor query performance

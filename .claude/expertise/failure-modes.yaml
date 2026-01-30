@@ -1,0 +1,226 @@
+# PMOVES Failure Modes Registry
+# Documented past failures and mitigation strategies for PPA-Plan
+# Last Updated: 2026-01-29
+
+version: "1.0"
+
+failure_modes:
+
+  # --- Simulation Failures ---
+
+  simulation_timeout:
+    severity: medium
+    symptoms:
+      - "Flask API returns 504 Gateway Timeout"
+      - "Simulation running >5 minutes without response"
+    root_causes:
+      - Large member count (>5000) without optimization
+      - Infinite loop in economic model
+      - Database connection pool exhausted
+    mitigation:
+      - Use smaller member counts for testing (<500)
+      - Set explicit timeout in simulation parameters
+      - Monitor Flask worker memory usage
+    prevention:
+      - Always validate params before running
+      - Use async simulation for large runs
+      - Implement progress callbacks
+
+  gini_divergence:
+    severity: high
+    symptoms:
+      - "Gini coefficient exceeds 0.9"
+      - "Gini shows NaN or Infinity"
+    root_causes:
+      - Division by zero in wealth calculation
+      - Negative wealth accumulation
+      - Parameter combination causing runaway inequality
+    mitigation:
+      - Check for zero total wealth before Gini calculation
+      - Clamp wealth values to non-negative
+      - Use bounded parameter ranges from validate-params
+    prevention:
+      - Run sensitivity analysis before production
+      - Implement circuit breakers in economic model
+
+  # --- Integration Failures ---
+
+  firefly_auth_expired:
+    severity: medium
+    symptoms:
+      - "HTTP 401 Unauthorized from Firefly API"
+      - "Token validation failed"
+    root_causes:
+      - Personal Access Token expired
+      - Token revoked by user
+      - Wrong Firefly instance URL
+    mitigation:
+      - Regenerate token in Firefly-III settings
+      - Verify FIREFLY_BASE_URL is correct
+      - Check token has required scopes
+    prevention:
+      - Use long-lived tokens for automation
+      - Implement token refresh logic
+      - Run api-health-check before exports
+
+  nats_connection_lost:
+    severity: high
+    symptoms:
+      - "NATS connection refused"
+      - "GEOMETRY BUS subscribers disconnected"
+      - "Messages queued but not delivered"
+    root_causes:
+      - NATS server crashed
+      - Network partition
+      - Docker container OOM killed
+    mitigation:
+      - Restart NATS container
+      - Implement reconnection logic
+      - Use NATS clustering for HA
+    prevention:
+      - Monitor NATS memory usage
+      - Set container memory limits
+      - Use nats-monitor.ts in watch mode
+
+  # --- CHIT Geometry Failures ---
+
+  merkle_verification_failed:
+    severity: high
+    symptoms:
+      - "Computed root doesn't match expected"
+      - "Proof verification returns false"
+    root_causes:
+      - Attribution data modified after tree construction
+      - Wrong hash algorithm used
+      - Proof generated from different tree version
+    mitigation:
+      - Regenerate Merkle tree from current attributions
+      - Verify hash algorithm is SHA-256
+      - Check CGP version compatibility
+    prevention:
+      - Immutable attribution storage
+      - Include tree version in CGP metadata
+      - Validate before publishing to GEOMETRY BUS
+
+  hyperbolic_overflow:
+    severity: medium
+    symptoms:
+      - "Position norm >= 1 in Poincare ball"
+      - "Distance calculation returns Infinity"
+    root_causes:
+      - Agent positions not normalized
+      - Accumulation of numerical errors
+      - Invalid curvature parameter
+    mitigation:
+      - Clamp positions to ||x|| < 0.999
+      - Use high-precision arithmetic for distances
+      - Validate curvature is negative
+    prevention:
+      - Normalize positions after each update
+      - Use cgp-validate before any operations
+
+  # --- Docker/Infrastructure Failures ---
+
+  port_conflict:
+    severity: low
+    symptoms:
+      - "Error: port is already allocated"
+      - "Service fails to start"
+    root_causes:
+      - Another process using the port
+      - Previous container not stopped
+      - Port mapping conflict in compose
+    mitigation:
+      - Find process: netstat -ano | findstr :PORT
+      - Stop conflicting process or container
+      - Use different port in configuration
+    prevention:
+      - Use service-discovery to check before starting
+      - Implement port ranges for scaling
+
+  container_oom:
+    severity: high
+    symptoms:
+      - "Container killed with exit code 137"
+      - "OOMKilled: true in docker inspect"
+    root_causes:
+      - Memory leak in application
+      - Insufficient container memory limit
+      - Large dataset loaded into memory
+    mitigation:
+      - Increase container memory limit
+      - Restart container
+      - Profile memory usage
+    prevention:
+      - Set appropriate memory limits
+      - Implement streaming for large datasets
+      - Use memory monitoring in docker-health
+
+  # --- Frontend Failures ---
+
+  api_hydration_mismatch:
+    severity: medium
+    symptoms:
+      - "Hydration failed in Next.js console"
+      - "Content differs between server and client"
+    root_causes:
+      - Date/time formatting differences
+      - Browser-specific APIs used during SSR
+      - Async data fetched differently
+    mitigation:
+      - Use suppressHydrationWarning where safe
+      - Ensure consistent date formatting
+      - Use useEffect for browser-only code
+    prevention:
+      - Test SSR output matches client
+      - Avoid browser APIs in initial render
+
+  chart_render_failure:
+    severity: low
+    symptoms:
+      - "Chart shows blank or error state"
+      - "Recharts throws undefined property error"
+    root_causes:
+      - Empty or malformed data array
+      - Missing required data keys
+      - Component mounted before data loaded
+    mitigation:
+      - Add null checks before rendering
+      - Show loading state during fetch
+      - Validate data shape before chart
+    prevention:
+      - Always provide default data shape
+      - Use TypeScript for data interfaces
+
+# Recovery procedures for common failure combinations
+
+recovery_playbooks:
+
+  full_stack_recovery:
+    description: "Recover from complete service outage"
+    steps:
+      - "1. Check Docker daemon is running"
+      - "2. Run: docker-compose -f docker-compose.pmoves.yml down"
+      - "3. Clear any orphan containers: docker container prune"
+      - "4. Start services: docker-compose up -d"
+      - "5. Verify: npx ts-node service-discovery.ts --check-all"
+      - "6. Check GEOMETRY BUS: npx ts-node nats-monitor.ts"
+
+  data_corruption_recovery:
+    description: "Recover from simulation data corruption"
+    steps:
+      - "1. Stop running simulations"
+      - "2. Validate last known good CGP: cgp-validate.ts"
+      - "3. Regenerate Merkle proofs"
+      - "4. Re-export to Firefly with dry-run first"
+      - "5. Verify data integrity in all systems"
+
+# Monitoring thresholds
+
+thresholds:
+  simulation_max_duration_ms: 300000  # 5 minutes
+  gini_warning_threshold: 0.7
+  gini_critical_threshold: 0.9
+  nats_reconnect_attempts: 5
+  api_latency_warning_ms: 1000
+  container_memory_warning_percent: 80

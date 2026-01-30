@@ -1,0 +1,270 @@
+# Model Selection Guide
+# When to use Opus, Sonnet, or Haiku for PMOVES tasks
+# Based on BoTZ Thread-Based Engineering doctrine
+# Last Updated: 2026-01-29
+
+version: "1.0"
+
+# --- Model Capabilities Overview ---
+
+models:
+  opus:
+    name: "Claude Opus 4.5"
+    role: "Brain - Architecture & Planning"
+    strengths:
+      - Complex architectural decisions
+      - Multi-step reasoning
+      - Novel problem solving
+      - Nuanced code review
+      - System design
+    cost: high
+    latency: high
+    context_window: 200000
+
+  sonnet:
+    name: "Claude Sonnet 3.5"
+    role: "Hands - Execution & Implementation"
+    strengths:
+      - Code generation
+      - Refactoring
+      - Test writing
+      - Documentation
+      - Standard implementations
+    cost: medium
+    latency: medium
+    context_window: 200000
+
+  haiku:
+    name: "Claude Haiku"
+    role: "Auditor - Validation & Safety"
+    strengths:
+      - Quick validation
+      - Syntax checking
+      - Simple transformations
+      - Classification tasks
+      - High-volume processing
+    cost: low
+    latency: low
+    context_window: 200000
+
+# --- Task-to-Model Mapping ---
+
+task_routing:
+
+  # Use OPUS for...
+  opus_tasks:
+    architecture:
+      - "Design new system components"
+      - "Plan migration strategies"
+      - "Evaluate architectural trade-offs"
+      - "Define API contracts"
+      examples:
+        - "Design the EvoSwarm feedback loop architecture"
+        - "Plan integration between CHIT and Firefly systems"
+        - "Evaluate MACA consensus algorithms"
+
+    complex_analysis:
+      - "Debug multi-system issues"
+      - "Analyze performance bottlenecks"
+      - "Review security implications"
+      - "Assess technical debt"
+      examples:
+        - "Why is the Gini coefficient diverging in long simulations?"
+        - "Analyze the security model of CGP Merkle proofs"
+        - "Review the economic model for edge cases"
+
+    planning:
+      - "Create implementation plans"
+      - "Define project roadmaps"
+      - "Estimate complexity"
+      - "Identify risks"
+      examples:
+        - "Plan the Venice.ai Big Thread integration"
+        - "Create roadmap for production deployment"
+        - "Assess risks in the Firefly data bridge"
+
+  # Use SONNET for...
+  sonnet_tasks:
+    implementation:
+      - "Write new features"
+      - "Implement bug fixes"
+      - "Create unit tests"
+      - "Refactor existing code"
+      examples:
+        - "Implement the csv-generator.ts tool"
+        - "Add validation to SimulationForm component"
+        - "Write tests for merkle-verify.ts"
+
+    documentation:
+      - "Write technical documentation"
+      - "Create cookbook recipes"
+      - "Update README files"
+      - "Generate API docs"
+      examples:
+        - "Document the GEOMETRY BUS subjects"
+        - "Create troubleshooting guide for NATS"
+        - "Write recipe for basic CGP validation"
+
+    standard_patterns:
+      - "CRUD operations"
+      - "API endpoints"
+      - "React components"
+      - "Database queries"
+      examples:
+        - "Create health check endpoint"
+        - "Implement dashboard chart component"
+        - "Add Supabase query for member data"
+
+  # Use HAIKU for...
+  haiku_tasks:
+    validation:
+      - "Syntax validation"
+      - "Schema checking"
+      - "Linting"
+      - "Format verification"
+      examples:
+        - "Validate JSON against CGP schema"
+        - "Check TypeScript for type errors"
+        - "Verify YAML syntax in config files"
+
+    simple_transforms:
+      - "Format conversion"
+      - "Data extraction"
+      - "Simple mappings"
+      - "Template filling"
+      examples:
+        - "Convert CSV to JSON"
+        - "Extract error messages from logs"
+        - "Generate env file from template"
+
+    classification:
+      - "Categorize errors"
+      - "Route requests"
+      - "Triage issues"
+      - "Label data"
+      examples:
+        - "Classify simulation failure type"
+        - "Route support request to correct team"
+        - "Label CGP packets by type"
+
+# --- Thread Type to Model Mapping ---
+
+thread_model_mapping:
+  B_thread:  # Base Thread
+    description: "Standard prompt-response"
+    primary: sonnet
+    fallback: haiku
+    use_opus_when: "Novel or ambiguous requirements"
+
+  P_thread:  # Parallel Thread
+    description: "Concurrent independent tasks"
+    primary: haiku  # Low latency for fan-out
+    fallback: sonnet
+    use_opus_when: "Aggregating complex parallel results"
+
+  C_thread:  # Chained Thread
+    description: "Sequential dependent operations"
+    primary: sonnet
+    fallback: haiku
+    use_opus_when: "Chain involves architectural decisions"
+
+  F_thread:  # Fusion Thread
+    description: "Multi-agent consensus (MACA)"
+    primary: opus  # Requires sophisticated reasoning
+    fallback: sonnet
+    use_opus_when: "Always - consensus requires deep reasoning"
+
+  L_thread:  # Big Thread (Venice.ai offload)
+    description: "Frontier model offloading"
+    primary: opus
+    fallback: sonnet
+    use_opus_when: "Complex multi-turn reasoning"
+
+  Z_thread:  # Zero-Touch Thread
+    description: "Automated workflows"
+    primary: haiku  # High volume, low latency
+    fallback: sonnet
+    use_opus_when: "Workflow involves novel decisions"
+
+# --- Cost Optimization Strategies ---
+
+cost_optimization:
+  principles:
+    - "Start with smallest capable model"
+    - "Escalate to larger model on failure or complexity"
+    - "Use Haiku for high-volume, low-stakes tasks"
+    - "Reserve Opus for decisions that matter"
+
+  escalation_triggers:
+    to_sonnet:
+      - "Haiku returns uncertain/low-confidence response"
+      - "Task requires code generation"
+      - "Output needs to be production-quality"
+
+    to_opus:
+      - "Sonnet struggles with multi-step reasoning"
+      - "Task involves architectural decisions"
+      - "Security or safety implications"
+      - "Novel problem not seen before"
+
+  batching:
+    - "Batch similar Haiku tasks for efficiency"
+    - "Prepare context once, process multiple items"
+    - "Use streaming for long Opus responses"
+
+# --- PMOVES-Specific Routing ---
+
+pmoves_task_routing:
+
+  simulation:
+    run_simulation: sonnet  # Standard execution
+    validate_params: haiku  # Quick validation
+    analyze_results: opus   # Interpret implications
+    optimize_params: opus   # Find optimal configuration
+
+  firefly:
+    generate_csv: haiku     # Simple transform
+    export_to_api: sonnet   # Standard integration
+    reconcile_data: opus    # Complex comparison
+
+  chit_geometry:
+    validate_cgp: haiku     # Schema check
+    generate_shapes: sonnet # Standard generation
+    analyze_distribution: opus  # Mathematical reasoning
+    verify_merkle: haiku    # Deterministic check
+
+  integration:
+    health_check: haiku     # Simple validation
+    service_discovery: haiku # Enumeration
+    debug_issues: opus      # Complex analysis
+    deploy_changes: sonnet  # Standard operations
+
+# --- Decision Tree ---
+
+decision_tree:
+  start: "What type of task?"
+  branches:
+    validation_or_check:
+      question: "Is it high-stakes?"
+      yes: sonnet
+      no: haiku
+
+    code_generation:
+      question: "Novel architecture?"
+      yes: opus
+      no: sonnet
+
+    analysis:
+      question: "Multi-system or complex?"
+      yes: opus
+      no: sonnet
+
+    planning:
+      question: "Strategic impact?"
+      yes: opus
+      no: sonnet
+
+    documentation:
+      question: "Technical depth required?"
+      high: sonnet
+      low: haiku
