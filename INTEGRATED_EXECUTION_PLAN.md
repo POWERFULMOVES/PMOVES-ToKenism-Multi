@@ -1,8 +1,9 @@
 # Integrated Execution Plan
 
-**Project:** PMOVEStokensim Economic Validation & Integrations  
-**Plan Start:** 2025-11-06  
-**Owner:** PMOVES Engineering & Data Teams  
+**Project:** PMOVEStokensim Economic Validation & Integrations
+**Plan Start:** 2025-11-06
+**Last Updated:** 2026-01-29
+**Owner:** PMOVES Engineering & Data Teams
 **Status Legend:** ☐ To Do · ◐ In Progress · ☐⧗ Blocked · ☑ Done
 
 ---
@@ -36,11 +37,11 @@
 ### 2.3 Firefly-iii Data Bridge
 | Status | Task | Notes |
 |--------|------|-------|
-| ☐ | Build Python API client leveraging endpoints from `FIREFLY_III_INTEGRATION_ANALYSIS.md` | Use typed dataclasses + retry logic. |
-| ☐ | Map Firefly payloads into simulator-compatible schema | Store under `pmoves_backend/adapters/firefly.py`. |
-| ☐ | Create contract tests with mocked responses | Validate pagination, filtering, auth errors. |
-| ☐ | Document API token/env var configuration | Add to top-level README & `.env.example`. |
-| ☐ | Schedule ingestion job (cron or task runner) to refresh calibration data | Output deltas for validation suite. |
+| ☑ | Build TypeScript API client leveraging endpoints from analysis | `integrations/firefly/firefly-client.ts` with retry logic |
+| ☐ | Map Firefly payloads into simulator-compatible schema | Store under `pmoves_backend/adapters/firefly.py` |
+| ☑ | Create contract tests with mocked responses | `integrations/firefly/firefly-client.spec.ts` (PR #30) |
+| ☑ | Document API token/env var configuration | Documented in integration README |
+| ☐ | Schedule ingestion job (cron or task runner) to refresh calibration data | Output deltas for validation suite |
 
 ### 2.4 Smart-Contract Harness & Simulation Hooks
 | Status | Task | Notes |
@@ -97,15 +98,25 @@ Mitigations: stagger feature flags, use mock services for CI, document fallback 
 |------|-------|
 | 2025-11-06 | Plan initialized; tasks seeded from visualization, integration, and contract analyses. |
 | 2025-11-06 | Navigation shell added with links to Analytics and Sensitivity routes. |
+| 2025-11-12 | Phases 1-3 complete: Event bus, contract models, projection validation. |
+| 2026-01-15 | Firefly-iii TypeScript client complete with tests (PR #30). |
+| 2026-01-20 | CHIT Geometry Bus implemented with NATS publisher. |
+| 2026-01-25 | BoTZ Claude Code skills and expertise guides added. |
+| 2026-01-29 | Branch consolidated to PMOVES.AI-Edition-Hardened. Production ready. |
 
 ---
 
 ## 6. Immediate Next Actions
-1. Confirm DoX repository access and note status in Progress Log.
-2. Draft navigation update PR for `/analytics` route.
-3. Outline Firefly client module structure and mock fixtures.
-4. Install Hardhat dependencies and verify existing contract tests.
+1. ~~Confirm DoX repository access and note status in Progress Log.~~ ✅ Available
+2. ~~Draft navigation update PR for `/analytics` route.~~ ✅ Complete
+3. ~~Outline Firefly client module structure and mock fixtures.~~ ✅ Complete
+4. ☐ Install Hardhat dependencies and verify existing contract tests.
+5. ☐ Implement Python adapter `pmoves_backend/adapters/firefly.py`
+6. ☐ Add `npm run analytics:test` and Hardhat lint/test jobs to CI pipeline
+7. ☐ Complete DoX CLI automation (`scripts/integrate_with_dox.py`)
 
 ---
+
+**Current Focus:** Frontend UI enhancements and production environment configuration.
 
 *Update this plan as milestones are reached and risks evolve. Link to this document from team status reports to centralize execution tracking.*
