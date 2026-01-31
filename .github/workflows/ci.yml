@@ -292,6 +292,10 @@ jobs:
   security:
     name: Security Audit
     runs-on: ubuntu-latest
+    outputs:
+      npm_nextjs_critical: ${{ steps.npm-nextjs.outputs.critical }}
+      npm_integrations_critical: ${{ steps.npm-integrations.outputs.critical }}
+      python_critical: ${{ steps.python-audit.outputs.critical }}
 
     steps:
       - name: Checkout repository
@@ -310,21 +314,48 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Audit npm packages (Next.js)
+        id: npm-nextjs
         working-directory: pmoves-nextjs
-        run: npm audit --audit-level=high || true
-        continue-on-error: true
+        run: |
+          echo "## Next.js Security Audit" >> $GITHUB_STEP_SUMMARY
+          if npm audit --audit-level=critical 2>&1; then
+            echo "critical=false" >> $GITHUB_OUTPUT
+            echo "No critical vulnerabilities found" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "critical=true" >> $GITHUB_OUTPUT
+            echo "Critical vulnerabilities detected - review required" >> $GITHUB_STEP_SUMMARY
+          fi
+          npm audit --audit-level=high || true
 
       - name: Audit npm packages (Integrations)
+        id: npm-integrations
         working-directory: integrations
-        run: npm audit --audit-level=high || true
-        continue-on-error: true
+        run: |
+          echo "## Integrations Security Audit" >> $GITHUB_STEP_SUMMARY
+          if npm audit --audit-level=critical 2>&1; then
+            echo "critical=false" >> $GITHUB_OUTPUT
+            echo "No critical vulnerabilities found" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "critical=true" >> $GITHUB_OUTPUT
+            echo "Critical vulnerabilities detected - review required" >> $GITHUB_STEP_SUMMARY
+          fi
+          npm audit --audit-level=high || true
 
       - name: Install safety for Python audit
         run: pip install safety
 
       - name: Audit Python packages
-        run: safety check -r requirements.txt --full-report || true
-        continue-on-error: true
+        id: python-audit
+        run: |
+          echo "## Python Security Audit" >> $GITHUB_STEP_SUMMARY
+          if safety check -r requirements.txt 2>&1; then
+            echo "critical=false" >> $GITHUB_OUTPUT
+            echo "No known vulnerabilities found" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "critical=true" >> $GITHUB_OUTPUT
+            echo "Vulnerabilities detected - review required" >> $GITHUB_STEP_SUMMARY
+          fi
+          safety check -r requirements.txt --full-report || true
 
   # ============================================
   # Summary Job
@@ -349,9 +380,21 @@ jobs:
           echo "| Integration Tests | ${{ needs.integrations.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Accessibility Tests | ${{ needs.accessibility.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Security Audit | ${{ needs.security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Security Status" >> $GITHUB_STEP_SUMMARY
+          echo "| Package | Critical Issues |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-----------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Next.js npm | ${{ needs.security.outputs.npm_nextjs_critical == 'true' && 'Yes' || 'No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integrations npm | ${{ needs.security.outputs.npm_integrations_critical == 'true' && 'Yes' || 'No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python | ${{ needs.security.outputs.python_critical == 'true' && 'Yes' || 'No' }} |" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if critical jobs failed
         if: needs.pytest.result == 'failure' || needs.jest.result == 'failure' || needs.build.result == 'failure'
         run: |
           echo "Critical jobs failed!"
           exit 1
+
+      - name: Warn on critical security issues
+        if: needs.security.outputs.npm_nextjs_critical == 'true' || needs.security.outputs.npm_integrations_critical == 'true' || needs.security.outputs.python_critical == 'true'
+        run: |
+          echo "::warning::Critical security vulnerabilities detected. Review the Security Audit job for details."

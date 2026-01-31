@@ -3,13 +3,20 @@ Firefly-iii API Client for Python
 
 Handles all interactions with PMOVES-Firefly-iii API.
 Mirrors the TypeScript client in integrations/firefly/firefly-client.ts
+
+Production-hardened with:
+- Immutable dataclasses with validation
+- Enum types for constrained values
+- Comprehensive logging for debugging
+- Explicit error handling and reporting
 """
 
 import logging
 import os
-import time
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from decimal import Decimal
+from enum import Enum
 from typing import Any, Optional
 
 import requests
@@ -19,9 +26,66 @@ from urllib3.util.retry import Retry
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+# ============================================
+# Enums for Type Safety
+# ============================================
+
+
+class TransactionType(str, Enum):
+    """Valid transaction types in Firefly-iii."""
+
+    WITHDRAWAL = "withdrawal"
+    DEPOSIT = "deposit"
+    TRANSFER = "transfer"
+
+    @classmethod
+    def from_str(cls, value: str) -> "TransactionType":
+        """Convert string to TransactionType, with fallback logging."""
+        try:
+            return cls(value.lower())
+        except ValueError:
+            logger.warning(
+                "[FireflyClient] Unknown transaction type '%s', defaulting to TRANSFER",
+                value,
+            )
+            return cls.TRANSFER
+
+
+class AccountType(str, Enum):
+    """Valid account types in Firefly-iii."""
+
+    ASSET = "asset"
+    EXPENSE = "expense"
+    REVENUE = "revenue"
+    CASH = "cash"
+    LIABILITY = "liability"
+    INITIAL_BALANCE = "initial-balance"
+    RECONCILIATION = "reconciliation"
+
+    @classmethod
+    def from_str(cls, value: str) -> "AccountType":
+        """Convert string to AccountType, with fallback logging."""
+        try:
+            return cls(value.lower())
+        except ValueError:
+            logger.warning(
+                "[FireflyClient] Unknown account type '%s', defaulting to ASSET",
+                value,
+            )
+            return cls.ASSET
+
+
+# ============================================
+# Configuration
+# ============================================
+
+
+@dataclass(frozen=True)
 class FireflyConfig:
-    """Configuration for Firefly-iii API client."""
+    """Configuration for Firefly-iii API client.
+
+    Immutable configuration to prevent accidental modification during runtime.
+    """
 
     base_url: str = "http://firefly:8080"
     api_token: str = ""
@@ -29,12 +93,20 @@ class FireflyConfig:
     timeout: int = 30
     retry_count: int = 3
 
+    def __post_init__(self) -> None:
+        """Validate configuration after initialization."""
+        if self.timeout <= 0:
+            raise ValueError(f"timeout must be positive, got {self.timeout}")
+        if self.retry_count < 0:
+            raise ValueError(f"retry_count must be non-negative, got {self.retry_count}")
+
     @classmethod
     def from_env(cls) -> "FireflyConfig":
         """Create config from environment variables.
 
         Raises:
-            ValueError: If FIREFLY_API_TOKEN is not set or empty.
+            ValueError: If FIREFLY_API_TOKEN is not set or empty,
+                       or if other values are invalid.
         """
         api_token = os.getenv("FIREFLY_API_TOKEN", "")
         if not api_token:
@@ -43,13 +115,15 @@ class FireflyConfig:
                 "Please set it to your Firefly-iii personal access token."
             )
 
-        timeout = int(os.getenv("FIREFLY_TIMEOUT", "30"))
-        if timeout <= 0:
-            raise ValueError("FIREFLY_TIMEOUT must be a positive integer")
+        try:
+            timeout = int(os.getenv("FIREFLY_TIMEOUT", "30"))
+        except ValueError as e:
+            raise ValueError(f"FIREFLY_TIMEOUT must be an integer: {e}") from e
 
-        retry_count = int(os.getenv("FIREFLY_RETRY_COUNT", "3"))
-        if retry_count < 0:
-            raise ValueError("FIREFLY_RETRY_COUNT must be non-negative")
+        try:
+            retry_count = int(os.getenv("FIREFLY_RETRY_COUNT", "3"))
+        except ValueError as e:
+            raise ValueError(f"FIREFLY_RETRY_COUNT must be an integer: {e}") from e
 
         return cls(
             base_url=os.getenv("FIREFLY_BASE_URL", "http://firefly:8080"),
@@ -60,75 +134,141 @@ class FireflyConfig:
         )
 
 
-@dataclass
+# ============================================
+# Data Models (Immutable)
+# ============================================
+
+
+@dataclass(frozen=True)
 class CategorySpending:
     """Spending by category."""
 
     category: str
-    amount: float
+    amount: Decimal
     count: int
 
+    def __post_init__(self) -> None:
+        """Validate spending data."""
+        if self.count < 0:
+            raise ValueError(f"count must be non-negative, got {self.count}")
 
-@dataclass
+
+@dataclass(frozen=True)
 class BudgetAnalysis:
     """Budget vs actual analysis."""
 
     budget_name: str
-    budgeted: float
-    actual: float
-    variance: float
-    variance_percent: float
+    budgeted: Decimal
+    actual: Decimal
+
+    @property
+    def variance(self) -> Decimal:
+        """Calculate variance (budgeted - actual)."""
+        return self.budgeted - self.actual
+
+    @property
+    def variance_percent(self) -> Decimal:
+        """Calculate variance percentage."""
+        if self.budgeted == 0:
+            return Decimal("0")
+        return (self.variance / self.budgeted) * 100
 
 
-@dataclass
+@dataclass(frozen=True)
 class AccountInfo:
     """Account information."""
 
     name: str
-    balance: float
-    account_type: str
+    balance: Decimal
+    account_type: AccountType
 
 
-@dataclass
+@dataclass(frozen=True)
 class WealthDistribution:
     """Wealth distribution for a user."""
 
     user_id: str
-    total_wealth: float
-    accounts: list[AccountInfo] = field(default_factory=list)
+    accounts: tuple[AccountInfo, ...]  # Immutable tuple instead of list
+
+    @property
+    def total_wealth(self) -> Decimal:
+        """Calculate total wealth from all accounts."""
+        return sum((acc.balance for acc in self.accounts), Decimal("0"))
 
 
-@dataclass
+@dataclass(frozen=True)
 class PiggyBank:
     """Piggy bank (savings goal) information."""
 
     name: str
-    target_amount: float
-    current_amount: float
-    progress_percent: float
+    target_amount: Decimal
+    current_amount: Decimal
+
+    @property
+    def progress_percent(self) -> Decimal:
+        """Calculate progress percentage."""
+        if self.target_amount == 0:
+            if self.current_amount > 0:
+                logger.warning(
+                    "[FireflyClient] Piggy bank '%s' has savings but no target amount",
+                    self.name,
+                )
+                return Decimal("100")
+            return Decimal("0")
+        return (self.current_amount / self.target_amount) * 100
 
 
-@dataclass
+@dataclass(frozen=True)
 class SavingsMetrics:
     """Savings progress metrics."""
 
-    total_savings: float
-    savings_rate: float
-    piggy_banks: list[PiggyBank] = field(default_factory=list)
+    piggy_banks: tuple[PiggyBank, ...]  # Immutable tuple
+    savings_rate: Decimal = Decimal("0")
+
+    @property
+    def total_savings(self) -> Decimal:
+        """Calculate total savings from all piggy banks."""
+        return sum((pb.current_amount for pb in self.piggy_banks), Decimal("0"))
 
 
-@dataclass
+@dataclass(frozen=True)
 class Transaction:
     """Transaction information."""
 
     id: str
-    amount: float
+    amount: Decimal
     description: str
-    date: str
+    transaction_date: date  # Use proper date type
     category: str
     source_account: str
     destination_account: str
-    transaction_type: str
+    transaction_type: TransactionType
+
+    def __post_init__(self) -> None:
+        """Validate transaction data."""
+        if not self.id:
+            raise ValueError("Transaction id cannot be empty")
+        if self.amount < 0:
+            raise ValueError(f"Transaction amount must be non-negative, got {self.amount}")
+
+
+# ============================================
+# Connection Test Result
+# ============================================
+
+
+@dataclass(frozen=True)
+class ConnectionTestResult:
+    """Result of connection test with detailed status."""
+
+    success: bool
+    message: str
+    details: Optional[dict[str, Any]] = None
+
+
+# ============================================
+# API Client
+# ============================================
 
 
 class FireflyClient:
@@ -141,6 +281,8 @@ class FireflyClient:
     - Budget analysis
     - Wealth distribution queries
     - Savings progress tracking
+
+    All methods include comprehensive logging for production debugging.
     """
 
     def __init__(self, config: Optional[FireflyConfig] = None):
@@ -149,6 +291,9 @@ class FireflyClient:
 
         Args:
             config: Configuration for the client. If None, loads from environment.
+
+        Raises:
+            ValueError: If configuration is invalid.
         """
         self.config = config or FireflyConfig.from_env()
         self._session = self._create_session()
@@ -246,20 +391,86 @@ class FireflyClient:
             return d.date().isoformat()
         return d.isoformat()
 
-    def test_connection(self) -> bool:
+    @staticmethod
+    def _safe_decimal(value: Any, field_name: str, default: Decimal = Decimal("0")) -> Decimal:
+        """Safely convert a value to Decimal with logging on fallback."""
+        if value is None:
+            logger.debug("[FireflyClient] Field '%s' is None, using default %s", field_name, default)
+            return default
+        try:
+            return Decimal(str(value))
+        except (ValueError, TypeError) as e:
+            logger.warning(
+                "[FireflyClient] Failed to convert '%s' value '%s' to Decimal: %s. Using default %s",
+                field_name,
+                value,
+                e,
+                default,
+            )
+            return default
+
+    @staticmethod
+    def _safe_int(value: Any, field_name: str, default: int = 0) -> int:
+        """Safely convert a value to int with logging on fallback."""
+        if value is None:
+            logger.debug("[FireflyClient] Field '%s' is None, using default %s", field_name, default)
+            return default
+        try:
+            return int(value)
+        except (ValueError, TypeError) as e:
+            logger.warning(
+                "[FireflyClient] Failed to convert '%s' value '%s' to int: %s. Using default %s",
+                field_name,
+                value,
+                e,
+                default,
+            )
+            return default
+
+    @staticmethod
+    def _safe_str(value: Any, field_name: str, default: str = "") -> str:
+        """Safely get string value with logging on fallback."""
+        if value is None:
+            logger.debug("[FireflyClient] Field '%s' is None, using default '%s'", field_name, default)
+            return default
+        return str(value)
+
+    def test_connection(self) -> ConnectionTestResult:
         """
-        Test connection to Firefly-iii.
+        Test connection to Firefly-iii with detailed error reporting.
 
         Returns:
-            True if connection successful, False otherwise
+            ConnectionTestResult with success status, message, and optional details
         """
         try:
             response = self._request("GET", "/about")
-            logger.info("[FireflyClient] Connection successful: %s", response.json())
-            return True
-        except requests.RequestException:
-            logger.error("[FireflyClient] Connection failed")
-            return False
+            data = response.json()
+            logger.info("[FireflyClient] Connection successful: %s", data)
+            return ConnectionTestResult(
+                success=True,
+                message="Connection successful",
+                details=data,
+            )
+        except requests.Timeout:
+            msg = f"Connection timed out after {self.config.timeout}s - check if Firefly is running"
+            logger.error("[FireflyClient] %s", msg)
+            return ConnectionTestResult(success=False, message=msg)
+        except requests.ConnectionError as e:
+            msg = f"Cannot connect to {self.config.base_url} - check URL and network: {e}"
+            logger.error("[FireflyClient] %s", msg)
+            return ConnectionTestResult(success=False, message=msg)
+        except requests.HTTPError as e:
+            if e.response is not None and e.response.status_code == 401:
+                msg = "Authentication failed - check FIREFLY_API_TOKEN"
+            else:
+                status = e.response.status_code if e.response is not None else "unknown"
+                msg = f"HTTP error {status}: {e}"
+            logger.error("[FireflyClient] %s", msg)
+            return ConnectionTestResult(success=False, message=msg)
+        except requests.RequestException as e:
+            msg = f"Request failed: {e}"
+            logger.error("[FireflyClient] %s", msg)
+            return ConnectionTestResult(success=False, message=msg)
 
     def get_spending_by_category(
         self, start_date: date, end_date: date
@@ -283,14 +494,30 @@ class FireflyClient:
             },
         )
 
-        return [
-            CategorySpending(
-                category=item.get("name", "unknown"),
-                amount=float(item.get("sum", 0)),
-                count=int(item.get("count", 0)),
+        results = []
+        for idx, item in enumerate(response.json()):
+            # Log missing fields
+            if "name" not in item:
+                logger.warning(
+                    "[FireflyClient] Category item %d missing 'name' field, using '[unknown-%d]'",
+                    idx,
+                    idx,
+                )
+            if "sum" not in item:
+                logger.warning(
+                    "[FireflyClient] Category '%s' missing 'sum' field, using 0",
+                    item.get("name", f"[unknown-{idx}]"),
+                )
+
+            results.append(
+                CategorySpending(
+                    category=item.get("name", f"[unknown-{idx}]"),
+                    amount=self._safe_decimal(item.get("sum"), f"category[{idx}].sum"),
+                    count=self._safe_int(item.get("count"), f"category[{idx}].count"),
+                )
             )
-            for item in response.json()
-        ]
+
+        return results
 
     def get_budget_vs_actual(
         self, start_date: date, end_date: date
@@ -315,18 +542,35 @@ class FireflyClient:
         )
 
         results = []
-        for item in response.json():
-            budgeted = float(item.get("budgeted", 0))
-            actual = float(item.get("sum", 0))
-            variance = budgeted - actual
+        for idx, item in enumerate(response.json()):
+            budget_name = item.get("name", f"[unknown-{idx}]")
+
+            if "budgeted" not in item:
+                logger.warning(
+                    "[FireflyClient] Budget '%s' missing 'budgeted' field",
+                    budget_name,
+                )
+            if "sum" not in item:
+                logger.warning(
+                    "[FireflyClient] Budget '%s' missing 'sum' (actual) field",
+                    budget_name,
+                )
+
+            budgeted = self._safe_decimal(item.get("budgeted"), f"budget[{idx}].budgeted")
+            actual = self._safe_decimal(item.get("sum"), f"budget[{idx}].sum")
+
+            if budgeted == 0 and actual != 0:
+                logger.warning(
+                    "[FireflyClient] Budget '%s' has $%s actual spending but $0 budgeted",
+                    budget_name,
+                    actual,
+                )
 
             results.append(
                 BudgetAnalysis(
-                    budget_name=item.get("name", "unknown"),
+                    budget_name=budget_name,
                     budgeted=budgeted,
                     actual=actual,
-                    variance=variance,
-                    variance_percent=(variance / budgeted * 100) if budgeted > 0 else 0,
                 )
             )
 
@@ -352,41 +596,36 @@ class FireflyClient:
         )
 
         # Group accounts by user
-        accounts_by_user: dict[str, list[dict]] = {}
+        accounts_by_user: dict[str, list[AccountInfo]] = {}
         for account in response.json().get("data", []):
-            user_id = account.get("attributes", {}).get("user_id", "unknown")
+            attrs = account.get("attributes", {})
+            user_id = self._safe_str(attrs.get("user_id"), "user_id", "unknown")
+
+            if user_id == "unknown":
+                logger.warning(
+                    "[FireflyClient] Account '%s' has no user_id",
+                    attrs.get("name", "unknown"),
+                )
+
             if user_id not in accounts_by_user:
                 accounts_by_user[user_id] = []
-            accounts_by_user[user_id].append(account)
 
-        # Calculate total wealth per user
-        wealth_distribution = []
-        for user_id, accounts in accounts_by_user.items():
-            total_wealth = sum(
-                float(acc.get("attributes", {}).get("current_balance", 0))
-                for acc in accounts
-            )
-
-            wealth_distribution.append(
-                WealthDistribution(
-                    user_id=user_id,
-                    total_wealth=total_wealth,
-                    accounts=[
-                        AccountInfo(
-                            name=acc.get("attributes", {}).get("name", "unknown"),
-                            balance=float(
-                                acc.get("attributes", {}).get("current_balance", 0)
-                            ),
-                            account_type=acc.get("attributes", {}).get(
-                                "type", "unknown"
-                            ),
-                        )
-                        for acc in accounts
-                    ],
+            accounts_by_user[user_id].append(
+                AccountInfo(
+                    name=self._safe_str(attrs.get("name"), "account.name", "[unnamed]"),
+                    balance=self._safe_decimal(attrs.get("current_balance"), "account.current_balance"),
+                    account_type=AccountType.from_str(attrs.get("type", "asset")),
                 )
             )
 
-        return wealth_distribution
+        # Build wealth distribution list
+        return [
+            WealthDistribution(
+                user_id=user_id,
+                accounts=tuple(accounts),  # Convert to immutable tuple
+            )
+            for user_id, accounts in accounts_by_user.items()
+        ]
 
     def get_savings_progress(self) -> SavingsMetrics:
         """
@@ -398,35 +637,38 @@ class FireflyClient:
         response = self._request("GET", "/piggy-banks")
 
         piggy_banks = []
-        for pb in response.json().get("data", []):
+        for idx, pb in enumerate(response.json().get("data", [])):
             attrs = pb.get("attributes", {})
-            target_amount = float(attrs.get("target_amount", 0))
-            current_amount = float(attrs.get("current_amount", 0))
+            name = self._safe_str(attrs.get("name"), f"piggy_bank[{idx}].name", f"[unnamed-{idx}]")
+
+            target_amount = self._safe_decimal(attrs.get("target_amount"), f"piggy_bank[{idx}].target_amount")
+            current_amount = self._safe_decimal(attrs.get("current_amount"), f"piggy_bank[{idx}].current_amount")
+
+            if target_amount == 0 and current_amount > 0:
+                logger.warning(
+                    "[FireflyClient] Piggy bank '%s' has $%s saved but no target amount set",
+                    name,
+                    current_amount,
+                )
 
             piggy_banks.append(
                 PiggyBank(
-                    name=attrs.get("name", "unknown"),
+                    name=name,
                     target_amount=target_amount,
                     current_amount=current_amount,
-                    progress_percent=(
-                        (current_amount / target_amount * 100) if target_amount > 0 else 0
-                    ),
                 )
             )
 
-        total_savings = sum(pb.current_amount for pb in piggy_banks)
-
         return SavingsMetrics(
-            total_savings=total_savings,
-            savings_rate=0,  # Would need income data for accurate calculation
-            piggy_banks=piggy_banks,
+            piggy_banks=tuple(piggy_banks),  # Convert to immutable tuple
+            savings_rate=Decimal("0"),  # Would need income data for accurate calculation
         )
 
     def get_transactions(
         self,
         start_date: date,
         end_date: date,
-        transaction_type: Optional[str] = None,
+        transaction_type: Optional[TransactionType] = None,
     ) -> list[Transaction]:
         """
         Get transactions for a date range.
@@ -444,23 +686,45 @@ class FireflyClient:
             "end": self._format_date(end_date),
         }
         if transaction_type:
-            params["type"] = transaction_type
+            params["type"] = transaction_type.value
 
         response = self._request("GET", "/transactions", params=params)
 
         transactions = []
-        for group in response.json().get("data", []):
-            for tx in group.get("attributes", {}).get("transactions", []):
+        for group_idx, group in enumerate(response.json().get("data", [])):
+            for tx_idx, tx in enumerate(group.get("attributes", {}).get("transactions", [])):
+                tx_id = self._safe_str(tx.get("transaction_journal_id"), f"tx[{group_idx}][{tx_idx}].id")
+
+                if not tx_id:
+                    logger.warning(
+                        "[FireflyClient] Transaction at group %d, index %d has no ID, skipping",
+                        group_idx,
+                        tx_idx,
+                    )
+                    continue
+
+                # Parse transaction date
+                date_str = tx.get("date", "")
+                try:
+                    tx_date = date.fromisoformat(date_str[:10]) if date_str else date.today()
+                except ValueError:
+                    logger.warning(
+                        "[FireflyClient] Invalid date '%s' for transaction %s, using today",
+                        date_str,
+                        tx_id,
+                    )
+                    tx_date = date.today()
+
                 transactions.append(
                     Transaction(
-                        id=str(tx.get("transaction_journal_id", "")),
-                        amount=float(tx.get("amount", 0)),
-                        description=tx.get("description", ""),
-                        date=tx.get("date", ""),
-                        category=tx.get("category_name", "uncategorized"),
-                        source_account=tx.get("source_name", ""),
-                        destination_account=tx.get("destination_name", ""),
-                        transaction_type=tx.get("type", ""),
+                        id=tx_id,
+                        amount=self._safe_decimal(tx.get("amount"), f"tx[{tx_id}].amount"),
+                        description=self._safe_str(tx.get("description"), f"tx[{tx_id}].description"),
+                        transaction_date=tx_date,
+                        category=self._safe_str(tx.get("category_name"), f"tx[{tx_id}].category", "uncategorized"),
+                        source_account=self._safe_str(tx.get("source_name"), f"tx[{tx_id}].source"),
+                        destination_account=self._safe_str(tx.get("destination_name"), f"tx[{tx_id}].destination"),
+                        transaction_type=TransactionType.from_str(tx.get("type", "transfer")),
                     )
                 )
 
@@ -487,7 +751,7 @@ class FireflyClient:
         )
         return response.text
 
-    def get_accounts(self, account_type: str = "asset") -> list[dict[str, Any]]:
+    def get_accounts(self, account_type: AccountType = AccountType.ASSET) -> list[dict[str, Any]]:
         """
         Get all accounts of a specific type.
 
@@ -500,15 +764,15 @@ class FireflyClient:
         response = self._request(
             "GET",
             "/accounts",
-            params={"type": account_type},
+            params={"type": account_type.value},
         )
         return response.json().get("data", [])
 
     def create_account(
         self,
         name: str,
-        account_type: str,
-        balance: float = 0,
+        account_type: AccountType,
+        balance: Decimal = Decimal("0"),
         account_role: Optional[str] = None,
     ) -> dict[str, Any]:
         """
@@ -516,7 +780,7 @@ class FireflyClient:
 
         Args:
             name: Account name
-            account_type: Type of account (e.g., 'asset', 'expense')
+            account_type: Type of account
             balance: Opening balance
             account_role: Account role (required for asset accounts)
 
@@ -525,13 +789,13 @@ class FireflyClient:
         """
         payload: dict[str, Any] = {
             "name": name,
-            "type": account_type,
+            "type": account_type.value,
             "opening_balance": str(balance),
             "opening_balance_date": date.today().isoformat(),
         }
 
         # Asset accounts require an account_role
-        if account_type == "asset":
+        if account_type == AccountType.ASSET:
             payload["account_role"] = account_role or "defaultAsset"
 
         response = self._request("POST", "/accounts", json_data=payload)
@@ -539,9 +803,9 @@ class FireflyClient:
 
     def create_transaction(
         self,
-        transaction_type: str,
+        transaction_type: TransactionType,
         transaction_date: date,
-        amount: float,
+        amount: Decimal,
         description: str,
         source_id: Optional[str] = None,
         destination_id: Optional[str] = None,
@@ -554,7 +818,7 @@ class FireflyClient:
         Create a new transaction.
 
         Args:
-            transaction_type: Type of transaction ('withdrawal', 'deposit', 'transfer')
+            transaction_type: Type of transaction
             transaction_date: Date of transaction
             amount: Transaction amount
             description: Transaction description
@@ -569,7 +833,7 @@ class FireflyClient:
             Created transaction data
         """
         payload: dict[str, Any] = {
-            "type": transaction_type,
+            "type": transaction_type.value,
             "date": self._format_date(transaction_date),
             "amount": str(amount),
             "description": description,
@@ -625,7 +889,7 @@ class FireflyClient:
             if "InternalTx_A" in week and week["InternalTx_A"] > 0:
                 transactions.append(
                     {
-                        "type": "transfer",
+                        "type": TransactionType.TRANSFER.value,
                         "date": week_date.isoformat(),
                         "amount": str(week["InternalTx_A"]),
                         "description": f"Week {week.get('Week', week_idx + 1)} - Group A Internal",
@@ -639,7 +903,7 @@ class FireflyClient:
             if "InternalTx_B" in week and week["InternalTx_B"] > 0:
                 transactions.append(
                     {
-                        "type": "transfer",
+                        "type": TransactionType.TRANSFER.value,
                         "date": week_date.isoformat(),
                         "amount": str(week["InternalTx_B"]),
                         "description": f"Week {week.get('Week', week_idx + 1)} - Group B Internal",
@@ -653,7 +917,7 @@ class FireflyClient:
             if "ExternalSpend_A" in week and week["ExternalSpend_A"] > 0:
                 transactions.append(
                     {
-                        "type": "withdrawal",
+                        "type": TransactionType.WITHDRAWAL.value,
                         "date": week_date.isoformat(),
                         "amount": str(week["ExternalSpend_A"]),
                         "description": f"Week {week.get('Week', week_idx + 1)} - Group A External",
@@ -666,7 +930,7 @@ class FireflyClient:
             if "ExternalSpend_B" in week and week["ExternalSpend_B"] > 0:
                 transactions.append(
                     {
-                        "type": "withdrawal",
+                        "type": TransactionType.WITHDRAWAL.value,
                         "date": week_date.isoformat(),
                         "amount": str(week["ExternalSpend_B"]),
                         "description": f"Week {week.get('Week', week_idx + 1)} - Group B External",
@@ -700,6 +964,10 @@ class FireflyClient:
         )
 
         if dry_run:
+            logger.info(
+                "[FireflyClient] Dry run: would create %d transactions",
+                len(transactions),
+            )
             return {
                 "dry_run": True,
                 "transaction_count": len(transactions),
@@ -708,21 +976,57 @@ class FireflyClient:
 
         created = []
         errors = []
+        total = len(transactions)
 
-        for tx in transactions:
+        logger.info("[FireflyClient] Starting import of %d transactions", total)
+
+        for idx, tx in enumerate(transactions):
             try:
                 result = self.create_transaction(
-                    transaction_type=tx["type"],
+                    transaction_type=TransactionType(tx["type"]),
                     transaction_date=date.fromisoformat(tx["date"]),
-                    amount=float(tx["amount"]),
+                    amount=Decimal(tx["amount"]),
                     description=tx["description"],
                     source_name=tx.get("source_name"),
                     destination_name=tx.get("destination_name"),
                     category=tx.get("category_name"),
                 )
                 created.append(result)
+                logger.debug(
+                    "[FireflyClient] Created transaction %d/%d: %s",
+                    idx + 1,
+                    total,
+                    tx["description"],
+                )
             except requests.RequestException as e:
+                logger.error(
+                    "[FireflyClient] Failed to create transaction %d/%d '%s': %s",
+                    idx + 1,
+                    total,
+                    tx["description"],
+                    str(e),
+                )
                 errors.append({"transaction": tx, "error": str(e)})
+            except (ValueError, KeyError, TypeError) as e:
+                logger.error(
+                    "[FireflyClient] Invalid transaction data at index %d: %s. Data: %s",
+                    idx,
+                    str(e),
+                    tx,
+                )
+                errors.append({"transaction": tx, "error": f"Invalid data: {str(e)}"})
+
+        if errors:
+            logger.warning(
+                "[FireflyClient] Import completed with %d errors out of %d transactions",
+                len(errors),
+                total,
+            )
+        else:
+            logger.info(
+                "[FireflyClient] Import completed successfully: %d transactions created",
+                len(created),
+            )
 
         return {
             "dry_run": False,
