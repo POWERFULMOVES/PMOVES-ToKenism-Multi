@@ -88,28 +88,36 @@ This document tracks the implementation status of PMOVES.AI features aligned wit
 
 ### High Priority
 
-| Feature | Reference | Description |
-|---------|-----------|-------------|
-| Production Env Files | `docker-compose.pmoves.yml` | Create `env.shared`, `env.tier-*` files |
-| EvoSwarm Evo-Controller | `agents/PMOVES.AI Agentic Architecture Deep Dive.md` §4.3 | Self-improving feedback loops |
-| Firefly Python Adapter | `INTEGRATED_EXECUTION_PLAN.md` §2.3 | `pmoves_backend/adapters/firefly.py` |
+| Feature | Reference | Status | Description |
+|---------|-----------|--------|-------------|
+| Production Env Files | `docker-compose.pmoves.yml` | ⏳ Phase 4 | Create `env.shared`, `env.tier-*` files |
+| Firefly Python Adapter | `INTEGRATED_EXECUTION_PLAN.md` §2.3 | ⏳ Phase 5 | `pmoves_backend/adapters/firefly.py` |
+| CI Pipeline Expansion | `INTEGRATED_EXECUTION_PLAN.md` §2.6 | ⏳ Phase 5 | Jest, Hardhat, Pytest workflows |
 
 ### Medium Priority
 
-| Feature | Reference | Description |
-|---------|-----------|-------------|
-| Venice.ai Integration | `agents/HARDWARE_TTS_REQUIREMENTS.md` §1.3 | Big Thread offloading to frontier models |
-| MACA Consensus | `agents/PMOVES.AI Agentic Architecture Deep Dive.md` §5.2 | Multi-Agent Consensus Alignment |
-| CI Pipeline Jobs | `INTEGRATED_EXECUTION_PLAN.md` §2.6 | `npm run analytics:test`, Hardhat tests |
-| DoX CLI Automation | `INTEGRATED_EXECUTION_PLAN.md` §2.2 | `scripts/integrate_with_dox.py` |
+| Feature | Reference | Status | Description |
+|---------|-----------|--------|-------------|
+| EvoSwarm Evo-Controller | `agents/` §4.3 | 🔬 Research | Tuning capsules, learning algorithm, expertise updater |
+| MACA Consensus | `agents/` §5.2 | 🔬 Research | Shape merger, entropy calculator, multi-model routing |
+| Venice.ai Integration | `agents/HARDWARE_TTS_REQUIREMENTS.md` | 🔬 Research | VeniceClient, complexity analyzer, offload routing |
+| DoX CLI Automation | `INTEGRATED_EXECUTION_PLAN.md` §2.2 | ⏳ Phase 5 | `scripts/integrate_with_dox.py` |
 
 ### Low Priority
 
-| Feature | Reference | Description |
-|---------|-----------|-------------|
-| TTS Engine Integration | `agents/HARDWARE_TTS_REQUIREMENTS.md` §2 | KOKORO, Fish Speech, IndexTTS2, VibeVoice |
-| Hardhat Contract Tests | `INTEGRATED_EXECUTION_PLAN.md` §2.4 | GroVault, GroupPurchase governance |
-| Smart Contract Harness | `INTEGRATED_EXECUTION_PLAN.md` §2.4 | Python adapter for contract simulation |
+| Feature | Reference | Status | Description |
+|---------|-----------|--------|-------------|
+| TTS Engine Integration | `agents/HARDWARE_TTS_REQUIREMENTS.md` §2 | 📋 Planned | KOKORO, Fish Speech, IndexTTS2, VibeVoice |
+| Hardhat Contract Tests | `INTEGRATED_EXECUTION_PLAN.md` §2.4 | ⏳ Phase 5 | GroVault, GroupPurchase governance |
+| Smart Contract Harness | `INTEGRATED_EXECUTION_PLAN.md` §2.4 | 📋 Planned | Python adapter for contract simulation |
+
+### Completed (Recently Verified)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| MathModelService | ✅ Complete | 8+ methods, full validation framework |
+| Frontend UI Animations | ✅ Complete | Phase 3 - globals.css, design-tokens.ts |
+| Accessibility Improvements | ✅ Complete | Phase 3 - skip nav, ARIA landmarks |
 
 ---
 
