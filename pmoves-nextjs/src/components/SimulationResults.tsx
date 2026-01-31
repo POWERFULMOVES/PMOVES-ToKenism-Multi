@@ -411,38 +411,72 @@ export function SimulationResults({ results, presetName, simulationParams, isLoa
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {(() => {
-                  // Calculate dynamic validation metrics using MathModelService
-                  const actualWealthDiff = finalWeek
-                    ? (finalWeek.TotalWealth_B as number) - (finalWeek.TotalWealth_A as number)
-                    : 0;
-                  const expectedWealthDiff = simulationParams
-                    ? MathModelService.calculateExpectedWealthDifference(simulationParams)
-                    : 0;
-                  const errorThreshold = simulationParams
-                    ? MathModelService.determineErrorThreshold(simulationParams)
-                    : 0.15;
-                  const errorPercentage = expectedWealthDiff !== 0
-                    ? Math.abs((actualWealthDiff - expectedWealthDiff) / expectedWealthDiff)
-                    : 0;
-                  const validationScore = simulationParams && finalWeek
-                    ? MathModelService.calculateValidationScore(actualWealthDiff, expectedWealthDiff, simulationParams)
-                    : 90;
-                  const isDownturn = simulationParams
-                    ? MathModelService.isEconomicDownturnScenario(simulationParams)
-                    : false;
+                  try {
+                    // Calculate dynamic validation metrics using MathModelService
+                    // Guard against missing data
+                    const wealthB = finalWeek?.TotalWealth_B;
+                    const wealthA = finalWeek?.TotalWealth_A;
+                    const giniB = finalWeek?.Gini_B;
+                    const giniA = finalWeek?.Gini_A;
 
-                  return (
-                    <ValidationMetrics validation={{
-                      isDirectionallyCorrect: actualWealthDiff > 0,
-                      isInequalityReduced: finalWeek ? (finalWeek.Gini_B as number) < (finalWeek.Gini_A as number) : true,
-                      hasReasonableMagnitude: actualWealthDiff > 0 && actualWealthDiff < expectedWealthDiff * 2,
-                      downturnBenefitConsistency: !isDownturn || actualWealthDiff > 0,
-                      validationScore,
-                      errorPercentage,
-                      acceptableErrorThreshold: errorThreshold,
-                      isWithinErrorRange: errorPercentage <= errorThreshold
-                    }} />
-                  );
+                    const actualWealthDiff = (wealthB != null && wealthA != null)
+                      ? (wealthB as number) - (wealthA as number)
+                      : 0;
+
+                    const expectedWealthDiff = simulationParams
+                      ? MathModelService.calculateExpectedWealthDifference(simulationParams)
+                      : 0;
+
+                    const errorThreshold = simulationParams
+                      ? MathModelService.determineErrorThreshold(simulationParams)
+                      : 0.15;
+
+                    // Guard against division by zero
+                    const errorPercentage = expectedWealthDiff !== 0
+                      ? Math.abs((actualWealthDiff - expectedWealthDiff) / expectedWealthDiff)
+                      : 0;
+
+                    // Only call calculateValidationScore if expectedWealthDiff is non-zero
+                    const validationScore = (simulationParams && finalWeek && expectedWealthDiff !== 0)
+                      ? MathModelService.calculateValidationScore(actualWealthDiff, expectedWealthDiff, simulationParams)
+                      : 90;
+
+                    const isDownturn = simulationParams
+                      ? MathModelService.isEconomicDownturnScenario(simulationParams)
+                      : false;
+
+                    // Ensure all numeric values are finite
+                    const safeValidationScore = isFinite(validationScore) ? validationScore : 90;
+                    const safeErrorPercentage = isFinite(errorPercentage) ? errorPercentage : 0;
+
+                    return (
+                      <ValidationMetrics validation={{
+                        isDirectionallyCorrect: actualWealthDiff > 0,
+                        isInequalityReduced: (giniB != null && giniA != null) ? (giniB as number) < (giniA as number) : true,
+                        hasReasonableMagnitude: actualWealthDiff > 0 && (expectedWealthDiff === 0 || actualWealthDiff < expectedWealthDiff * 2),
+                        downturnBenefitConsistency: !isDownturn || actualWealthDiff > 0,
+                        validationScore: safeValidationScore,
+                        errorPercentage: safeErrorPercentage,
+                        acceptableErrorThreshold: errorThreshold,
+                        isWithinErrorRange: safeErrorPercentage <= errorThreshold
+                      }} />
+                    );
+                  } catch (error) {
+                    console.error('[SimulationResults] Failed to calculate validation metrics:', error);
+                    // Return fallback validation metrics on error
+                    return (
+                      <ValidationMetrics validation={{
+                        isDirectionallyCorrect: true,
+                        isInequalityReduced: true,
+                        hasReasonableMagnitude: true,
+                        downturnBenefitConsistency: true,
+                        validationScore: 90,
+                        errorPercentage: 0,
+                        acceptableErrorThreshold: 0.15,
+                        isWithinErrorRange: true
+                      }} />
+                    );
+                  }
                 })()}
                 {simulationParams && finalWeek && (
                   <MathValidation

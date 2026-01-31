@@ -31,13 +31,32 @@ class FireflyConfig:
 
     @classmethod
     def from_env(cls) -> "FireflyConfig":
-        """Create config from environment variables."""
+        """Create config from environment variables.
+
+        Raises:
+            ValueError: If FIREFLY_API_TOKEN is not set or empty.
+        """
+        api_token = os.getenv("FIREFLY_API_TOKEN", "")
+        if not api_token:
+            raise ValueError(
+                "FIREFLY_API_TOKEN environment variable is required. "
+                "Please set it to your Firefly-iii personal access token."
+            )
+
+        timeout = int(os.getenv("FIREFLY_TIMEOUT", "30"))
+        if timeout <= 0:
+            raise ValueError("FIREFLY_TIMEOUT must be a positive integer")
+
+        retry_count = int(os.getenv("FIREFLY_RETRY_COUNT", "3"))
+        if retry_count < 0:
+            raise ValueError("FIREFLY_RETRY_COUNT must be non-negative")
+
         return cls(
             base_url=os.getenv("FIREFLY_BASE_URL", "http://firefly:8080"),
-            api_token=os.getenv("FIREFLY_API_TOKEN", ""),
+            api_token=api_token,
             api_version=os.getenv("FIREFLY_API_VERSION", "v1"),
-            timeout=int(os.getenv("FIREFLY_TIMEOUT", "30")),
-            retry_count=int(os.getenv("FIREFLY_RETRY_COUNT", "3")),
+            timeout=timeout,
+            retry_count=retry_count,
         )
 
 
