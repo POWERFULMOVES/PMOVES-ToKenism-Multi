@@ -39,15 +39,29 @@ export function MetricsDisplay({ metrics }: MetricsDisplayProps) {
   };
 
   const getTrendColor = (trend: number) => {
-    if (trend > 0) return 'text-green-500';
-    if (trend < 0) return 'text-red-500';
-    return 'text-gray-500';
+    if (trend > 0) return 'text-green-600 dark:text-green-400';
+    if (trend < 0) return 'text-red-600 dark:text-red-400';
+    return 'text-muted-foreground';
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 0.8) return 'text-green-600 dark:text-green-400';
+    if (score >= 0.6) return 'text-blue-600 dark:text-blue-400';
+    if (score >= 0.4) return 'text-amber-600 dark:text-amber-400';
+    return 'text-red-600 dark:text-red-400';
+  };
+
+  const getScoreBgColor = (score: number) => {
+    if (score >= 0.8) return 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900';
+    if (score >= 0.6) return 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900';
+    if (score >= 0.4) return 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900';
+    return 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900';
   };
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className={`card-hover animate-slide-up stagger-1 transition-all duration-200 ${getScoreBgColor(metrics.health_score)}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center">
               System Health
@@ -62,10 +76,13 @@ export function MetricsDisplay({ metrics }: MetricsDisplayProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold mb-2">
-              {formatPercentage(metrics.health_score)}
-              <span className={`text-sm ml-2 ${getTrendColor(metrics.trends.health_trend)}`}>
+            <div className="flex items-baseline gap-2 mb-2">
+              <span className={`text-3xl font-bold tracking-tight ${getScoreColor(metrics.health_score)}`}>
+                {formatPercentage(metrics.health_score)}
+              </span>
+              <span className={`text-sm font-medium flex items-center gap-0.5 ${getTrendColor(metrics.trends.health_trend)}`}>
                 {getTrendIcon(metrics.trends.health_trend)}
+                <span className="text-xs">vs last week</span>
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -77,7 +94,7 @@ export function MetricsDisplay({ metrics }: MetricsDisplayProps) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={`card-hover animate-slide-up stagger-2 transition-all duration-200 ${getScoreBgColor(metrics.market_efficiency)}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center">
               Market Efficiency
@@ -92,10 +109,13 @@ export function MetricsDisplay({ metrics }: MetricsDisplayProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold mb-2">
-              {formatPercentage(metrics.market_efficiency)}
-              <span className={`text-sm ml-2 ${getTrendColor(metrics.trends.efficiency_trend)}`}>
+            <div className="flex items-baseline gap-2 mb-2">
+              <span className={`text-3xl font-bold tracking-tight ${getScoreColor(metrics.market_efficiency)}`}>
+                {formatPercentage(metrics.market_efficiency)}
+              </span>
+              <span className={`text-sm font-medium flex items-center gap-0.5 ${getTrendColor(metrics.trends.efficiency_trend)}`}>
                 {getTrendIcon(metrics.trends.efficiency_trend)}
+                <span className="text-xs">vs last week</span>
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -107,7 +127,7 @@ export function MetricsDisplay({ metrics }: MetricsDisplayProps) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={`card-hover animate-slide-up stagger-3 transition-all duration-200 ${getScoreBgColor(metrics.resilience_score)}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center">
               Resilience Score
@@ -122,10 +142,13 @@ export function MetricsDisplay({ metrics }: MetricsDisplayProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold mb-2">
-              {formatPercentage(metrics.resilience_score)}
-              <span className={`text-sm ml-2 ${getTrendColor(metrics.trends.resilience_trend)}`}>
+            <div className="flex items-baseline gap-2 mb-2">
+              <span className={`text-3xl font-bold tracking-tight ${getScoreColor(metrics.resilience_score)}`}>
+                {formatPercentage(metrics.resilience_score)}
+              </span>
+              <span className={`text-sm font-medium flex items-center gap-0.5 ${getTrendColor(metrics.trends.resilience_trend)}`}>
                 {getTrendIcon(metrics.trends.resilience_trend)}
+                <span className="text-xs">vs last week</span>
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -147,24 +170,36 @@ export function MetricsDisplay({ metrics }: MetricsDisplayProps) {
         <SystemBalanceChart />
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {metrics.warnings && metrics.warnings.length > 0 && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-            <h4 className="font-medium text-amber-800 mb-1">Warnings</h4>
-            <ul className="list-disc list-inside text-sm text-amber-700">
-              {metrics.warnings.map((warning: string) => (
-                <li key={warning.substring(0, 20)}>{warning}</li>
+          <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg animate-fade-in" role="alert" aria-label="Warnings">
+            <h4 className="font-semibold text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-2">
+              <span className="text-lg">⚠️</span>
+              Warnings
+            </h4>
+            <ul className="space-y-1 text-sm text-amber-700 dark:text-amber-300">
+              {metrics.warnings.map((warning: string, index: number) => (
+                <li key={warning.substring(0, 20)} className={`flex items-start gap-2 stagger-${index + 1}`}>
+                  <span className="text-amber-500 mt-0.5">•</span>
+                  <span>{warning}</span>
+                </li>
               ))}
             </ul>
           </div>
         )}
 
         {metrics.recommendations && metrics.recommendations.length > 0 && (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-            <h4 className="font-medium text-blue-800 mb-1">Recommendations</h4>
-            <ul className="list-disc list-inside text-sm text-blue-700">
-              {metrics.recommendations.map((recommendation: string) => (
-                <li key={recommendation.substring(0, 20)}>{recommendation}</li>
+          <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg animate-fade-in" role="complementary" aria-label="Recommendations">
+            <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2 flex items-center gap-2">
+              <span className="text-lg">💡</span>
+              Recommendations
+            </h4>
+            <ul className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
+              {metrics.recommendations.map((recommendation: string, index: number) => (
+                <li key={recommendation.substring(0, 20)} className={`flex items-start gap-2 stagger-${index + 1}`}>
+                  <span className="text-blue-500 mt-0.5">•</span>
+                  <span>{recommendation}</span>
+                </li>
               ))}
             </ul>
           </div>

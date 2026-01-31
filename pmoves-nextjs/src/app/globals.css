@@ -228,3 +228,205 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.7);
 }
+
+/* ============================================
+   PMOVES.AI Animation System
+   ============================================ */
+
+/* Shimmer animation for loading skeletons */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--muted-foreground) / 0.1) 50%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Fade in animation for element entrance */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Slide up animation for cards and modals */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out forwards;
+}
+
+/* Pulse animation for attention indicators */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* Scale animation for interactive elements */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+/* Chart line draw animation */
+@keyframes chartDraw {
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-chart-draw {
+  stroke-dasharray: 1000;
+  animation: chartDraw 1.5s ease-out forwards;
+}
+
+/* Spin animation for loaders */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 2s linear infinite;
+}
+
+/* ============================================
+   Component Enhancement Styles
+   ============================================ */
+
+/* Card hover lift effect */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1),
+              0 4px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Input focus glow */
+.input-focus-glow:focus {
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.2);
+  transition: box-shadow 0.15s ease;
+}
+
+/* Status indicator colors */
+.status-positive {
+  color: hsl(var(--positive));
+  background-color: hsl(var(--positive-muted));
+}
+
+.status-negative {
+  color: hsl(var(--destructive));
+  background-color: hsl(var(--destructive) / 0.1);
+}
+
+.status-neutral {
+  color: hsl(var(--muted-foreground));
+  background-color: hsl(var(--muted));
+}
+
+.status-info {
+  color: hsl(var(--informative));
+  background-color: hsl(var(--informative-muted));
+}
+
+/* Metric card styles */
+.metric-card {
+  @apply rounded-lg border bg-card p-4 transition-all duration-200;
+}
+
+.metric-card:hover {
+  @apply shadow-md;
+}
+
+.metric-value {
+  @apply text-2xl font-bold tracking-tight;
+}
+
+.metric-label {
+  @apply text-sm text-muted-foreground;
+}
+
+.metric-trend-up {
+  @apply text-green-600 dark:text-green-400;
+}
+
+.metric-trend-down {
+  @apply text-red-600 dark:text-red-400;
+}
+
+/* Staggered animation delays for lists */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+/* Skip navigation link for accessibility */
+.skip-nav {
+  @apply absolute -top-10 left-0 z-50 bg-primary px-4 py-2 text-primary-foreground transition-all focus:top-0;
+}
+
+/* Ensure minimum touch targets for mobile */
+@media (pointer: coarse) {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
