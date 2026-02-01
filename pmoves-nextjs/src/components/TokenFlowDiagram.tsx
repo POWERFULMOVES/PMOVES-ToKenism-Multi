@@ -118,7 +118,7 @@ export function TokenFlowDiagram({ params, results }: TokenFlowDiagramProps) {
               <div className="bg-blue-50 p-3 rounded-md">
                 <h4 className="text-sm font-medium text-blue-800">Understanding the Flow</h4>
                 <p className="text-xs text-blue-700 mt-1">
-                  This diagram shows how money flows through the cooperative system. Members spend part of their budget internally (through the cooperative) and part externally. The cooperative creates savings through group purchasing and local production, and issues GroTokens that add to members' wealth.
+                  This diagram shows how money flows through the cooperative system. Members spend part of their budget internally (through the cooperative) and part externally. The cooperative creates savings through group purchasing and local production, and issues GroTokens that add to members&apos; wealth.
                 </p>
                 <p className="text-xs text-blue-700 mt-1">
                   <strong>Note:</strong> This is a simplified view. The dual-token tab shows how USD and GroTokens interact in the system.
@@ -264,7 +264,7 @@ export function TokenFlowDiagram({ params, results }: TokenFlowDiagramProps) {
 
                 <h4>USD in the Cooperative Model</h4>
                 <p>
-                  USD functions as the primary connection to the external economy. Members receive income in USD, pay for external goods and services in USD, and use USD for some internal transactions. However, USD tends to "leak" out of the community when spent externally.
+                  USD functions as the primary connection to the external economy. Members receive income in USD, pay for external goods and services in USD, and use USD for some internal transactions. However, USD tends to &quot;leak&quot; out of the community when spent externally.
                 </p>
 
                 <h4>GroTokens as Complementary Currency</h4>
@@ -309,7 +309,7 @@ export function TokenFlowDiagram({ params, results }: TokenFlowDiagramProps) {
 
                 <h4>Mathematical Representation</h4>
                 <p>
-                  In the simulation, a member's total wealth in Scenario B is calculated as:
+                  In the simulation, a member&apos;s total wealth in Scenario B is calculated as:
                 </p>
                 <div className="bg-slate-50 p-3 rounded-md font-mono text-sm my-2">
                   wealth_scenario_B = usd_balance + (grotoken_balance * GROTOKEN_USD_VALUE)

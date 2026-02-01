@@ -257,7 +257,7 @@ export function ComparisonResults({ results }: ComparisonResultsProps) {
                 <div className="bg-amber-50 p-3 rounded-md border border-amber-200">
                   <h4 className="font-medium text-amber-800 mb-1">Where Does the Extra Wealth Come From?</h4>
                   <p className="text-sm text-amber-700">
-                    The cooperative model doesn't create wealth from nothing. Instead, it <strong>retains wealth</strong> that would otherwise leave
+                    The cooperative model doesn&apos;t create wealth from nothing. Instead, it <strong>retains wealth</strong> that would otherwise leave
                     the community through more efficient spending (group purchasing), local production, and a complementary currency system.
                     The {formatCurrency(Math.abs(finalMetrics.TotalWealth_B - finalMetrics.TotalWealth_A))} difference represents money that would have
                     flowed to external entities in the traditional model but instead remained within the community.

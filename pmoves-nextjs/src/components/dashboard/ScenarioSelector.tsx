@@ -118,7 +118,7 @@ export function ScenarioSelector({
               </div>
               <div className="bg-amber-50 p-3 rounded-md">
                 <p className="text-xs text-amber-700">
-                  Custom scenarios use the parameters you've configured in the Custom Setup tab.
+                  Custom scenarios use the parameters you&apos;ve configured in the Custom Setup tab.
                   Make sure to set up your parameters before running a custom scenario.
                 </p>
               </div>

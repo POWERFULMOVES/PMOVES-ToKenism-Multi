@@ -102,7 +102,7 @@ export default function Home() {
               </p>
               <p>
                 This simulator allows you to test how different economic structures affect wealth distribution, inequality, and community resilience.
-                Choose a preset scenario below or customize your own parameters in the "Custom Setup" tab.
+                Choose a preset scenario below or customize your own parameters in the &quot;Custom Setup&quot; tab.
               </p>
             </div>
             <PresetSelector onSelectPreset={handlePresetSelect} isLoading={isLoading} />
