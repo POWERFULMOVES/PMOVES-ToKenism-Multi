@@ -91,7 +91,7 @@ export default function DocumentationPage() {
           <h3 className="mt-8">Getting Started</h3>
           <p>
             To get started with the simulator, select a preset scenario from the dropdown menu or adjust the parameters manually. 
-            Click the "Run Simulation" button to see the results.
+            Click the &quot;Run Simulation&quot; button to see the results.
           </p>
           
           <p>

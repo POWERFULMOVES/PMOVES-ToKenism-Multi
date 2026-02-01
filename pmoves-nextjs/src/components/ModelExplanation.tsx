@@ -213,7 +213,7 @@ export function ModelExplanation() {
                     <ul className="text-sm text-blue-700 list-disc list-inside space-y-1 mt-2">
                       <li>Enters community through external income</li>
                       <li>Used for external purchases and some internal transactions</li>
-                      <li>Tends to "leak" out of the community when spent externally</li>
+                      <li>Tends to &quot;leak&quot; out of the community when spent externally</li>
                       <li>Universal acceptance outside the community</li>
                     </ul>
                   </div>
@@ -278,7 +278,7 @@ export function ModelExplanation() {
 
                 <h4>Mathematical Representation</h4>
                 <p>
-                  In the simulation, a member's total wealth in Scenario B is calculated as:
+                  In the simulation, a member&apos;s total wealth in Scenario B is calculated as:
                 </p>
                 <div className="bg-slate-50 p-3 rounded-md font-mono text-sm my-2">
                   wealth_scenario_B = usd_balance + (grotoken_balance * GROTOKEN_USD_VALUE)

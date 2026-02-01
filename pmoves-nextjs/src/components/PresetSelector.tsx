@@ -185,7 +185,7 @@ export function PresetSelector({ onSelectPreset, isLoading = false }: PresetSele
                       {presetDetails.tags.map(tag => ` ${tag.replace('-', ' ')}`)} conditions.
                     </p>
                     <p className="text-xs text-blue-700 mt-2">
-                      After running the simulation, you'll see detailed results in the Analysis tab, including wealth distribution,
+                      After running the simulation, you&apos;ll see detailed results in the Analysis tab, including wealth distribution,
                       inequality metrics, and economic resilience comparisons.
                     </p>
                   </div>

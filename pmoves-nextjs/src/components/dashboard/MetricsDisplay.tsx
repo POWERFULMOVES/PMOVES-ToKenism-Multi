@@ -136,7 +136,7 @@ export function MetricsDisplay({ metrics }: MetricsDisplayProps) {
                   <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p className="max-w-xs">Measures the economy's ability to withstand and recover from economic shocks. Higher values indicate greater resilience.</p>
+                  <p className="max-w-xs">Measures the economy&apos;s ability to withstand and recover from economic shocks. Higher values indicate greater resilience.</p>
                 </TooltipContent>
               </Tooltip>
             </CardTitle>

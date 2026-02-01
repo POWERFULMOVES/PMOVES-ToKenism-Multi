@@ -173,7 +173,7 @@ function SensitivityPageContent() {
               </div>
             </CardContent>
             <CardFooter>
-              <p className="text-xs text-muted-foreground">Higher sensitivity coefficients indicate a stronger impact on the simulation's wealth difference outcome.</p>
+              <p className="text-xs text-muted-foreground">Higher sensitivity coefficients indicate a stronger impact on the simulation&apos;s wealth difference outcome.</p>
             </CardFooter>
           </Card>
         )}

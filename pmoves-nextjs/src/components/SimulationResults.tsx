@@ -68,7 +68,7 @@ function EmptyResultsState() {
         <BarChart3 className="h-16 w-16 text-muted-foreground/50 mb-4" />
         <h3 className="text-lg font-semibold text-muted-foreground mb-2">No Simulation Results</h3>
         <p className="text-sm text-muted-foreground text-center max-w-md">
-          Configure your simulation parameters and click "Run Simulation" to see the results here.
+          Configure your simulation parameters and click &quot;Run Simulation&quot; to see the results here.
         </p>
       </CardContent>
     </Card>
@@ -315,7 +315,7 @@ export function SimulationResults({ results, presetName, simulationParams, isLoa
                       </div>
                       <div className="mt-4 p-3 bg-blue-50 rounded-md text-xs text-blue-800">
                         <p className="font-medium">Understanding Wealth Distribution</p>
-                        <p>This chart shows the wealth thresholds for each 20% segment of the population. For example, the "40-60%" bar shows the wealth level at the 60th percentile.</p>
+                        <p>This chart shows the wealth thresholds for each 20% segment of the population. For example, the &quot;40-60%&quot; bar shows the wealth level at the 60th percentile.</p>
                         <p className="mt-1">A more equal distribution would show similar heights across all bars, while high inequality shows much taller bars on the right side.</p>
                       </div>
                     </CardContent>

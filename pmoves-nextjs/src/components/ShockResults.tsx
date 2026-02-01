@@ -208,7 +208,7 @@ export function ShockResults({ results }: ShockResultsProps) {
                         <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p className="max-w-xs">A composite score measuring the system's overall ability to withstand and recover from economic shocks. Considers both impact severity and recovery speed.</p>
+                        <p className="max-w-xs">A composite score measuring the system&apos;s overall ability to withstand and recover from economic shocks. Considers both impact severity and recovery speed.</p>
                       </TooltipContent>
                     </UITooltip>
                   </CardTitle>
@@ -218,7 +218,7 @@ export function ShockResults({ results }: ShockResultsProps) {
                     {formatPercentage(recovery_metrics.resilience_score)}
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    System's ability to withstand shocks
+                    System&apos;s ability to withstand shocks
                   </p>
                 </CardContent>
               </Card>
@@ -233,7 +233,7 @@ export function ShockResults({ results }: ShockResultsProps) {
                       <InfoCircledIcon className="h-4 w-4 ml-1 text-blue-600 cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="max-w-xs">Suggested actions to improve the system's resilience based on the shock test results.</p>
+                      <p className="max-w-xs">Suggested actions to improve the system&apos;s resilience based on the shock test results.</p>
                     </TooltipContent>
                   </UITooltip>
                 </h4>

@@ -1,5 +1,6 @@
 flask==2.3.3
 numpy>=1.26.0
+scipy>=1.11.0
 pandas>=2.1.0
 pywebview>=4.3.0
 pyinstaller>=5.13.0
