@@ -1,6 +1,6 @@
 # PMOVES-ToKenism-Multi Implementation Status
 
-**Last Updated:** 2026-01-31
+**Last Updated:** 2026-01-31 (Phase 4 Complete)
 **Branch:** PMOVES.AI-Edition-Hardened (Production)
 **Status:** Production Ready with Pending Enhancements
 
@@ -99,6 +99,25 @@ This document tracks the implementation status of PMOVES.AI features aligned wit
 | CI Pipeline | `.github/workflows/ci.yml` | ✅ Complete |
 | Dependabot | `.github/dependabot.yml` | ✅ Complete |
 
+### Production Configuration (Phase 4)
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `env.shared` | Base PMOVES.AI configuration | ✅ Complete |
+| `env.docker` | Docker-compatible env (no export) | ✅ Complete |
+| `env.tier-api` | API tier: PostgREST, Hi-RAG, TensorZero routing | ✅ Complete |
+| `env.tier-data` | Data tier: Postgres, Qdrant, Neo4j, MinIO, NATS | ✅ Complete |
+| `env.tier-llm` | LLM tier: All provider API keys (TensorZero only) | ✅ Complete |
+| `env.tier-worker` | Worker tier: extract-worker, langextract, notebook-sync | ✅ Complete |
+| `env.tier-media` | Media tier: pmoves-yt, whisper, ComfyUI, VibeVoice | ✅ Complete |
+| `env.tier-agent.sh` | Agent tier: Agent Zero, Archon, DeepResearch | ✅ Complete |
+| `integrations/.env.production` | Firefly production config | ✅ Complete |
+
+**Tier Architecture Principle:**
+- `env.tier-llm` is the ONLY tier with external API keys
+- All other tiers call TensorZero gateway (http://tensorzero-gateway:3030)
+- Secrets referenced via `${VAR}` interpolation from env.shared or Docker secrets
+
 ---
 
 ## Pending Implementations
@@ -107,15 +126,16 @@ This document tracks the implementation status of PMOVES.AI features aligned wit
 
 | Feature | Reference | Status | Description |
 |---------|-----------|--------|-------------|
-| Production Env Files | `docker-compose.pmoves.yml` | ⏳ Phase 4 | Create `env.shared`, `env.tier-*` files |
+| Production Env Files | `docker-compose.pmoves.yml` | ✅ Complete | 6-tier env configuration |
 
 ### Medium Priority
 
 | Feature | Reference | Status | Description |
 |---------|-----------|--------|-------------|
-| EvoSwarm Evo-Controller | `agents/` §4.3 | 🔬 Research | Tuning capsules, learning algorithm, expertise updater |
-| MACA Consensus | `agents/` §5.2 | 🔬 Research | Shape merger, entropy calculator, multi-model routing |
-| Venice.ai Integration | `agents/HARDWARE_TTS_REQUIREMENTS.md` | 🔬 Research | VeniceClient, complexity analyzer, offload routing |
+| EvoSwarm Evo-Controller | `docs/architecture/evoswarm-agentgym-rl-quickstart.md` | 📋 Documented | Tuning capsules, AgentGym-RL, ScalingInter-RL |
+| MACA Consensus | `docs/PHASE5_RESEARCH_SUMMARY.md` §2 | 🔬 Research | Shape merger, entropy calculator, multi-model routing |
+| RL Feedback Loop | `docs/architecture/rl-feedback-loop-design.md` | 📋 Documented | Trajectory collection, reward computation, model training |
+| TensorZero Big Thread | `docs/PHASE5_RESEARCH_SUMMARY.md` §3 | ✅ Ready | All LLM routing via TensorZero Gateway |
 | DoX CLI Automation | `INTEGRATED_EXECUTION_PLAN.md` §2.2 | ⏳ Phase 5 | `scripts/integrate_with_dox.py` |
 
 ### Low Priority
@@ -139,6 +159,7 @@ This document tracks the implementation status of PMOVES.AI features aligned wit
 | PR Review Critical Fixes | ✅ Complete | Division by zero, null safety, error boundaries |
 | Type Safety Hardening | ✅ Complete | frozen dataclasses, TransactionType/AccountType enums |
 | Logging & Diagnostics | ✅ Complete | _safe_* helpers, ConnectionTestResult, fallback logging |
+| Phase 4: Production Env | ✅ Complete | 6-tier env files: api, data, llm, worker, media, agent |
 
 ---
 
@@ -195,6 +216,14 @@ This document tracks the implementation status of PMOVES.AI features aligned wit
 - `agents/PMOVES_Engine_Templates.md` - TTS templates
 - `INTEGRATED_EXECUTION_PLAN.md` - Execution milestones
 - `CLAUDE.md` - Developer context for Claude Code
+
+### Phase 5d Research Documentation
+
+- `docs/PHASE5_RESEARCH_SUMMARY.md` - Consolidated Phase 5d research
+- `docs/architecture/evoswarm-agentgym-rl-quickstart.md` - EvoSwarm implementation guide
+- `docs/architecture/rl-feedback-loop-design.md` - Full RL architecture (1100+ lines)
+- `docs/architecture/rl-feedback-loop-quickref.md` - Commands and quick reference
+- `docs/architecture/rl-feedback-loop-summary.md` - Implementation roadmap
 
 ---
 

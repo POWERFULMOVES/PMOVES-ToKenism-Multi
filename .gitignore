@@ -94,6 +94,12 @@ ENV/
 env.bak/
 venv.bak/
 
+# Production environment files (contain secrets)
+*.env.production
+*.env.local
+integrations/.env.production
+env.secrets
+
 # Spyder project settings
 .spyderproject
 .spyproject
