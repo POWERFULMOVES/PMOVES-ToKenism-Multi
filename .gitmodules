@@ -1,12 +1,12 @@
-[submodule "home/pmoves/PMOVES.AI/integrations-workspace/PMOVES-Firefly-iii"]
-	path = home/pmoves/PMOVES.AI/integrations-workspace/PMOVES-Firefly-iii
-	url = https://github.com/POWERFULMOVES/PMOVES-Firefly-iii.git
+[submodule "home/pmoves/PMOVES.AI/integrations-workspace/PMOVES-Wealth"]
+	path = home/pmoves/PMOVES.AI/integrations-workspace/PMOVES-Wealth
+	url = https://github.com/POWERFULMOVES/PMOVES-Wealth.git
 [submodule "home/pmoves/PMOVES.AI/integrations-workspace/PMOVES-DoX"]
 	path = home/pmoves/PMOVES.AI/integrations-workspace/PMOVES-DoX
 	url = https://github.com/POWERFULMOVES/PMOVES-DoX.git
 [submodule "integrations/PMOVES-DoX"]
 	path = integrations/PMOVES-DoX
 	url = https://github.com/POWERFULMOVES/PMOVES-DoX.git
-[submodule "integrations/PMOVES-Firefly-iii"]
-	path = integrations/PMOVES-Firefly-iii
-	url = https://github.com/POWERFULMOVES/PMOVES-Firefly-iii.git
+[submodule "integrations/PMOVES-Wealth"]
+	path = integrations/PMOVES-Wealth
+	url = https://github.com/POWERFULMOVES/PMOVES-Wealth.git
