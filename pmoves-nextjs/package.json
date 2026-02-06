@@ -22,7 +22,7 @@
     "perf:compare": "node scripts/performance-monitor.js compare",
     "perf:dashboard": "node scripts/performance-dashboard.js",
     "bundle:analyze": "cross-env ANALYZE=true next build",
-    "bundle:size": "npm run build && npx bundlesize"
+    "bundle:size": "npm run build && node scripts/check-bundle-size.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
@@ -70,7 +70,6 @@
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.14",
     "axe-core": "^4.11.0",
-    "bundlesize": "^0.18.2",
     "chrome-launcher": "^1.2.1",
     "cross-env": "^10.1.0",
     "eslint": "^8",
