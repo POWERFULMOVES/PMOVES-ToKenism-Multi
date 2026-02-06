@@ -7,10 +7,16 @@
     "test": "hardhat test"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "hardhat": "^2.26.0"
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "hardhat": "^2.28.4"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.0"
+  },
+  "overrides": {
+    "js-yaml": "^4.1.1",
+    "sc-istanbul": {
+      "js-yaml": "3.14.2"
+    }
   }
 }
