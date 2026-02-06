@@ -832,10 +832,18 @@ def handle_simulation() -> Tuple[Any, int]:
     Returns:
         JSON response containing simulation history, metrics, and narrative summary.
     """
-    remote_addr = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown")
+    # Extract leftmost IP from X-Forwarded-For (client IP before any proxies)
+    x_forwarded_for = request.headers.get("X-Forwarded-For", "")
+    if x_forwarded_for:
+        # X-Forwarded-For can contain "client, proxy1, proxy2" - use leftmost (original client)
+        remote_addr = x_forwarded_for.split(",")[0].strip() or request.remote_addr or "unknown"
+    else:
+        remote_addr = request.remote_addr or "unknown"
+
     now = time.time()
     request_log = _request_log_by_ip[remote_addr]
 
+    # Prune expired timestamps from the request log
     while request_log and now - request_log[0] > RATE_LIMIT_WINDOW_SECONDS:
         request_log.popleft()
 
@@ -849,7 +857,7 @@ def handle_simulation() -> Tuple[Any, int]:
     params = request.get_json()
     if params is None:
         return jsonify({"error": "Request body cannot be empty."}), 400
-    app.logger.info(f"Received request with params: {params}")
+    app.logger.debug(f"Received request with params: {params}")
     try:
         validated_params = validate_simulation_params(params)
     except ParameterValidationError as validation_error:
@@ -863,7 +871,7 @@ def handle_simulation() -> Tuple[Any, int]:
         simulation_results = run_simulation(validated_params, validated=True)
     except ValueError as exc:
         app.logger.error("Simulation Value Error: %s", exc, exc_info=True)
-        return jsonify({"error": str(exc)}), 400
+        return jsonify({"error": "Simulation failed due to invalid parameters."}), 400
     except Exception as exc:  # pragma: no cover - defensive logging
         app.logger.error("Unexpected error during simulation: %s", exc, exc_info=True)
         return jsonify({"error": "An unexpected error occurred during simulation."}), 500
