@@ -8,6 +8,8 @@ import math
 import os
 import random
 import sys
+import time
+from collections import defaultdict, deque
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -59,6 +61,11 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24).hex())
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 
 logging.basicConfig(level=logging.INFO)  # Basic logging
+
+# Security: simple in-memory rate limit for simulation endpoint (10 req/min per IP)
+RATE_LIMIT_REQUESTS = int(os.environ.get("RUN_SIM_RATE_LIMIT_REQUESTS", "10"))
+RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("RUN_SIM_RATE_LIMIT_WINDOW_SECONDS", "60"))
+_request_log_by_ip: Dict[str, deque[float]] = defaultdict(deque)
 
 
 # --- Simulation Parameters ---
@@ -825,11 +832,32 @@ def handle_simulation() -> Tuple[Any, int]:
     Returns:
         JSON response containing simulation history, metrics, and narrative summary.
     """
+    # Extract leftmost IP from X-Forwarded-For (client IP before any proxies)
+    x_forwarded_for = request.headers.get("X-Forwarded-For", "")
+    if x_forwarded_for:
+        # X-Forwarded-For can contain "client, proxy1, proxy2" - use leftmost (original client)
+        remote_addr = x_forwarded_for.split(",")[0].strip() or request.remote_addr or "unknown"
+    else:
+        remote_addr = request.remote_addr or "unknown"
+
+    now = time.time()
+    request_log = _request_log_by_ip[remote_addr]
+
+    # Prune expired timestamps from the request log
+    while request_log and now - request_log[0] > RATE_LIMIT_WINDOW_SECONDS:
+        request_log.popleft()
+
+    if len(request_log) >= RATE_LIMIT_REQUESTS:
+        app.logger.warning("Rate limit exceeded for %s", remote_addr)
+        return jsonify({"error": "Rate limit exceeded. Please try again shortly."}), 429
+
+    request_log.append(now)
+
     if not request.is_json: return jsonify({"error": "Request must be JSON"}), 400
     params = request.get_json()
     if params is None:
         return jsonify({"error": "Request body cannot be empty."}), 400
-    app.logger.info(f"Received request with params: {params}")
+    app.logger.debug(f"Received request with params: {params}")
     try:
         validated_params = validate_simulation_params(params)
     except ParameterValidationError as validation_error:
@@ -837,13 +865,13 @@ def handle_simulation() -> Tuple[Any, int]:
         return jsonify({"errors": validation_error.errors}), 400
     except Exception as exc:
         app.logger.error("Unexpected validation error: %s", exc, exc_info=True)
-        return jsonify({"error": str(exc)}), 400
+        return jsonify({"error": "Invalid request payload."}), 400
 
     try:
         simulation_results = run_simulation(validated_params, validated=True)
     except ValueError as exc:
         app.logger.error("Simulation Value Error: %s", exc, exc_info=True)
-        return jsonify({"error": str(exc)}), 400
+        return jsonify({"error": "Simulation failed due to invalid parameters."}), 400
     except Exception as exc:  # pragma: no cover - defensive logging
         app.logger.error("Unexpected error during simulation: %s", exc, exc_info=True)
         return jsonify({"error": "An unexpected error occurred during simulation."}), 500
@@ -887,7 +915,8 @@ def get_current_metrics() -> Tuple[Any, int]:
             }
         )
     except Exception as exc:  # pragma: no cover - defensive logging
-        return jsonify({"error": str(exc)}), 500
+        app.logger.error("Error fetching current metrics: %s", exc, exc_info=True)
+        return jsonify({"error": "Failed to fetch metrics."}), 500
 
 
 @app.route("/run_scenario", methods=["POST"])
@@ -930,7 +959,7 @@ def run_scenario() -> Tuple[Any, int]:
         )
     except Exception as exc:  # pragma: no cover - defensive logging
         app.logger.error("Error running scenario: %s", exc, exc_info=True)
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "Scenario execution failed."}), 500
 
 
 @app.route("/test_shock", methods=["POST"])
@@ -971,7 +1000,7 @@ def test_shock() -> Tuple[Any, int]:
         )
     except Exception as exc:  # pragma: no cover - defensive logging
         app.logger.error("Error testing shock: %s", exc, exc_info=True)
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "Shock test failed."}), 500
 
 
 @app.route("/")

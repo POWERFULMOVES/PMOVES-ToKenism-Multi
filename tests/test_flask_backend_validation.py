@@ -79,3 +79,26 @@ def test_run_simulation_accepts_valid_payload(client):
     assert len(data['final_members']) == payload["NUM_MEMBERS"]
     assert 'key_events' in data
     assert 'summary' in data
+
+
+
+def test_run_simulation_rate_limit_returns_429(client, monkeypatch):
+    import flask_backend
+
+    flask_backend._request_log_by_ip.clear()
+    monkeypatch.setattr(flask_backend, "RATE_LIMIT_REQUESTS", 2)
+    monkeypatch.setattr(flask_backend, "RATE_LIMIT_WINDOW_SECONDS", 60)
+
+    payload = {"NUM_MEMBERS": 5, "SIMULATION_WEEKS": 1}
+    headers = {"X-Forwarded-For": "203.0.113.10"}
+
+    first = client.post('/run_simulation', json=payload, headers=headers)
+    second = client.post('/run_simulation', json=payload, headers=headers)
+    third = client.post('/run_simulation', json=payload, headers=headers)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert third.status_code == 429
+    data = third.get_json()
+    assert data is not None
+    assert data["error"] == "Rate limit exceeded. Please try again shortly."
