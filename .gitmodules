@@ -1,12 +1,14 @@
-[submodule "home/pmoves/PMOVES.AI/integrations-workspace/PMOVES-Wealth"]
-	path = home/pmoves/PMOVES.AI/integrations-workspace/PMOVES-Wealth
-	url = https://github.com/POWERFULMOVES/PMOVES-Wealth.git
-[submodule "home/pmoves/PMOVES.AI/integrations-workspace/PMOVES-DoX"]
-	path = home/pmoves/PMOVES.AI/integrations-workspace/PMOVES-DoX
-	url = https://github.com/POWERFULMOVES/PMOVES-DoX.git
-[submodule "integrations/PMOVES-DoX"]
-	path = integrations/PMOVES-DoX
-	url = https://github.com/POWERFULMOVES/PMOVES-DoX.git
-[submodule "integrations/PMOVES-Wealth"]
-	path = integrations/PMOVES-Wealth
-	url = https://github.com/POWERFULMOVES/PMOVES-Wealth.git
+# PMOVES-ToKenism-Multi Submodules Configuration
+#
+# IMPORTANT: This directory previously contained invalid absolute path entries.
+# Those were RUNTIME INTEGRATIONS (via NATS/gRPC/HTTP networking), not git submodules.
+#
+# Services like PMOVES-DoX and PMOVES-Wealth integrate via "holographic" networking:
+# - Docked mode: Connect to parent PMOVES.AI infrastructure
+# - Standalone mode: Use local resources
+# - Hybrid mode: Mix local and parent resources
+#
+# Git submodules = Code ownership
+# Networking integrations = Runtime collaboration
+#
+# No nested git submodules are needed for this service.
