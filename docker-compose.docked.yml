@@ -15,10 +15,10 @@ services:
       - TENSORZERO_URL=${TENSORZERO_URL:-http://tensorzero-gateway:3030}
 
       # Use parent Supabase
-      - SUPABASE_URL=${SUPABASE_URL:-http://supabase-kong:8000}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@supabase-db:5432/postgres
+      - SUPABASE_URL=${SUPABASE_URL:?http://supabase-kong:8000}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:?}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY:?}
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:?}@supabase-db:5432/postgres
 
       # Docked mode flag
       - DOCKED_MODE=true
