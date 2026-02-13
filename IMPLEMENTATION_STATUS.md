@@ -110,7 +110,7 @@ This document tracks the implementation status of PMOVES.AI features aligned wit
 | `env.tier-llm` | LLM tier: All provider API keys (TensorZero only) | ✅ Complete |
 | `env.tier-worker` | Worker tier: extract-worker, langextract, notebook-sync | ✅ Complete |
 | `env.tier-media` | Media tier: pmoves-yt, whisper, ComfyUI, VibeVoice | ✅ Complete |
-| `env.tier-agent.sh` | Agent tier: Agent Zero, Archon, DeepResearch | ✅ Complete |
+| `env.tier-agent` | Agent tier: Agent Zero, Archon, DeepResearch | ✅ Complete |
 | `integrations/.env.production` | Firefly production config | ✅ Complete |
 
 **Tier Architecture Principle:**

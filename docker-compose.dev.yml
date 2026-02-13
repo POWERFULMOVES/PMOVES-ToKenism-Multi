@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   economic-simulation-dev:
     build: .

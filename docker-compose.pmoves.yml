@@ -11,8 +11,6 @@
 #         SERVICE_NAME: my-service
 #         SERVICE_SPECIFIC_VAR: value
 
-version: "3.8"
-
 # PMOVES.AI Environment Loading Anchors
 # These anchors provide tier-based environment file loading
 # NOTE: Use map-based environment vars (not list-based) for proper YAML merging

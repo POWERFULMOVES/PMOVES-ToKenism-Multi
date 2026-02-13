@@ -124,6 +124,14 @@ dmypy.json
 *.swp
 *.swo
 
+# Node.js / Next.js
+node_modules/
+.next/
+coverage/
+dist/
+out/
+*.tsbuildinfo
+
 # Application specific
 simulation_app.log
 installer/
