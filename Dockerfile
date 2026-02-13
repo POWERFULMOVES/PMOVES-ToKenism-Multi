@@ -29,7 +29,7 @@ ENV DOCKER_CONTAINER=True
 ENV FLASK_ENV=production
 
 # Create non-root user
-RUN adduser -D -u 1000 appuser
+RUN useradd -u 1000 --create-home --shell /bin/bash appuser
 
 # Copy and make the entrypoint script executable
 COPY docker-entrypoint.sh /usr/local/bin/

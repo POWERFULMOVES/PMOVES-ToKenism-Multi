@@ -1,0 +1,46 @@
+# PMOVES-ToKenism-Multi Docked Mode Configuration
+# This file configures ToKenism-Multi to run as a submodule within PMOVES.AI
+# Usage: docker compose -f docker-compose.yml -f docker-compose.docked.yml up -d
+
+services:
+  economic-simulation:
+    env_file:
+      - env.shared
+      - env.tier-api
+    environment:
+      # Connect to parent PMOVES.AI services
+      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - TENSORZERO_URL=${TENSORZERO_URL:-http://tensorzero-gateway:3030}
+
+      # Use parent Supabase
+      - SUPABASE_URL=${SUPABASE_URL:-http://supabase-kong:8000}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY is required}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY:?SUPABASE_SERVICE_KEY is required}
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@supabase-db:5432/postgres
+
+      # Docked mode flag
+      - DOCKED_MODE=true
+      - PMOVES_ENV=${PMOVES_ENV:-production}
+    networks:
+      - pmoves_api
+      - pmoves_app
+      - pmoves_bus
+      - pmoves_data
+
+networks:
+  # Connect to parent PMOVES.AI networks
+  pmoves_api:
+    external: true
+    name: pmoves_api
+
+  pmoves_app:
+    external: true
+    name: pmoves_app
+
+  pmoves_bus:
+    external: true
+    name: pmoves_bus
+
+  pmoves_data:
+    external: true
+    name: pmoves_data

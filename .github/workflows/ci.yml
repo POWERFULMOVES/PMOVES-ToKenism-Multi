@@ -155,7 +155,7 @@ jobs:
       - name: Check for contracts directory
         id: check-contracts
         run: |
-          if [ -f "package.json" ] && [ -f "hardhat.config.ts" ]; then
+          if [ -f "package.json" ] && ([ -f "hardhat.config.ts" ] || [ -f "hardhat.config.js" ]); then
             echo "has_hardhat=true" >> $GITHUB_OUTPUT
           else
             echo "has_hardhat=false" >> $GITHUB_OUTPUT
@@ -235,8 +235,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run accessibility tests
-        run: npm run test:accessibility -- --passWithNoTests 2>/dev/null || npm run test:jest -- --testPathPattern="accessibility" --passWithNoTests
+      - name: Run Jest with accessibility tests
+        run: npm run test:jest -- --testPathPattern="accessibility" --coverage --passWithNoTests
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        if: success()
+        with:
+          files: pmoves-nextjs/coverage/lcov.info
+          flags: accessibility
+          name: accessibility-coverage
+          fail_ci_if_error: false
 
   # ============================================
   # E2E Tests (Playwright)
