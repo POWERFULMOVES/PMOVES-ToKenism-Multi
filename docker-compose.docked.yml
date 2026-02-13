@@ -7,8 +7,8 @@ version: '3.8'
 services:
   economic-simulation:
     env_file:
-      - ../pmoves/env.shared
-      - ../pmoves/env.tier-api
+      - env.shared
+      - env.tier-api
     environment:
       # Connect to parent PMOVES.AI services
       - NATS_URL=${NATS_URL:-nats://nats:4222}
@@ -18,7 +18,7 @@ services:
       - SUPABASE_URL=${SUPABASE_URL:-http://supabase-kong:8000}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@supabase-db:5432/postgres
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@supabase-db:5432/postgres
 
       # Docked mode flag
       - DOCKED_MODE=true
