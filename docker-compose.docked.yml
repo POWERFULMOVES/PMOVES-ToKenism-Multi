@@ -2,8 +2,6 @@
 # This file configures ToKenism-Multi to run as a submodule within PMOVES.AI
 # Usage: docker compose -f docker-compose.yml -f docker-compose.docked.yml up -d
 
-version: '3.8'
-
 services:
   economic-simulation:
     env_file:
@@ -15,10 +13,10 @@ services:
       - TENSORZERO_URL=${TENSORZERO_URL:-http://tensorzero-gateway:3030}
 
       # Use parent Supabase
-      - SUPABASE_URL=${SUPABASE_URL:?http://supabase-kong:8000}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:?}
-      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY:?}
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:?}@supabase-db:5432/postgres
+      - SUPABASE_URL=${SUPABASE_URL:-http://supabase-kong:8000}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY is required}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY:?SUPABASE_SERVICE_KEY is required}
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@supabase-db:5432/postgres
 
       # Docked mode flag
       - DOCKED_MODE=true
