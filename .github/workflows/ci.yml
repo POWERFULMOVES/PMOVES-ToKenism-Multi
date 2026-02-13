@@ -155,7 +155,7 @@ jobs:
       - name: Check for contracts directory
         id: check-contracts
         run: |
-          if [ -f "package.json" ] && [ -f "hardhat.config.ts" ]; then
+          if [ -f "package.json" ] && ([ -f "hardhat.config.ts" ] || [ -f "hardhat.config.js" ]); then
             echo "has_hardhat=true" >> $GITHUB_OUTPUT
           else
             echo "has_hardhat=false" >> $GITHUB_OUTPUT
