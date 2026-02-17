@@ -211,6 +211,8 @@ export const CHIT_NATS_SUBJECTS = {
   geometryEvent: 'tokenism.geometry.event.v1',
   /** Swarm population update */
   swarmPopulation: 'tokenism.swarm.population.v1',
+  /** Credential rotation/redaction event */
+  credentialRotated: 'tokenism.credential.rotated.v1',
 };
 
 /**
@@ -220,4 +222,81 @@ export function validateCGPDocument(cgp: _CGPDocument): { valid: boolean; errors
   const { CGPGenerator } = require('./cgp-generator');
   const generator = new CGPGenerator();
   return generator.validateCGP(cgp);
+}
+
+// ---------------------------------------------------------------------------
+// Credential Management Types (CGP Archives)
+// ---------------------------------------------------------------------------
+
+/** Credential redaction metadata for CGP archives */
+export interface CHITRedactionRecord {
+  key: string;
+  redacted_at: string;  // ISO 8601
+  cgp_archive: string;  // relative path to CGP archive
+  namespace: string;     // CGP namespace
+  encoding: 'hex' | 'cleartext';
+}
+
+/** Credential rotation event for NATS */
+export interface CredentialRotationEvent {
+  keys: string[];
+  namespace: string;
+  timestamp: string;
+  archive_path: string;
+}
+
+/** CGP credential archive point structure */
+interface CGPArchivePoint {
+  label: string;
+  value: string;
+  anchor: number[];
+  encoding: string;
+}
+
+/**
+ * Lightweight validator for CGP credential archives.
+ * Verifies version, namespace, points structure, and encoding fields.
+ */
+export function validateCGPArchive(
+  cgp: Record<string, unknown>,
+): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (typeof cgp.version !== 'string') {
+    errors.push('Missing or invalid "version" field');
+  } else if (!cgp.version.startsWith('chit.cgp.')) {
+    errors.push(`Unexpected version prefix: ${cgp.version}`);
+  }
+
+  if (typeof cgp.namespace !== 'string' || !cgp.namespace) {
+    errors.push('Missing or empty "namespace" field');
+  }
+
+  if (!Array.isArray(cgp.points)) {
+    errors.push('"points" must be an array');
+  } else {
+    const points = cgp.points as CGPArchivePoint[];
+    if (points.length === 0) {
+      errors.push('"points" array is empty');
+    }
+    for (let i = 0; i < points.length; i++) {
+      const pt = points[i];
+      if (typeof pt.label !== 'string' || !pt.label) {
+        errors.push(`points[${i}]: missing or empty "label"`);
+      }
+      if (typeof pt.value !== 'string') {
+        errors.push(`points[${i}]: missing "value"`);
+      }
+      if (!Array.isArray(pt.anchor) || pt.anchor.length !== 3) {
+        errors.push(`points[${i}]: "anchor" must be a 3-element array`);
+      }
+      if (typeof pt.encoding !== 'string') {
+        errors.push(`points[${i}]: missing "encoding" field`);
+      } else if (pt.encoding !== 'hex' && pt.encoding !== 'cleartext') {
+        errors.push(`points[${i}]: invalid encoding "${pt.encoding}"`);
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
 }

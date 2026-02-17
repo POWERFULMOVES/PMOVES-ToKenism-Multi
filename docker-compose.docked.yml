@@ -9,7 +9,7 @@ services:
       - env.tier-api
     environment:
       # Connect to parent PMOVES.AI services
-      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - NATS_URL=${NATS_URL:-nats://nats:pmoves@nats:4222}
       - TENSORZERO_URL=${TENSORZERO_URL:-http://tensorzero-gateway:3030}
 
       # Use parent Supabase

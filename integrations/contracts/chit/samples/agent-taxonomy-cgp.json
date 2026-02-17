@@ -1,0 +1,293 @@
+{
+  "spec": "chit.cgp.v0.2",
+  "meta": {
+    "source": "agent_taxonomy",
+    "units_mode": "agents",
+    "K": 7,
+    "bins": 7,
+    "mhep": 85.2,
+    "backend": "pmoves/config/agent_registry.yaml",
+    "taxonomy_version": "1.0.0",
+    "description": "Agent network topology encoded as CGP v0.2 packet. Each super_node represents a class, constellations represent types, and points represent individual agents."
+  },
+  "super_nodes": [
+    {
+      "id": "class_legendary",
+      "x": 0.0,
+      "y": 0.0,
+      "r": 50.0,
+      "label": "Legendary (POWERFULMOVES)",
+      "constellations": []
+    },
+    {
+      "id": "class_standard",
+      "x": 0.0,
+      "y": 0.0,
+      "r": 400.0,
+      "label": "Standard (PMOVES-)",
+      "constellations": [
+        {
+          "id": "type_agent",
+          "anchor": [0.05, 0.05, 0.10, 0.05, 0.05, 0.60, 0.10],
+          "summary": "Agent-type: orchestration, planning, delegation",
+          "radial_minmax": [0.10, 0.40],
+          "spectrum": [0.05, 0.10, 0.15, 0.05, 0.05, 0.50, 0.10],
+          "points": [
+            {
+              "id": "agent_zero",
+              "magnitude": 0.95,
+              "modality": "agent",
+              "text_b64": "QWdlbnQgWmVybzogTDEgb3JjaGVzdHJhdG9yLCBNZWdhIEV2b2x1dGlvbiwgNyBsYXllcnM=",
+              "layers": ["L0", "L1", "L2", "L2.5", "L3", "L4", "L5"],
+              "evolution_stage": "mega",
+              "chit_toggles": {
+                "delta_sensitive": true,
+                "kappa_sensitive": true,
+                "hz_sensitive": true,
+                "swarm_participant": true,
+                "attribution_gated": true
+              }
+            },
+            {
+              "id": "archon",
+              "magnitude": 0.88,
+              "modality": "agent",
+              "text_b64": "QXJjaG9uOiBMMSBjb3BpbG90LCBTdGFnZSAyLCA2IGxheWVycw==",
+              "layers": ["L0", "L1", "L2", "L2.5", "L4", "L5"],
+              "evolution_stage": "stage_2"
+            },
+            {
+              "id": "supaserch",
+              "magnitude": 0.82,
+              "modality": "agent",
+              "text_b64": "U3VwYVNlcmNoOiBob2xvZ3JhcGhpYyBkZWVwIHJlc2VhcmNoLCBTdGFnZSAy",
+              "layers": ["L0", "L2", "L2.5", "L3", "L4"],
+              "evolution_stage": "stage_2"
+            },
+            {
+              "id": "botz_gateway",
+              "magnitude": 0.75,
+              "modality": "agent",
+              "text_b64": "Qm9UWiBHYXRld2F5OiB3b3JrIGl0ZW0gZGlzdHJpYnV0aW9u",
+              "layers": ["L0", "L2", "L3", "L4"],
+              "evolution_stage": "stage_1"
+            },
+            {
+              "id": "mesh_agent",
+              "magnitude": 0.60,
+              "modality": "agent",
+              "text_b64": "TWVzaCBBZ2VudDogbm9kZSBhbm5vdW5jZXI=",
+              "layers": ["L0", "L2"],
+              "evolution_stage": "base"
+            }
+          ]
+        },
+        {
+          "id": "type_worker",
+          "anchor": [0.15, 0.05, 0.05, 0.50, 0.10, 0.05, 0.10],
+          "summary": "Worker-type: processing, transformation, embedding",
+          "radial_minmax": [0.10, 0.40],
+          "spectrum": [0.10, 0.05, 0.05, 0.50, 0.15, 0.05, 0.10],
+          "points": [
+            {
+              "id": "hirag_v2",
+              "magnitude": 0.85,
+              "modality": "worker",
+              "text_b64": "SGktUkFHIHYyOiBoeWJyaWQgUkFHLCBTdGFnZSAy",
+              "layers": ["L0", "L2", "L2.5", "L4", "L5"],
+              "evolution_stage": "stage_2"
+            },
+            {
+              "id": "extract_worker",
+              "magnitude": 0.65,
+              "modality": "worker",
+              "text_b64": "RXh0cmFjdCBXb3JrZXI6IGVtYmVkZGluZyArIGluZGV4aW5n",
+              "layers": ["L0", "L2", "L4", "L5"],
+              "evolution_stage": "stage_1"
+            },
+            {
+              "id": "pdf_ingest",
+              "magnitude": 0.50,
+              "modality": "worker",
+              "text_b64": "UERGIEluZ2VzdDogZG9jdW1lbnQgcHJvY2Vzc2luZw==",
+              "layers": ["L0", "L2", "L4", "L5"],
+              "evolution_stage": "stage_1"
+            }
+          ]
+        },
+        {
+          "id": "type_media",
+          "anchor": [0.05, 0.05, 0.05, 0.15, 0.55, 0.05, 0.10],
+          "summary": "Media-type: multimodal ingestion and processing",
+          "radial_minmax": [0.10, 0.40],
+          "spectrum": [0.05, 0.05, 0.05, 0.15, 0.55, 0.05, 0.10],
+          "points": [
+            {
+              "id": "pmoves_yt",
+              "magnitude": 0.80,
+              "modality": "media",
+              "text_b64": "UE1PVkVTLllUOiBZb3VUdWJlIGluZ2VzdGlvbg==",
+              "layers": ["L0", "L2", "L4", "L5"],
+              "evolution_stage": "stage_1"
+            },
+            {
+              "id": "ffmpeg_whisper",
+              "magnitude": 0.70,
+              "modality": "media",
+              "text_b64": "RkZtcGVnLVdoaXNwZXI6IHRyYW5zY3JpcHRpb24=",
+              "layers": ["L0", "L2", "L4"],
+              "evolution_stage": "stage_1"
+            },
+            {
+              "id": "ultimate_tts",
+              "magnitude": 0.75,
+              "modality": "media",
+              "text_b64": "VWx0aW1hdGUtVFRTLVN0dWRpbzogNyBlbmdpbmVz",
+              "layers": ["L0", "L4"],
+              "evolution_stage": "base"
+            }
+          ]
+        },
+        {
+          "id": "type_llm",
+          "anchor": [0.05, 0.05, 0.60, 0.15, 0.05, 0.05, 0.05],
+          "summary": "LLM-type: reasoning and generation",
+          "radial_minmax": [0.10, 0.35],
+          "spectrum": [0.05, 0.05, 0.60, 0.15, 0.05, 0.05, 0.05],
+          "points": [
+            {
+              "id": "deep_research",
+              "magnitude": 0.80,
+              "modality": "llm",
+              "text_b64": "RGVlcFJlc2VhcmNoOiBMTE0gcmVzZWFyY2ggcGxhbm5lcg==",
+              "layers": ["L0", "L2", "L4", "L5"],
+              "evolution_stage": "stage_1"
+            }
+          ]
+        },
+        {
+          "id": "type_api",
+          "anchor": [0.10, 0.50, 0.10, 0.10, 0.10, 0.05, 0.05],
+          "summary": "API-type: routing and gateway services",
+          "radial_minmax": [0.10, 0.35],
+          "spectrum": [0.10, 0.50, 0.10, 0.10, 0.10, 0.05, 0.05],
+          "points": [
+            {
+              "id": "tensorzero",
+              "magnitude": 0.90,
+              "modality": "api",
+              "text_b64": "VGVuc29yWmVybzogTExNIGdhdGV3YXk=",
+              "layers": ["L0", "L2", "L4"],
+              "evolution_stage": "stage_1"
+            },
+            {
+              "id": "flute_gateway",
+              "magnitude": 0.78,
+              "modality": "api",
+              "text_b64": "Rmx1dGUtR2F0ZXdheTogdm9pY2UgY29tbXVuaWNhdGlvbg==",
+              "layers": ["L0", "L2", "L2.5", "L4"],
+              "evolution_stage": "stage_1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "class_specialized",
+      "x": 0.0,
+      "y": 0.0,
+      "r": 600.0,
+      "label": "Specialized (Pmoves-)",
+      "constellations": [
+        {
+          "id": "type_specialized_mixed",
+          "anchor": [0.30, 0.10, 0.05, 0.05, 0.15, 0.05, 0.30],
+          "summary": "Specialized domain agents",
+          "radial_minmax": [0.50, 0.70],
+          "spectrum": [0.25, 0.10, 0.05, 0.05, 0.20, 0.05, 0.30],
+          "points": [
+            {
+              "id": "cipher_memory",
+              "magnitude": 0.72,
+              "modality": "data",
+              "text_b64": "Q2lwaGVyIE1lbW9yeTogTmVvNGogbWVtb3J5",
+              "layers": ["L0", "L5"],
+              "evolution_stage": "base"
+            },
+            {
+              "id": "hyperdimensions",
+              "magnitude": 0.80,
+              "modality": "ui",
+              "text_b64": "SHlwZXJkaW1lbnNpb25zOiBMMi41IGNvbnRyb2wgcGxhbmU=",
+              "layers": ["L0", "L2.5"],
+              "evolution_stage": "base"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "class_utility",
+      "x": 0.0,
+      "y": 0.0,
+      "r": 800.0,
+      "label": "Utility (pmoves-)",
+      "constellations": [
+        {
+          "id": "type_data_infra",
+          "anchor": [0.80, 0.10, 0.00, 0.00, 0.00, 0.00, 0.10],
+          "summary": "Data infrastructure: persistence layer",
+          "radial_minmax": [0.75, 0.95],
+          "spectrum": [0.80, 0.10, 0.00, 0.00, 0.00, 0.00, 0.10],
+          "points": [
+            {
+              "id": "nats",
+              "magnitude": 0.95,
+              "modality": "data",
+              "text_b64": "TkFUUzogZXZlbnQgYnJva2Vy",
+              "layers": ["L0", "L2"],
+              "evolution_stage": "base"
+            },
+            {
+              "id": "supabase",
+              "magnitude": 0.90,
+              "modality": "data",
+              "text_b64": "U3VwYWJhc2U6IFBvc3RncmVzICsgcGd2ZWN0b3I=",
+              "layers": ["L0", "L5"],
+              "evolution_stage": "base"
+            },
+            {
+              "id": "qdrant",
+              "magnitude": 0.80,
+              "modality": "data",
+              "text_b64": "UWRyYW50OiB2ZWN0b3IgZW1iZWRkaW5ncw==",
+              "layers": ["L0", "L5"],
+              "evolution_stage": "base"
+            },
+            {
+              "id": "neo4j",
+              "magnitude": 0.80,
+              "modality": "data",
+              "text_b64": "TmVvNGo6IGtub3dsZWRnZSBncmFwaA==",
+              "layers": ["L0", "L5"],
+              "evolution_stage": "base"
+            },
+            {
+              "id": "minio",
+              "magnitude": 0.85,
+              "modality": "data",
+              "text_b64": "TWluSU86IG9iamVjdCBzdG9yYWdl",
+              "layers": ["L0", "L5"],
+              "evolution_stage": "base"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "nats": {
+    "subject": "tokenism.cgp.ready.v1",
+    "timestamp": "2026-02-16T00:00:00Z",
+    "publisher_id": "agent-taxonomy-publisher"
+  }
+}
