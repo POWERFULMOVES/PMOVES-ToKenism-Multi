@@ -308,7 +308,7 @@ class CommonServices:
     MINIO = "http://minio:9000"
 
     # NATS
-    NATS = "nats://nats:4222"
+    NATS = "nats://nats:pmoves@nats:4222"
 
     @classmethod
     def get(cls, service: str) -> Optional[str]:
