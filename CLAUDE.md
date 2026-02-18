@@ -127,3 +127,12 @@ This project has these Claude Code plugins enabled:
 - `ralph-loop` - Iterative development loops
 - `frontend-design` - UI/UX implementation
 - `huggingface-skills` - HuggingFace integration
+
+<!-- PMOVES.AI-CONTEXT-TAGS -->
+## PMOVES.AI Skill Hints
+
+**Primary Skills:** `/chit:encode`, `/chit:decode`, `/chit:visualize`, `/chit:bus`
+**Context Files:** `chit-geometry-bus.md`, `geometry-nats-subjects.md`
+**Domain Tags:** `math`, `finance`
+**Context Tier:** 2 (On-Demand (Major Subsystem))
+<!-- /PMOVES.AI-CONTEXT-TAGS -->
