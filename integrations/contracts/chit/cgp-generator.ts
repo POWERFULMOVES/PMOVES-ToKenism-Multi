@@ -1,7 +1,7 @@
 /**
  * CGP Generator
  *
- * Generates CHIT Geometry Packets (CGP) v2 documents from ToKenism
+ * Generates CHIT Geometry Packets (CGP) v1.0 documents from ToKenism
  * economic simulation data with full attribution tracking.
  *
  * Key capabilities:
@@ -22,7 +22,7 @@ import { ContributionWeight } from './dirichlet-weights';
  * CGP Document structure following v0.2 schema
  */
 export interface CGPDocument {
-  spec: 'chit.cgp.v0.1' | 'chit.cgp.v0.2';
+  spec: 'chit.cgp.v0.1' | 'chit.cgp.v0.2' | 'chit.cgp.v1.0';
   summary: string;
   meta?: Record<string, unknown>;
   created_at: string;
@@ -31,6 +31,13 @@ export interface CGPDocument {
   hyperbolic?: CGPHyperbolicEncoding;
   super_nodes: CGPSuperNodeExtended[];
   sig?: CGPSignature | string | null;
+  /** v1.0: NATS publishing metadata */
+  nats?: {
+    subject?: string;
+    timestamp?: string;
+    publisher_id?: string;
+    stream?: string;
+  };
 }
 
 /**
@@ -244,7 +251,7 @@ export class CGPGenerator {
     const weekAttribution = attribution.getWeekAttribution(weekData.week);
 
     const cgp: CGPDocument = {
-      spec: 'chit.cgp.v0.2',
+      spec: 'chit.cgp.v1.0',
       summary: `ToKenism Economic Simulation - Week ${weekData.week}`,
       meta: {
         namespace: this.config.namespace,
@@ -304,7 +311,7 @@ export class CGPGenerator {
     const lastWeek = weeks[weeks.length - 1].week;
 
     const cgp: CGPDocument = {
-      spec: 'chit.cgp.v0.2',
+      spec: 'chit.cgp.v1.0',
       summary: `ToKenism Economic Simulation - Weeks ${firstWeek} to ${lastWeek}`,
       meta: {
         namespace: this.config.namespace,
@@ -696,7 +703,7 @@ export class CGPGenerator {
     const errors: string[] = [];
 
     // Check required fields
-    if (!cgp.spec || !['chit.cgp.v0.1', 'chit.cgp.v0.2'].includes(cgp.spec)) {
+    if (!cgp.spec || !['chit.cgp.v0.1', 'chit.cgp.v0.2', 'chit.cgp.v1.0'].includes(cgp.spec)) {
       errors.push('Invalid or missing spec field');
     }
 

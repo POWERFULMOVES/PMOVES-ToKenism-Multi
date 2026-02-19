@@ -193,7 +193,7 @@ export function createCHITSystem(config: CHITSystemConfig = {}): CHITSystem {
  */
 export const CHIT_VERSION = {
   module: '1.0.0',
-  cgpSchema: 'chit.cgp.v0.2',
+  cgpSchema: 'chit.cgp.v1.0',
   swarmSchema: 'swarm.meta.v1',
 };
 

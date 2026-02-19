@@ -314,7 +314,7 @@ describe('CHIT Integration Module', () => {
       attribution.recordAction('0xABC', 'spending', 100, 1, 'groceries');
 
       const cgp = attribution.exportCGP(1);
-      expect(cgp.spec).toBe('chit.cgp.v0.2');
+      expect(cgp.spec).toBe('chit.cgp.v1.0');
       expect(cgp.super_nodes.length).toBeGreaterThan(0);
     });
 
@@ -375,7 +375,7 @@ describe('CHIT Integration Module', () => {
 
       const cgp = generator.generateWeeklyCGP(weekData, attribution, encoder);
 
-      expect(cgp.spec).toBe('chit.cgp.v0.2');
+      expect(cgp.spec).toBe('chit.cgp.v1.0');
       expect(cgp.summary).toContain('Week 1');
       expect(cgp.super_nodes.length).toBe(7); // One per contract type
     });
@@ -640,7 +640,7 @@ describe('CHIT Integration Module', () => {
 
     test('should provide version information', () => {
       expect(CHIT_VERSION.module).toBe('1.0.0');
-      expect(CHIT_VERSION.cgpSchema).toBe('chit.cgp.v0.2');
+      expect(CHIT_VERSION.cgpSchema).toBe('chit.cgp.v1.0');
       expect(CHIT_VERSION.swarmSchema).toBe('swarm.meta.v1');
     });
 
@@ -651,7 +651,7 @@ describe('CHIT Integration Module', () => {
 
     test('should validate CGP documents via utility function', () => {
       const cgp = {
-        spec: 'chit.cgp.v0.2' as const,
+        spec: 'chit.cgp.v1.0' as const,
         summary: 'Test CGP',
         created_at: new Date().toISOString(),
         super_nodes: [
@@ -709,7 +709,7 @@ describe('CHIT Integration Module', () => {
         system.attribution,
         system.encoder
       );
-      expect(cgp.spec).toBe('chit.cgp.v0.2');
+      expect(cgp.spec).toBe('chit.cgp.v1.0');
 
       // 4. Get swarm meta
       const meta = system.swarm.createSwarmMeta(weekData);
@@ -718,6 +718,62 @@ describe('CHIT Integration Module', () => {
       // 5. Validate CGP
       const validation = system.generator.validateCGP(cgp);
       expect(validation.valid).toBe(true);
+    });
+
+    test('should generate v1.0 spec documents', () => {
+      const system = createCHITSystem();
+
+      system.attribution.recordAction('0xABC', 'spending', 100, 1, 'groceries');
+
+      const weekData = {
+        week: 1,
+        gini: 0.4,
+        povertyRate: 0.15,
+        totalWealth: 100000,
+        totalSpending: 5000,
+        totalSavings: 1000,
+        participantCount: 50,
+      };
+
+      const cgp = system.generator.generateWeeklyCGP(
+        weekData,
+        system.attribution,
+        system.encoder
+      );
+
+      // Verify v1.0 spec
+      expect(cgp.spec).toBe('chit.cgp.v1.0');
+
+      // Validate v1.0 document passes validation
+      const validation = system.generator.validateCGP(cgp);
+      expect(validation.valid).toBe(true);
+    });
+
+    test('should accept v1.0 spec in validateCGPDocument', () => {
+      const cgp = {
+        spec: 'chit.cgp.v1.0' as const,
+        summary: 'Test v1.0 CGP',
+        created_at: new Date().toISOString(),
+        super_nodes: [
+          {
+            id: 'test-node',
+            label: 'Test',
+            x: 0,
+            y: 0,
+            r: 0,
+            constellations: [
+              {
+                id: 'test-constellation',
+                anchor: [0.5, 0.5, 0.5],
+                points: [{ id: 'point-1', x: 0.1, y: 0.2 }],
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = validateCGPDocument(cgp);
+      expect(result.valid).toBe(true);
     });
   });
 });

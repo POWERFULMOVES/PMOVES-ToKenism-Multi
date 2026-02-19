@@ -65,6 +65,14 @@ export interface CGPConstellation {
   summary?: string;
   anchor: number[];
   points: CGPPoint[];
+  /** v1.0: Zeta-filtered spectrum */
+  spectrum_zeta?: number[];
+  /** v1.0: MACA consensus result */
+  maca_consensus?: {
+    entropy_delta: number;
+    votes: number[];
+    confidence: number;
+  };
 }
 
 export interface CGPPoint {
@@ -75,6 +83,12 @@ export interface CGPPoint {
   proj?: number;
   conf?: number;
   modality?: string;
+  /** v1.0: Point attribution contributor */
+  contributor_id?: string;
+  /** v1.0: Per-point Merkle proof */
+  merkle_proof?: string[];
+  /** v1.0: Contribution weight */
+  weight?: number;
 }
 
 export class HyperbolicEncoder {
