@@ -233,7 +233,7 @@ function printResult(result: MonitorResult): void {
 
 async function main() {
   const args = process.argv.slice(2);
-  let natsUrl = process.env.NATS_URL || 'nats://localhost:4222';
+  let natsUrl = process.env.NATS_URL || 'nats://nats:pmoves@nats:4222';
   let jsonOutput = false;
   let watchMode = false;
   let watchInterval = 5000;
