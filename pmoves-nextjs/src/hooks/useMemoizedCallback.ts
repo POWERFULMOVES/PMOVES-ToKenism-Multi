@@ -3,7 +3,7 @@
  * Provides a stable callback reference that only changes when dependencies change
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 export function useMemoizedCallback<T extends (...args: any[]) => any>(
   callback: T,
@@ -12,12 +12,12 @@ export function useMemoizedCallback<T extends (...args: any[]) => any>(
   const callbackRef = useRef(callback);
 
   // Update ref when callback changes
-  useRef(() => {
+  useEffect(() => {
     callbackRef.current = callback;
   }, [callback]);
 
   // Return memoized callback
-  return useCallback((...args: Parameters<T>) => callbackRef.current(...args), deps);
+  return useCallback((...args: Parameters<T>) => callbackRef.current(...args), deps) as T;
 }
 
 /**

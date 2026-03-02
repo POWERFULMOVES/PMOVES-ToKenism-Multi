@@ -482,7 +482,9 @@ export async function testAllPresets() {
     // Save test results to history
     if (typeof process !== 'undefined') {
       try {
-        saveTestResults(testResults, analysisResults);
+        if (analysisResults) {
+          saveTestResults(testResults, analysisResults as Record<string, any>);
+        }
         generateTestReport();
       } catch (e) {
         console.log('Note: Could not save test history (likely running in browser environment)');

@@ -29,7 +29,7 @@ export class SimulationErrorBoundary extends Component<ErrorBoundaryProps, Error
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
+    return { hasError: true, error, errorInfo: null };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {

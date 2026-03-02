@@ -305,7 +305,6 @@ export function ComparisonResults({ results }: ComparisonResultsProps) {
                   GROTOKEN_USD_VALUE: 2,
                   WEEKLY_COOP_FEE_B: 1
                 }}
-                results={results}
               />
             </div>
           </CardContent>

@@ -171,7 +171,7 @@ export function generateTestReport() {
     }
 
     // Most common recommendations
-    if (history.some(h => h.recommendations?.length > 0)) {
+    if (history.some(h => (h.recommendations?.length ?? 0) > 0)) {
       console.log('\nMost common recommendations:');
       const recommendationCounts: Record<string, number> = {};
 

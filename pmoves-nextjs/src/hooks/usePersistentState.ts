@@ -8,8 +8,6 @@
 import { useState, useEffect } from 'react';
 
 interface PersistentStateOptions<T> {
-  key: string;
-  defaultValue: T;
   serialize?: (value: T) => string;
   deserialize?: (value: string) => T;
   onSync?: (value: T) => void;
@@ -110,14 +108,49 @@ export function useSimulationHistory(): {
     id: string;
     name: string;
     timestamp: number;
-    params: Record<string, any>;
+    params: Record<string, unknown>;
   }>;
-  addSimulation: (simulation: any) => void;
+  addSimulation: (simulation: {
+    id: string;
+    name: string;
+    timestamp: number;
+    params: Record<string, unknown>;
+  }) => void;
   clearHistory: () => void;
 } {
-  return usePersistentState('simulation-history', {
-    simulations: [],
-    serialize: JSON.stringify,
-    deserialize: JSON.parse
-  });
+  type SimulationEntry = {
+    id: string;
+    name: string;
+    timestamp: number;
+    params: Record<string, unknown>;
+  };
+
+  type SimulationHistoryState = {
+    simulations: SimulationEntry[];
+  };
+
+  const [history, setHistory] = usePersistentState<SimulationHistoryState>(
+    'simulation-history',
+    { simulations: [] },
+    {
+      serialize: JSON.stringify,
+      deserialize: JSON.parse,
+    }
+  );
+
+  const addSimulation = (simulation: SimulationEntry) => {
+    setHistory({
+      simulations: [simulation, ...history.simulations],
+    });
+  };
+
+  const clearHistory = () => {
+    setHistory({ simulations: [] });
+  };
+
+  return {
+    simulations: history.simulations,
+    addSimulation,
+    clearHistory,
+  };
 }

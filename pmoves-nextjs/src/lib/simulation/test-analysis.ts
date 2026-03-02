@@ -35,8 +35,6 @@ export interface TestResult {
       validationScore: number;
     };
     [key: string]: unknown;
-  } | {
-    [key: string]: unknown;
   };
   error?: string;
 }
@@ -128,7 +126,10 @@ export function analyzeTestResults(results: TestResult[], parameters: Record<str
     if (uniqueValues.size <= 1) return;
 
     // Calculate correlation between parameter value and error
-    const paramValues = results.map(r => parameters[r.presetId]?.[param] || 0);
+    const paramValues = results.map(r => {
+      const rawValue = parameters[r.presetId]?.[param];
+      return typeof rawValue === 'number' ? rawValue : 0;
+    });
     const errorValues = results.map(r => r.verification.errorPercentage);
     const correlation = calculateCorrelation(paramValues, errorValues);
 
@@ -191,10 +192,12 @@ export function analyzeTestResults(results: TestResult[], parameters: Record<str
   const highErrorScenarios = [...results].sort((a, b) => b.verification.errorPercentage - a.verification.errorPercentage).slice(0, 3);
   console.log('\n  Highest error scenarios:');
   for (const s of highErrorScenarios) {
+    const expectedWealthDiff = s.verification.expectedWealthDiff ?? 0;
+    const actualWealthDiff = s.verification.actualWealthDiff ?? 0;
     console.log(`    ${s.presetName}: ${formatPercentage(s.verification.errorPercentage)} error`);
-    console.log(`      Expected: ${formatCurrency(s.verification.expectedWealthDiff)}`);
-    console.log(`      Actual: ${formatCurrency(s.verification.actualWealthDiff)}`);
-    console.log(`      Difference: ${formatCurrency(s.verification.actualWealthDiff - s.verification.expectedWealthDiff)}`);
+    console.log(`      Expected: ${formatCurrency(expectedWealthDiff)}`);
+    console.log(`      Actual: ${formatCurrency(actualWealthDiff)}`);
+    console.log(`      Difference: ${formatCurrency(actualWealthDiff - expectedWealthDiff)}`);
 
     // List key parameters
     const params = parameters[s.presetId];
@@ -215,9 +218,11 @@ export function analyzeTestResults(results: TestResult[], parameters: Record<str
   const lowErrorScenarios = [...results].sort((a, b) => a.verification.errorPercentage - b.verification.errorPercentage).slice(0, 3);
   console.log('\n  Lowest error scenarios:');
   for (const s of lowErrorScenarios) {
+    const expectedWealthDiff = s.verification.expectedWealthDiff ?? 0;
+    const actualWealthDiff = s.verification.actualWealthDiff ?? 0;
     console.log(`    ${s.presetName}: ${formatPercentage(s.verification.errorPercentage)} error`);
-    console.log(`      Expected: ${formatCurrency(s.verification.expectedWealthDiff)}`);
-    console.log(`      Actual: ${formatCurrency(s.verification.actualWealthDiff)}`);
+    console.log(`      Expected: ${formatCurrency(expectedWealthDiff)}`);
+    console.log(`      Actual: ${formatCurrency(actualWealthDiff)}`);
 
     // List key parameters
     const params = parameters[s.presetId];
@@ -239,6 +244,7 @@ export function analyzeTestResults(results: TestResult[], parameters: Record<str
     r.presetName.includes('Economic Downturn') ||
     r.presetName.includes('Severe Economic')
   );
+  let suggestedMultiplier = 1;
 
   if (stressScenarios.length > 0) {
     console.log('\n  Economic stress scenario analysis:');
@@ -265,9 +271,9 @@ export function analyzeTestResults(results: TestResult[], parameters: Record<str
     console.log(`    Correlation between income-to-expense ratio and error: ${ratioErrorCorrelation.toFixed(2)}`);
 
     // Suggest adjustment factor
-    const avgExpectedDiff = stressScenarios.reduce((sum, r) => sum + r.verification.expectedWealthDiff, 0) / stressScenarios.length;
-    const avgActualDiff = stressScenarios.reduce((sum, r) => sum + r.verification.actualWealthDiff, 0) / stressScenarios.length;
-    const suggestedMultiplier = avgActualDiff / avgExpectedDiff;
+    const avgExpectedDiff = stressScenarios.reduce((sum, r) => sum + (r.verification.expectedWealthDiff ?? 0), 0) / stressScenarios.length;
+    const avgActualDiff = stressScenarios.reduce((sum, r) => sum + (r.verification.actualWealthDiff ?? 0), 0) / stressScenarios.length;
+    suggestedMultiplier = avgExpectedDiff !== 0 ? (avgActualDiff / avgExpectedDiff) : 1;
 
     console.log(`    Suggested stress factor multiplier: ${suggestedMultiplier.toFixed(2)}x`);
     console.log('    This would adjust the current stress factor to account for the observed non-linear benefits.');

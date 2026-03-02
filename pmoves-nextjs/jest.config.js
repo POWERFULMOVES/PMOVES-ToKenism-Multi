@@ -1,7 +1,7 @@
 module.exports = {
   preset: 'ts-jest',
-  testEnvironment: 'jsdom',
-  testMatch: ['**/__tests__/**/*.test.ts?(x)'],
+  testEnvironment: 'node',
+  testMatch: ['**/__tests__/**/*.test.ts'],
   collectCoverageFrom: ['**/src/**/*.ts', '**/src/**/*.tsx'],
   coverageDirectory: 'coverage',
   coverageReporters: ['json', 'lcov', 'text', 'html'],
