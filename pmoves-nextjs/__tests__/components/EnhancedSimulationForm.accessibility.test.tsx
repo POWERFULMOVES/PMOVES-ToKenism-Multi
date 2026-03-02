@@ -15,7 +15,7 @@ import {
   testFocusManagement,
   FORM_ACCESSIBILITY_TESTS,
   WCAG21_AA_RULES
-} from '../utils/accessibility-utils.test';
+} from '../utils/accessibility-utils';
 
 // Extend Jest matchers
 expect.extend(toHaveNoViolations);
