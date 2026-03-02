@@ -18,7 +18,7 @@ from enum import Enum
 
 class ServiceTier(str, Enum):
     """
-    PMOVES service tiers (6-tier architecture).
+    PMOVES service tiers (7-tier architecture).
 
     The 6-tier model provides clear separation of concerns and security boundaries:
     - DATA: Infrastructure services (Postgres, Qdrant, Neo4j, MinIO, NATS)
@@ -37,6 +37,7 @@ class ServiceTier(str, Enum):
     WORKER = "worker"
     MEDIA = "media"
     AGENT = "agent"
+    UI = "ui"
 
     @classmethod
     def is_valid(cls, value: str) -> bool:

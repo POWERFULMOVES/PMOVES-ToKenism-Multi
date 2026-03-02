@@ -35,8 +35,6 @@ export interface TestResult {
       validationScore: number;
     };
     [key: string]: unknown;
-  } | {
-    [key: string]: unknown;
   };
   error?: string;
 }
@@ -68,6 +66,10 @@ interface ParameterSensitivity {
   correlation: number;
   passRate: number;
   avgError: number;
+}
+
+function formatCurrencyOrNA(value: number | undefined): string {
+  return typeof value === 'number' ? formatCurrency(value) : 'N/A';
 }
 
 /**
@@ -125,11 +127,18 @@ export function analyzeTestResults(results: TestResult[], parameters: Record<str
     // Skip parameters that don't vary
     const values = results.map(r => parameters[r.presetId]?.[param]).filter(v => v !== undefined);
     const uniqueValues = new Set(values);
-    if (uniqueValues.size <= 1) return;
+    if (uniqueValues.size <= 1) continue;
 
     // Calculate correlation between parameter value and error
-    const paramValues = results.map(r => parameters[r.presetId]?.[param] || 0);
-    const errorValues = results.map(r => r.verification.errorPercentage);
+    const pairedValues = results.flatMap((r) => {
+      const rawValue = parameters[r.presetId]?.[param];
+      return typeof rawValue === 'number'
+        ? [{ x: rawValue, y: r.verification.errorPercentage }]
+        : [];
+    });
+    if (pairedValues.length < 2) continue;
+    const paramValues = pairedValues.map((v) => v.x);
+    const errorValues = pairedValues.map((v) => v.y);
     const correlation = calculateCorrelation(paramValues, errorValues);
 
     // Calculate pass rate for different parameter values
@@ -191,10 +200,16 @@ export function analyzeTestResults(results: TestResult[], parameters: Record<str
   const highErrorScenarios = [...results].sort((a, b) => b.verification.errorPercentage - a.verification.errorPercentage).slice(0, 3);
   console.log('\n  Highest error scenarios:');
   for (const s of highErrorScenarios) {
+    const expectedWealthDiff = s.verification.expectedWealthDiff;
+    const actualWealthDiff = s.verification.actualWealthDiff;
     console.log(`    ${s.presetName}: ${formatPercentage(s.verification.errorPercentage)} error`);
-    console.log(`      Expected: ${formatCurrency(s.verification.expectedWealthDiff)}`);
-    console.log(`      Actual: ${formatCurrency(s.verification.actualWealthDiff)}`);
-    console.log(`      Difference: ${formatCurrency(s.verification.actualWealthDiff - s.verification.expectedWealthDiff)}`);
+    console.log(`      Expected: ${formatCurrencyOrNA(expectedWealthDiff)}`);
+    console.log(`      Actual: ${formatCurrencyOrNA(actualWealthDiff)}`);
+    if (typeof expectedWealthDiff === 'number' && typeof actualWealthDiff === 'number') {
+      console.log(`      Difference: ${formatCurrency(actualWealthDiff - expectedWealthDiff)}`);
+    } else {
+      console.log('      Difference: N/A');
+    }
 
     // List key parameters
     const params = parameters[s.presetId];
@@ -215,9 +230,11 @@ export function analyzeTestResults(results: TestResult[], parameters: Record<str
   const lowErrorScenarios = [...results].sort((a, b) => a.verification.errorPercentage - b.verification.errorPercentage).slice(0, 3);
   console.log('\n  Lowest error scenarios:');
   for (const s of lowErrorScenarios) {
+    const expectedWealthDiff = s.verification.expectedWealthDiff;
+    const actualWealthDiff = s.verification.actualWealthDiff;
     console.log(`    ${s.presetName}: ${formatPercentage(s.verification.errorPercentage)} error`);
-    console.log(`      Expected: ${formatCurrency(s.verification.expectedWealthDiff)}`);
-    console.log(`      Actual: ${formatCurrency(s.verification.actualWealthDiff)}`);
+    console.log(`      Expected: ${formatCurrencyOrNA(expectedWealthDiff)}`);
+    console.log(`      Actual: ${formatCurrencyOrNA(actualWealthDiff)}`);
 
     // List key parameters
     const params = parameters[s.presetId];
@@ -239,6 +256,7 @@ export function analyzeTestResults(results: TestResult[], parameters: Record<str
     r.presetName.includes('Economic Downturn') ||
     r.presetName.includes('Severe Economic')
   );
+  let suggestedMultiplier = 1;
 
   if (stressScenarios.length > 0) {
     console.log('\n  Economic stress scenario analysis:');
@@ -265,12 +283,23 @@ export function analyzeTestResults(results: TestResult[], parameters: Record<str
     console.log(`    Correlation between income-to-expense ratio and error: ${ratioErrorCorrelation.toFixed(2)}`);
 
     // Suggest adjustment factor
-    const avgExpectedDiff = stressScenarios.reduce((sum, r) => sum + r.verification.expectedWealthDiff, 0) / stressScenarios.length;
-    const avgActualDiff = stressScenarios.reduce((sum, r) => sum + r.verification.actualWealthDiff, 0) / stressScenarios.length;
-    const suggestedMultiplier = avgActualDiff / avgExpectedDiff;
+    const stressPairs = stressScenarios.flatMap((r) => {
+      const expected = r.verification.expectedWealthDiff;
+      const actual = r.verification.actualWealthDiff;
+      return typeof expected === 'number' && typeof actual === 'number' && expected !== 0
+        ? [{ expected, actual }]
+        : [];
+    });
+    if (stressPairs.length > 0) {
+      const avgExpectedDiff = stressPairs.reduce((sum, pair) => sum + pair.expected, 0) / stressPairs.length;
+      const avgActualDiff = stressPairs.reduce((sum, pair) => sum + pair.actual, 0) / stressPairs.length;
+      suggestedMultiplier = avgExpectedDiff !== 0 ? (avgActualDiff / avgExpectedDiff) : 1;
 
-    console.log(`    Suggested stress factor multiplier: ${suggestedMultiplier.toFixed(2)}x`);
-    console.log('    This would adjust the current stress factor to account for the observed non-linear benefits.');
+      console.log(`    Suggested stress factor multiplier: ${suggestedMultiplier.toFixed(2)}x`);
+      console.log('    This would adjust the current stress factor to account for the observed non-linear benefits.');
+    } else {
+      console.log('    Suggested stress factor multiplier: N/A (missing expected/actual wealth deltas)');
+    }
   }
 
   // 7. Provide recommendations

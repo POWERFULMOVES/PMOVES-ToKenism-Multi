@@ -528,7 +528,7 @@ export class ShapeAttribution {
     }
 
     return {
-      spec: 'chit.cgp.v0.2',
+      spec: 'chit.cgp.v1.0',
       summary: `ToKenism Week ${week} Economic Simulation`,
       created_at: new Date().toISOString(),
       super_nodes,

@@ -3,31 +3,29 @@
  * Provides a stable callback reference that only changes when dependencies change
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 export function useMemoizedCallback<T extends (...args: any[]) => any>(
-  callback: T,
-  deps: React.DependencyList
+  callback: T
 ): T {
   const callbackRef = useRef(callback);
 
   // Update ref when callback changes
-  useRef(() => {
+  useEffect(() => {
     callbackRef.current = callback;
   }, [callback]);
 
-  // Return memoized callback
-  return useCallback((...args: Parameters<T>) => callbackRef.current(...args), deps);
+  // Stable callback identity with latest callback implementation
+  return useCallback((...args: Parameters<T>) => callbackRef.current(...args), []) as T;
 }
 
 /**
  * Memoized Value Hook
- * Similar to useMemo but with better debugging and type safety
+ * Similar to useMemo with explicit dependency comparison
  */
 export function useMemoizedValue<T>(
   factory: () => T,
-  deps: React.DependencyList,
-  debugKey?: string
+  deps: React.DependencyList
 ): T {
   const ref = useRef<{ value: T; deps: React.DependencyList }>({
     value: factory(),

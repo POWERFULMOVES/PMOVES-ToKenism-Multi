@@ -8,8 +8,6 @@
 import { useState, useEffect } from 'react';
 
 interface PersistentStateOptions<T> {
-  key: string;
-  defaultValue: T;
   serialize?: (value: T) => string;
   deserialize?: (value: string) => T;
   onSync?: (value: T) => void;
@@ -19,7 +17,7 @@ export function usePersistentState<T>(
   key: string,
   defaultValue: T,
   options: PersistentStateOptions<T> = {}
-): [T, (value: T) => void] {
+): [T, React.Dispatch<React.SetStateAction<T>>] {
   const {
     serialize = JSON.stringify,
     deserialize = JSON.parse,
@@ -55,7 +53,7 @@ export function usePersistentState<T>(
         console.error(`Error saving persistent state for key "${key}":`, error);
       }
     }
-  }, [key, state, serialize]);
+  }, [key, state, serialize, onSync]);
 
   // Listen for storage events from other tabs
   useEffect(() => {
@@ -77,7 +75,7 @@ export function usePersistentState<T>(
         window.removeEventListener('storage', handleStorageChange);
       };
     }
-  }, [key, deserialize]);
+  }, [key, deserialize, defaultValue]);
 
   return [state, setState];
 }
@@ -110,14 +108,49 @@ export function useSimulationHistory(): {
     id: string;
     name: string;
     timestamp: number;
-    params: Record<string, any>;
+    params: Record<string, unknown>;
   }>;
-  addSimulation: (simulation: any) => void;
+  addSimulation: (simulation: {
+    id: string;
+    name: string;
+    timestamp: number;
+    params: Record<string, unknown>;
+  }) => void;
   clearHistory: () => void;
 } {
-  return usePersistentState('simulation-history', {
-    simulations: [],
-    serialize: JSON.stringify,
-    deserialize: JSON.parse
-  });
+  type SimulationEntry = {
+    id: string;
+    name: string;
+    timestamp: number;
+    params: Record<string, unknown>;
+  };
+
+  type SimulationHistoryState = {
+    simulations: SimulationEntry[];
+  };
+
+  const [history, setHistory] = usePersistentState<SimulationHistoryState>(
+    'simulation-history',
+    { simulations: [] },
+    {
+      serialize: JSON.stringify,
+      deserialize: JSON.parse,
+    }
+  );
+
+  const addSimulation = (simulation: SimulationEntry) => {
+    setHistory((prev) => ({
+      simulations: [simulation, ...prev.simulations],
+    }));
+  };
+
+  const clearHistory = () => {
+    setHistory({ simulations: [] });
+  };
+
+  return {
+    simulations: history.simulations,
+    addSimulation,
+    clearHistory,
+  };
 }

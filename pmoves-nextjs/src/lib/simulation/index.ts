@@ -284,7 +284,7 @@ class EconomicMetrics {
     const sortedWealth = [...currentWealth].sort((a, b) => a - b);
 
     // Define quintile boundaries
-    const quintileBoundaries = [];
+    const quintileBoundaries: number[] = [];
     for (let i = 1; i < 5; i++) {
       const idx = Math.min(i * quintileSize, sortedWealth.length - 1);
       quintileBoundaries.push(sortedWealth[idx]);
@@ -797,6 +797,16 @@ export async function runSimulation(params: Partial<SimulationParams>): Promise<
     // Prepare Results
     try {
       const final_member_data = members.map(m => ({
+        id: m.id,
+        wealth_scenario_A: m.wealth_scenario_A,
+        wealth_scenario_B: m.wealth_scenario_B,
+        food_usd_balance: m.food_usd_balance,
+        grotoken_balance: m.grotoken_balance,
+        weekly_food_budget: m.weekly_food_budget,
+        propensity_to_spend_internal: m.propensity_to_spend_internal,
+        weekly_income: m.weekly_income,
+        internal_transaction_count: m.internal_transaction_count,
+        grotoken_usage_rate: m.grotoken_usage_rate,
         ID: m.id,
         Income: m.weekly_income,
         Budget: m.weekly_food_budget,
@@ -804,7 +814,7 @@ export async function runSimulation(params: Partial<SimulationParams>): Promise<
         Wealth_B: m.wealth_scenario_B,
         FoodUSD_B: m.food_usd_balance,
         GroToken_B: m.grotoken_balance
-      }));
+      } as SimMember));
 
       const summary_narrative = generateNarrativeSummary(simulation_history, key_events);
 

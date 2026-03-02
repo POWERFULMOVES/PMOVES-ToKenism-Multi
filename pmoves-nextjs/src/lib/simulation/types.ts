@@ -139,11 +139,6 @@ export interface EconomicMetricsClass {
   calculate_economic_diversity: () => number;
   calculate_risk_resilience: () => number;
   calculate_trends: (current_metrics: WeeklyMetrics) => Record<string, number>;
-  calculate_market_efficiency: () => number;
-  calculate_innovation_adoption: () => number;
-  calculate_wealth_mobility_score: () => number;
-  calculate_economic_diversity: () => number;
-  calculate_risk_resilience: () => number;
   calculate_advanced_metrics: () => Record<string, number>;
 }
 

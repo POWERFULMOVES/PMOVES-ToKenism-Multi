@@ -8,7 +8,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, RefreshCw, WifiOff, Calculator } from 'lucide-react';
+import { AlertCircle, RefreshCw, WifiOff } from 'lucide-react';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -29,7 +29,7 @@ export class SimulationErrorBoundary extends Component<ErrorBoundaryProps, Error
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
+    return { hasError: true, error, errorInfo: null };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {

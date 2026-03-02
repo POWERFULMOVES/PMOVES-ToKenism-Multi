@@ -74,13 +74,14 @@ except ImportError:
     from enum import Enum
 
     class ServiceTier(str, Enum):
-        """PMOVES service tiers (6-tier architecture)."""
+        """PMOVES service tiers (7-tier architecture)."""
         DATA = "data"
         API = "api"
         LLM = "llm"
+        WORKER = "worker"
         MEDIA = "media"
         AGENT = "agent"
-        WORKER = "worker"
+        UI = "ui"
 
 
 @dataclass

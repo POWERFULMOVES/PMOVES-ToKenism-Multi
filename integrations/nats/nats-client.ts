@@ -111,7 +111,7 @@ export class NATSClient extends EventEmitter {
   constructor(config: Partial<NATSConfig> = {}) {
     super();
     this.config = {
-      url: config.url ?? process.env.NATS_URL ?? "nats://localhost:4222",
+      url: config.url ?? process.env.NATS_URL ?? "nats://nats:pmoves@nats:4222",
       clientName: config.clientName ?? "pmoves-tokenism-multi",
       jetstream: config.jetstream ?? true,
       maxReconnectAttempts: config.maxReconnectAttempts ?? 10,

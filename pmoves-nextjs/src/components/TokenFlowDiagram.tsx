@@ -29,22 +29,25 @@ interface TokenFlowDiagramProps {
     GROTOKEN_REWARD_PER_WEEK_AVG?: number;
     GROTOKEN_USD_VALUE?: number;
     WEEKLY_COOP_FEE_B?: number;
-    [key: string]: number | undefined;
+    [key: string]: unknown;
   };
-  results?: Record<string, unknown>;
 }
 
-export function TokenFlowDiagram({ params, results }: TokenFlowDiagramProps) {
+const asNumber = (value: unknown, fallback: number): number => {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+};
+
+export function TokenFlowDiagram({ params }: TokenFlowDiagramProps) {
   // Calculate values based on simulation parameters
-  const weeklyIncome = params?.WEEKLY_INCOME_AVG || 200;
-  const weeklyBudget = params?.WEEKLY_FOOD_BUDGET_AVG || 100;
-  const internalSpendRate = params?.PERCENT_SPEND_INTERNAL_AVG || 0.4;
-  const groupSavingsRate = params?.GROUP_BUY_SAVINGS_PERCENT || 0.15;
-  const localSavingsRate = params?.LOCAL_PRODUCTION_SAVINGS_PERCENT || 0.2;
+  const weeklyIncome = asNumber(params.WEEKLY_INCOME_AVG, 200);
+  const weeklyBudget = asNumber(params.WEEKLY_FOOD_BUDGET_AVG, 100);
+  const internalSpendRate = asNumber(params.PERCENT_SPEND_INTERNAL_AVG, 0.4);
+  const groupSavingsRate = asNumber(params.GROUP_BUY_SAVINGS_PERCENT, 0.15);
+  const localSavingsRate = asNumber(params.LOCAL_PRODUCTION_SAVINGS_PERCENT, 0.2);
   const avgSavingsRate = (groupSavingsRate + localSavingsRate) / 2;
-  const weeklyGroTokens = params?.GROTOKEN_REWARD_PER_WEEK_AVG || 10;
-  const groTokenValue = params?.GROTOKEN_USD_VALUE || 2;
-  const coopFee = params?.WEEKLY_COOP_FEE_B || 1;
+  const weeklyGroTokens = asNumber(params.GROTOKEN_REWARD_PER_WEEK_AVG, 10);
+  const groTokenValue = asNumber(params.GROTOKEN_USD_VALUE, 2);
+  const coopFee = asNumber(params.WEEKLY_COOP_FEE_B, 1);
 
   // Calculate flows
   const internalSpend = weeklyBudget * internalSpendRate;
@@ -248,7 +251,9 @@ export function TokenFlowDiagram({ params, results }: TokenFlowDiagramProps) {
                     </li>
                     <li className="flex justify-between text-sm">
                       <span>Backing Ratio:</span>
-                      <span className="font-medium">{formatPercentage(totalBacking / groTokenValueWeekly)}</span>
+                      <span className="font-medium">
+                        {formatPercentage(groTokenValueWeekly > 0 ? totalBacking / groTokenValueWeekly : 0)}
+                      </span>
                     </li>
                   </ul>
                 </div>
