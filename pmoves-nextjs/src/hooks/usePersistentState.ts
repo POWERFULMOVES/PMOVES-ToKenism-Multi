@@ -17,7 +17,7 @@ export function usePersistentState<T>(
   key: string,
   defaultValue: T,
   options: PersistentStateOptions<T> = {}
-): [T, (value: T) => void] {
+): [T, React.Dispatch<React.SetStateAction<T>>] {
   const {
     serialize = JSON.stringify,
     deserialize = JSON.parse,
@@ -53,7 +53,7 @@ export function usePersistentState<T>(
         console.error(`Error saving persistent state for key "${key}":`, error);
       }
     }
-  }, [key, state, serialize]);
+  }, [key, state, serialize, onSync]);
 
   // Listen for storage events from other tabs
   useEffect(() => {
@@ -75,7 +75,7 @@ export function usePersistentState<T>(
         window.removeEventListener('storage', handleStorageChange);
       };
     }
-  }, [key, deserialize]);
+  }, [key, deserialize, defaultValue]);
 
   return [state, setState];
 }
@@ -139,9 +139,9 @@ export function useSimulationHistory(): {
   );
 
   const addSimulation = (simulation: SimulationEntry) => {
-    setHistory({
-      simulations: [simulation, ...history.simulations],
-    });
+    setHistory((prev) => ({
+      simulations: [simulation, ...prev.simulations],
+    }));
   };
 
   const clearHistory = () => {
