@@ -12,6 +12,8 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 const nextConfig = {
+  // Standalone output for Docker multi-stage builds
+  output: 'standalone',
   // Use the app directory for routing
   reactStrictMode: true,
   webpack: (config, { isServer, dev }) => {
