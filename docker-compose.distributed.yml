@@ -1,0 +1,101 @@
+# PMOVES-ToKenism-Multi Distributed Deployment Overlay
+#
+# Use with: docker compose -f docker-compose.yml -f docker-compose.distributed.yml up
+#
+# This overlay configures Tokenism for distributed deployment:
+# - External service discovery via environment variables
+# - Non-internal networks for cross-host communication
+# - Optional Tailscale sidecar for VPN mesh
+
+version: '3.8'
+
+services:
+  economic-simulation:
+    environment:
+      # Deployment mode
+      - DEPLOYMENT_MODE=distributed
+      - DISTRIBUTED_SERVICES=true
+
+      # Service identity
+      - SERVICE_NAME=${SERVICE_NAME:-pmoves-tokenism}
+      - SERVICE_SLUG=${SERVICE_SLUG:-tokenism}
+
+      # NATS Message Bus (remote)
+      - NATS_URL=${NATS_URL:-nats://nats:4222}
+      - NATS_JETSTREAM=${NATS_JETSTREAM:-true}
+
+      # TensorZero LLM Gateway (remote)
+      - TENSORZERO_URL=${TENSORZERO_URL:-http://tensorzero-gateway:3030}
+
+      # DoX Document Intelligence (remote)
+      - DOX_BACKEND_URL=${DOX_BACKEND_URL:-http://dox-backend:8484}
+
+      # Agent Zero (dual-instance in DoX)
+      - AGENT_ZERO_URL=${AGENT_ZERO_URL:-http://agent-zero:50051}
+      - AGENT_ZERO_MCP_URL=${AGENT_ZERO_MCP_URL:-http://agent-zero:50051/mcp}
+
+      # BoTZ MCP Gateway (remote)
+      - BOTZ_GATEWAY_URL=${BOTZ_GATEWAY_URL:-http://botz-gateway:2091}
+
+      # Archon Knowledge (in BoTZ)
+      - ARCHON_URL=${ARCHON_URL:-http://archon:8091}
+
+      # PMOVES-Wealth Firefly (remote or local)
+      - FIREFLY_API_URL=${FIREFLY_API_URL:-http://firefly:8080/api/v1}
+      - FIREFLY_TOKEN=${FIREFLY_TOKEN:-}
+
+      # Supabase (remote)
+      - SUPABASE_URL=${SUPABASE_URL:-http://supabase:54321}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET:-}
+
+      # Monitoring
+      - PROMETHEUS_PUSHGATEWAY=${PROMETHEUS_PUSHGATEWAY:-http://prometheus:9091}
+
+    # Health check with service discovery
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    # Labels for Prometheus discovery
+    labels:
+      - "pmoves.service=tokenism"
+      - "pmoves.mode=distributed"
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=5000"
+      - "prometheus.io/path=/metrics"
+
+networks:
+  default:
+    name: pmoves_tokenism
+    driver: bridge
+    # Non-internal for distributed access
+    internal: false
+
+# Optional Tailscale sidecar profile
+# Use with: docker compose -f docker-compose.yml -f docker-compose.distributed.yml --profile tailscale up
+---
+# Tailscale sidecar service (optional)
+services:
+  tailscale:
+    profiles: ["tailscale"]
+    image: tailscale/tailscale:stable
+    container_name: pmoves-tokenism-tailscale
+    hostname: ${TAILSCALE_HOSTNAME:-pmoves-tokenism}
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_EXTRA_ARGS=${TAILSCALE_LOGIN_SERVER:+--login-server=${TAILSCALE_LOGIN_SERVER}}
+      - TS_ROUTES=${TAILSCALE_ADVERTISE_ROUTES:-172.33.0.0/16}
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    restart: unless-stopped
+
+volumes:
+  tailscale-state:
