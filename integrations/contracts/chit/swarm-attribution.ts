@@ -193,7 +193,9 @@ const TARGET_WEIGHTS: Record<OptimizationTarget, FitnessWeights> = {
 /**
  * Swarm Attribution class
  *
- * Integrates ToKenism simulation with swarm.meta.v1 for optimization tracking.
+ * Integrates ToKenism simulation with swarm.meta.v1 for fitness and
+ * population tracking. It records generations and scores simulation states;
+ * it does not perform mutation, selection, crossover, or particle updates.
  *
  * @example
  * ```typescript

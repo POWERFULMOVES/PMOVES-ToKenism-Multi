@@ -11,6 +11,8 @@
  * - Exports to CGP format
  */
 
+import { createHash } from 'crypto';
+import { keccak256, toUtf8Bytes } from 'ethers';
 import { DirichletWeights, ContributionWeight } from './dirichlet-weights';
 import { HyperbolicEncoder, PoincarePoint, CGPSuperNode, CGPConstellation, CGPPoint } from './hyperbolic-encoder';
 
@@ -121,38 +123,37 @@ export class ShapeAttribution {
   }
 
   /**
-   * Simple hash function (SHA-256 simulation for browser/node compatibility)
-   * In production, use crypto.createHash('sha256') or Web Crypto API
+   * Hash data using the configured Merkle hash algorithm.
    */
   private hash(data: string): string {
-    // Simple hash for simulation - in production use proper crypto
-    let hash = 0;
-    for (let i = 0; i < data.length; i++) {
-      const char = data.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
+    switch (this.config.merkle.hashAlgorithm) {
+      case 'sha256':
+        return `0x${createHash('sha256').update(data, 'utf8').digest('hex')}`;
+      case 'keccak256':
+        return keccak256(toUtf8Bytes(data));
     }
-
-    // Convert to hex and pad to simulate SHA-256 length
-    const base = Math.abs(hash).toString(16).padStart(8, '0');
-    return `0x${base.repeat(8)}`; // 64 char hex string
+    const exhaustive: never = this.config.merkle.hashAlgorithm;
+    throw new Error(`Unsupported Merkle hash algorithm: ${exhaustive}`);
   }
 
   /**
    * Hash a leaf node (action record)
    */
   private hashLeaf(record: Omit<AttributionRecord, 'chitId' | 'proof' | 'timestamp'>): string {
-    const data = `${record.address}:${record.action}:${record.amount}:${record.week}:${record.category}`;
-    return this.hash(data);
+    return this.hash(JSON.stringify({
+      address: record.address,
+      action: record.action,
+      amount: record.amount,
+      week: record.week,
+      category: record.category,
+    }));
   }
 
   /**
    * Hash two nodes together (parent in Merkle tree)
    */
   private hashPair(left: string, right: string): string {
-    // Sort for consistent ordering
-    const [a, b] = left < right ? [left, right] : [right, left];
-    return this.hash(a + b);
+    return this.hash(JSON.stringify([left, right]));
   }
 
   /**

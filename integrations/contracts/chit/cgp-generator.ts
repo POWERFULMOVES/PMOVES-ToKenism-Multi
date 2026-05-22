@@ -15,7 +15,7 @@
  */
 
 import { ShapeAttribution, AttributionRecord } from './shape-attribution';
-import { HyperbolicEncoder, CGPSuperNode, CGPConstellation, CGPPoint } from './hyperbolic-encoder';
+import { HyperbolicEncoder, PoincarePoint, CGPSuperNode, CGPConstellation, CGPPoint } from './hyperbolic-encoder';
 import { ContributionWeight } from './dirichlet-weights';
 
 /**
@@ -279,7 +279,10 @@ export class CGPGenerator {
 
     // Add hyperbolic encoding if enabled
     if (this.config.includeHyperbolic && encoder) {
-      cgp.hyperbolic = this.createHyperbolicEncoding(encoder);
+      cgp.hyperbolic = this.createHyperbolicEncoding(
+        encoder,
+        attribution.getExpectedAttribution()
+      );
     }
 
     // Create super_nodes for each contract type
@@ -332,7 +335,10 @@ export class CGPGenerator {
 
     // Add hyperbolic encoding
     if (this.config.includeHyperbolic && encoder) {
-      cgp.hyperbolic = this.createHyperbolicEncoding(encoder);
+      cgp.hyperbolic = this.createHyperbolicEncoding(
+        encoder,
+        attribution.getExpectedAttribution()
+      );
     }
 
     // Create super_nodes - one per week
@@ -400,13 +406,17 @@ export class CGPGenerator {
   /**
    * Create hyperbolic encoding metadata
    */
-  private createHyperbolicEncoding(encoder: HyperbolicEncoder): CGPHyperbolicEncoding {
+  private createHyperbolicEncoding(
+    encoder: HyperbolicEncoder,
+    weights: ContributionWeight[] = []
+  ): CGPHyperbolicEncoding {
     const config = encoder.getConfig();
     return {
       space: 'poincare_disk',
       curvature: config.curvature,
       base_radius: config.baseRadius,
       max_radius: config.maxRadius,
+      points: this.encodeContributionWeights(weights, encoder),
     };
   }
 
@@ -453,7 +463,8 @@ export class CGPGenerator {
         constellations: this.createContractConstellations(
           contractType,
           contractRecords,
-          weekData.week
+          weekData.week,
+          _encoder
         ),
         meta: {
           contract_type: contractType,
@@ -502,7 +513,7 @@ export class CGPGenerator {
           id: `summary-week-${weekData.week}`,
           summary: `Economic summary for week ${weekData.week}`,
           anchor: [weekData.gini, weekData.povertyRate, weekData.totalWealth / 1000000],
-          points: this.createSummaryPoints(weekData, weekRecords),
+          points: this.createSummaryPoints(weekData, weekRecords, _encoder),
         },
       ],
       meta: {
@@ -520,7 +531,8 @@ export class CGPGenerator {
   private createContractConstellations(
     contractType: ContractType,
     records: AttributionRecord[],
-    week: number
+    week: number,
+    encoder?: HyperbolicEncoder
   ): CGPConstellation[] {
     if (records.length === 0) {
       return [{
@@ -542,6 +554,7 @@ export class CGPGenerator {
     }
 
     const constellations: CGPConstellation[] = [];
+    const pointLookup = this.createRecordPointLookup(records, encoder);
 
     for (const [action, actionRecords] of byAction) {
       const totalAmount = actionRecords.reduce((sum, r) => sum + r.amount, 0);
@@ -555,7 +568,7 @@ export class CGPGenerator {
           actionRecords.length / 100, // Normalized count
           totalAmount / 10000, // Normalized total
         ],
-        points: actionRecords.map(r => this.recordToPoint(r)),
+        points: actionRecords.map(r => this.recordToPoint(r, pointLookup)),
       });
     }
 
@@ -567,9 +580,11 @@ export class CGPGenerator {
    */
   private createSummaryPoints(
     weekData: WeeklySimulationData,
-    records: AttributionRecord[]
+    records: AttributionRecord[],
+    encoder?: HyperbolicEncoder
   ): CGPPoint[] {
     const points: CGPPoint[] = [];
+    const pointLookup = this.createRecordPointLookup(records, encoder);
 
     // Add metric points
     points.push({
@@ -595,7 +610,7 @@ export class CGPGenerator {
     // Add top contributor points (limit to 10)
     const sortedRecords = [...records].sort((a, b) => b.amount - a.amount);
     for (let i = 0; i < Math.min(10, sortedRecords.length); i++) {
-      points.push(this.recordToPoint(sortedRecords[i]));
+      points.push(this.recordToPoint(sortedRecords[i], pointLookup));
     }
 
     return points;
@@ -604,18 +619,118 @@ export class CGPGenerator {
   /**
    * Convert attribution record to CGP point
    */
-  private recordToPoint(record: AttributionRecord): CGPPoint {
+  private recordToPoint(
+    record: AttributionRecord,
+    pointLookup?: Map<string, PoincarePoint>
+  ): CGPPoint {
     const modality = ACTION_TO_MODALITY[record.action] || 'economic_transaction';
+    const point =
+      pointLookup?.get(this.recordPointKey(record)) ??
+      this.createDeterministicRecordPoint(record);
 
     return {
       id: record.chitId,
-      x: Math.random() * 0.8 - 0.4, // Placeholder - should use encoder
-      y: Math.random() * 0.8 - 0.4,
+      x: point.x,
+      y: point.y,
       text: `${record.address.substring(0, 8)}...: ${record.action}`,
-      proj: record.amount / 1000, // Normalized
-      conf: 0.95,
+      proj: point.radius,
+      conf: Math.max(0.1, Math.min(0.99, 1 - point.radius * 0.5)),
       modality,
     };
+  }
+
+  /**
+   * Encode contribution weights into top-level CGP hyperbolic points.
+   */
+  private encodeContributionWeights(
+    weights: ContributionWeight[],
+    encoder: HyperbolicEncoder
+  ): CGPPoincarePoint[] {
+    if (weights.length === 0) {
+      return [];
+    }
+
+    const participants = new Map<string, { value: number; category: string }>();
+    for (const weight of weights) {
+      participants.set(
+        `${weight.address}:${weight.category}`,
+        { value: weight.weight, category: weight.category }
+      );
+    }
+
+    return encoder.encodeParticipants(participants).map((point) => ({
+      id: point.id,
+      label: point.label,
+      x: point.x,
+      y: point.y,
+      r: point.radius,
+      theta: point.theta,
+    }));
+  }
+
+  /**
+   * Build a deterministic point lookup for records using the hyperbolic encoder.
+   */
+  private createRecordPointLookup(
+    records: AttributionRecord[],
+    encoder?: HyperbolicEncoder
+  ): Map<string, PoincarePoint> {
+    const lookup = new Map<string, PoincarePoint>();
+    if (!encoder || records.length === 0) {
+      return lookup;
+    }
+
+    const participants = new Map<string, { value: number; category: string }>();
+    for (const record of records) {
+      const key = this.recordPointKey(record);
+      const existing = participants.get(key);
+      participants.set(key, {
+        value: (existing?.value ?? 0) + record.amount,
+        category: record.category,
+      });
+    }
+
+    for (const point of encoder.encodeParticipants(participants)) {
+      if (point.id) {
+        lookup.set(point.id, point);
+      }
+    }
+
+    return lookup;
+  }
+
+  /**
+   * Stable point key for a contributor/category pair.
+   */
+  private recordPointKey(record: AttributionRecord): string {
+    return `${record.address}:${record.category}`;
+  }
+
+  /**
+   * Deterministic fallback when a caller does not provide a HyperbolicEncoder.
+   */
+  private createDeterministicRecordPoint(record: AttributionRecord): PoincarePoint {
+    const seed = `${record.address}:${record.category}:${record.action}:${record.week}`;
+    const angleHash = this.hashString(seed);
+    const amountScale = Math.min(1, Math.log10(Math.max(1, record.amount) + 1) / 6);
+    const radius = 0.2 + (1 - amountScale) * 0.65;
+    const theta = (angleHash / 0xffffffff) * 2 * Math.PI;
+    const x = radius * Math.cos(theta);
+    const y = radius * Math.sin(theta);
+
+    return { x, y, radius, theta, id: this.recordPointKey(record), label: record.category };
+  }
+
+  /**
+   * FNV-1a hash for deterministic coordinate fallback.
+   */
+  private hashString(value: string): number {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < value.length; i++) {
+      hash ^= value.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    return hash >>> 0;
   }
 
   /**

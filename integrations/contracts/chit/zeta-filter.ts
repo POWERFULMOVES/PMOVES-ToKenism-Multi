@@ -2,7 +2,7 @@
  * Zeta-Inspired Spectral Filter for CGP Spectrum Processing
  *
  * Uses first N non-trivial Riemann zeta zeros (γ_n ≈ 14.13, 21.02, 25.01, ...)
- * to create frequency-domain filtering weights for CGP spectrum arrays.
+ * as deterministic heuristic weights for CGP spectrum arrays.
  *
  * Mathematical basis:
  * - Each zero γ_n corresponds to a "harmonic" frequency on the critical line Re(s) = 1/2
@@ -10,9 +10,9 @@
  * - Creates scale-invariant filtering across hierarchical data
  *
  * @remarks
- * The Riemann zeta function zeros encode fundamental information about
- * the distribution of primes. By using these zeros as frequency weights,
- * we create a filter that respects natural hierarchical scaling patterns.
+ * This is a zeta-zero-weighted engineering heuristic, not a proof-backed
+ * Riemann-spectrum model. The zeros provide stable, nonuniform harmonic
+ * weights for comparing and smoothing CGP spectra.
  *
  * @example
  * ```typescript
@@ -89,7 +89,7 @@ const ZETA_ZEROS: readonly number[] = Object.freeze([
 /**
  * Zeta-Inspired Spectral Filter
  *
- * Applies frequency-domain filtering using Riemann zeta zeros as weights.
+ * Applies zeta-zero-weighted filtering using Riemann zeta zeros as weights.
  * Useful for analyzing CGP spectrum arrays with natural harmonic structure.
  */
 export class ZetaInspiredFilter {
