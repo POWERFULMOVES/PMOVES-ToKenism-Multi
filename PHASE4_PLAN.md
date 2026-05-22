@@ -1,5 +1,5 @@
 > **ARCHIVED**: This planning document is superseded by [PHASE4_IMPLEMENTATION.md](PHASE4_IMPLEMENTATION.md).
-> Phase 4 implementation is complete. See the implementation guide for current documentation.
+> Phase 4 implementation modules are complete. See the implementation guide for current documentation. This archived plan does not imply scheduled production ingestion, live settlement, or optimizer execution is complete.
 
 # Phase 4: Firefly-iii Data Integration (Planning Document)
 

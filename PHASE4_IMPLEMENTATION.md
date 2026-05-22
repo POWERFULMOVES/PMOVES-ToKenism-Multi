@@ -8,6 +8,8 @@
 
 Phase 4 integrates real financial data from Firefly-iii to calibrate and validate PMOVES business projections. This creates a feedback loop between real user behavior and simulated token economy models.
 
+**2026-05-22 scope note:** "Implementation complete" here means the Firefly client, transformer, calibration, runner, and reporting modules exist. It does not mean scheduled production ingestion, live credential rollout, or NATS -> FireFly -> contract settlement is complete.
+
 ## Deliverables
 
 ### 1. Firefly-iii API Client ✅

@@ -1,14 +1,28 @@
 # PMOVES-ToKenism-Multi Implementation Status
 
-**Last Updated:** 2026-01-31 (Phase 4 Complete)
-**Branch:** PMOVES.AI-Edition-Hardened (Production)
-**Status:** Production Ready with Pending Enhancements
+**Last Updated:** 2026-05-22 (CHIT hardening review)
+**Branch:** codex/tokenism-chit-gap-closure
+**Status:** CHIT core hardened; production settlement and optimizer integration pending
 
 ---
 
 ## Overview
 
 This document tracks the implementation status of PMOVES.AI features aligned with the architectural documentation in `agents/`.
+
+## Scope Reality Check (2026-05-22)
+
+Working now:
+- Dirichlet contribution weighting, temporal decay, deterministic CGP generation, and real Merkle proof hashing.
+- SHA-256 uses Node `crypto`; keccak256 uses `ethers.keccak256(toUtf8Bytes(...))`.
+- Proof verification is order-preserving through `pathIndices` and fails on tampered leaf/path/root.
+- NATS publisher payloads are validated for the hardened Tokenism subjects before publish.
+
+Bounded or planned:
+- Hyperbolic geometry is an embedding support layer, not a completed proof-backed fairness pillar.
+- Zeta filtering remains a heuristic until a method-design review validates the math.
+- `SwarmAttribution` records fitness/population metadata only; it does not perform mutation, crossover, selection, PSO, or RL.
+- Production token settlement should be implemented as an explicit NATS -> FireFly -> contract flow.
 
 ---
 
@@ -20,26 +34,29 @@ This document tracks the implementation status of PMOVES.AI features aligned wit
 |-----------|------|--------|
 | CHIT Module Index | `integrations/contracts/chit/index.ts` | ✅ Complete |
 | Dirichlet Weights | `integrations/contracts/chit/dirichlet-weights.ts` | ✅ Complete |
-| Hyperbolic Encoder | `integrations/contracts/chit/hyperbolic-encoder.ts` | ✅ Complete |
-| Shape Attribution | `integrations/contracts/chit/shape-attribution.ts` | ✅ Complete |
+| Hyperbolic Encoder | `integrations/contracts/chit/hyperbolic-encoder.ts` | ◐ Embedding support |
+| Shape Attribution | `integrations/contracts/chit/shape-attribution.ts` | ✅ Hardened Merkle hashing |
 | CGP Generator | `integrations/contracts/chit/cgp-generator.ts` | ✅ Complete |
-| Swarm Attribution | `integrations/contracts/chit/swarm-attribution.ts` | ✅ Complete |
-| Zeta Filter | `integrations/contracts/chit/zeta-filter.ts` | ✅ Complete |
-| NATS Publisher | `integrations/contracts/chit/chit-nats-publisher.ts` | ✅ Complete |
+| Swarm Attribution | `integrations/contracts/chit/swarm-attribution.ts` | ✅ Fitness tracking only |
+| Zeta Filter | `integrations/contracts/chit/zeta-filter.ts` | ◐ Heuristic |
+| NATS Publisher | `integrations/contracts/chit/chit-nats-publisher.ts` | ✅ Schema-validated |
 
 **NATS Subjects (GEOMETRY BUS):**
 - `tokenism.attribution.recorded.v1` - Attribution events
 - `tokenism.cgp.weekly.v1` - Weekly CGP exports
 - `tokenism.cgp.ready.v1` - CGP ready for consumption
-- `tokenism.geometry.event.v1` - Direct geometry events
 - `tokenism.swarm.population.v1` - Swarm population updates
+
+**Legacy/service subjects still used outside the hardened publisher set:**
+- `tokenism.geometry.event.v1` - Direct voice geometry events
+- `tokenism.credential.rotated.v1` - Credential rotation/redaction audit events
 
 ### Schemas
 
 | Schema | File | Version |
 |--------|------|---------|
-| CGP v1 | `contracts/schemas/geometry/cgp.v1.schema.json` | chit.cgp.v0.1 |
-| Swarm Meta | `contracts/schemas/geometry/swarm.meta.v1.schema.json` | swarm.meta.v1 |
+| CGP v1 | `contracts/schemas/geometry/cgp.v1.schema.json` | accepts `chit.cgp.v0.2` and `chit.cgp.v1.0` |
+| Swarm Meta | `contracts/schemas/geometry/swarm.meta.v1.schema.json` | `swarm.meta.v1`, bounded fitness fields |
 
 ### BoTZ Agentic Features
 
@@ -203,7 +220,8 @@ This document tracks the implementation status of PMOVES.AI features aligned wit
 |-------|-------|--------|
 | Python (pytest) | 41 | ✅ Passing |
 | Jest | 14 | ✅ Passing |
-| Firefly Export (dry-run) | 312 transactions | ✅ Verified |
+| Firefly Export (dry-run) | 312 transactions | ✅ Historical verification |
+| CHIT focused Jest suites | 58 tests | ✅ Passing on 2026-05-22 |
 | CHIT CGP Generation | 7 super nodes | ✅ Verified |
 | Health Endpoints | 3 endpoints | ✅ Responding |
 
