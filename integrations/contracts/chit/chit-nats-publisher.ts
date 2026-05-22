@@ -7,11 +7,34 @@
  * @module chit-nats-publisher
  */
 
+import { existsSync, readFileSync } from 'fs';
+import path from 'path';
+import Ajv2020 from 'ajv/dist/2020';
+import addFormats from 'ajv-formats';
+import type { ErrorObject, ValidateFunction } from 'ajv';
 import { NATSClient } from '../../nats/nats-client';
-import { CHIT_NATS_SUBJECTS } from './index';
 import type { SwarmMeta, ToKenismMetrics } from './swarm-attribution';
 import type { AttributionRecord } from './shape-attribution';
 import type { CGPDocument } from './cgp-generator';
+
+const CHIT_PUBLISH_SUBJECTS = {
+  attributionRecorded: 'tokenism.attribution.recorded.v1',
+  cgpWeekly: 'tokenism.cgp.weekly.v1',
+  cgpReady: 'tokenism.cgp.ready.v1',
+  swarmPopulation: 'tokenism.swarm.population.v1',
+} as const;
+
+const TOKENISM_SCHEMA_FILES: Record<string, string> = {
+  [CHIT_PUBLISH_SUBJECTS.attributionRecorded]: 'attribution.recorded.v1.schema.json',
+  [CHIT_PUBLISH_SUBJECTS.cgpWeekly]: 'cgp.weekly.v1.schema.json',
+  [CHIT_PUBLISH_SUBJECTS.cgpReady]: 'cgp.ready.v1.schema.json',
+  [CHIT_PUBLISH_SUBJECTS.swarmPopulation]: 'swarm.population.v1.schema.json',
+};
+
+export interface CHITPublisherOptions {
+  enabled?: boolean;
+  strictPublish?: boolean;
+}
 
 /**
  * Swarm population event payload
@@ -56,6 +79,18 @@ export interface CGPWeeklyPayload {
 }
 
 /**
+ * CGP ready event payload
+ */
+export interface CGPReadyPayload {
+  cgp: CGPDocument;
+  super_node_count: number;
+  week?: number;
+  source: string;
+  cgp_spec: string;
+  timestamp: string;
+}
+
+/**
  * CHIT NATS Publisher
  *
  * Provides methods to publish CHIT events to the PMOVES.AI NATS bus.
@@ -77,17 +112,110 @@ export interface CGPWeeklyPayload {
 export class CHITNATSPublisher {
   private client: NATSClient;
   private enabled: boolean;
+  private strictPublish: boolean;
+  private static readonly validators = CHITNATSPublisher.createValidators();
 
-  constructor(client: NATSClient, enabled = true) {
+  constructor(client: NATSClient, enabledOrOptions: boolean | CHITPublisherOptions = true) {
     this.client = client;
-    this.enabled = enabled;
+    if (typeof enabledOrOptions === 'boolean') {
+      this.enabled = enabledOrOptions;
+      this.strictPublish = false;
+    } else {
+      this.enabled = enabledOrOptions.enabled ?? true;
+      this.strictPublish = enabledOrOptions.strictPublish ?? false;
+    }
   }
 
   /**
-   * Check if publishing is enabled and client is connected
+   * Locate tokenism schema files from source or built output.
    */
-  private canPublish(): boolean {
-    return this.enabled && this.client.isConnected();
+  private static schemaDir(): string {
+    const candidates = [
+      path.resolve(__dirname, '../../../contracts/schemas/tokenism'),
+      path.resolve(process.cwd(), '../contracts/schemas/tokenism'),
+      path.resolve(process.cwd(), 'contracts/schemas/tokenism'),
+    ];
+
+    for (const candidate of candidates) {
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    return candidates[0];
+  }
+
+  private static createValidators(): Map<string, ValidateFunction> {
+    const ajv = new Ajv2020({ allErrors: true, strict: false });
+    addFormats(ajv);
+    const schemaDir = CHITNATSPublisher.schemaDir();
+    const validators = new Map<string, ValidateFunction>();
+
+    for (const [subject, fileName] of Object.entries(TOKENISM_SCHEMA_FILES)) {
+      const schemaPath = path.join(schemaDir, fileName);
+      const schema = JSON.parse(readFileSync(schemaPath, 'utf8')) as Record<string, unknown>;
+      validators.set(subject, ajv.compile(schema));
+    }
+
+    return validators;
+  }
+
+  private formatValidationErrors(errors: ErrorObject[] | null | undefined): string {
+    if (!errors || errors.length === 0) {
+      return 'unknown schema violation';
+    }
+
+    return errors
+      .map((error) => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`)
+      .join('; ');
+  }
+
+  private validatePayload(subject: string, payload: unknown): void {
+    const validate = CHITNATSPublisher.validators.get(subject);
+    if (!validate) {
+      throw new Error(`No CHIT schema validator registered for ${subject}`);
+    }
+
+    if (!validate(payload)) {
+      throw new Error(
+        `Payload failed schema validation for ${subject}: ${this.formatValidationErrors(validate.errors)}`
+      );
+    }
+  }
+
+  private fail(subject: string, error: unknown): false {
+    const err = error instanceof Error ? error : new Error(String(error));
+    if (this.strictPublish) {
+      throw err;
+    }
+
+    console.error(`[CHIT] Failed to publish ${subject}: ${err.message}`);
+    return false;
+  }
+
+  private async publishValidated<T>(
+    subject: string,
+    payload: T,
+    successMessage: string,
+  ): Promise<boolean> {
+    if (!this.enabled) {
+      console.log(`[CHIT] Skipping ${subject} publish (disabled)`);
+      return false;
+    }
+
+    if (!this.client.isConnected()) {
+      return this.fail(subject, new Error('NATS client not connected'));
+    }
+
+    try {
+      const cleanPayload = JSON.parse(JSON.stringify(payload)) as T;
+      this.validatePayload(subject, cleanPayload);
+      await this.client.publish(subject, cleanPayload);
+      console.log(successMessage);
+      return true;
+    } catch (error) {
+      return this.fail(subject, error);
+    }
   }
 
   /**
@@ -98,12 +226,7 @@ export class CHITNATSPublisher {
   async publishSwarmPopulation(
     meta: SwarmMeta,
     generation?: number
-  ): Promise<void> {
-    if (!this.canPublish()) {
-      console.log('[CHIT] Skipping swarm population publish (disabled or disconnected)');
-      return;
-    }
-
+  ): Promise<boolean> {
     const payload: SwarmPopulationPayload = {
       namespace: meta.namespace,
       modality: meta.modality,
@@ -116,16 +239,11 @@ export class CHITNATSPublisher {
       timestamp: meta.ts || new Date().toISOString(),
     };
 
-    try {
-      await this.client.publish(
-        CHIT_NATS_SUBJECTS.swarmPopulation,
-        payload
-      );
-      console.log(`[CHIT] Published swarm population: ${meta.pack_id}`);
-    } catch (error) {
-      console.error('[CHIT] Failed to publish swarm population:', error);
-      // Best-effort: don't throw
-    }
+    return this.publishValidated(
+      CHIT_PUBLISH_SUBJECTS.swarmPopulation,
+      payload,
+      `[CHIT] Published swarm population: ${meta.pack_id}`,
+    );
   }
 
   /**
@@ -135,12 +253,7 @@ export class CHITNATSPublisher {
    */
   async publishAttributionRecorded(
     record: AttributionRecord
-  ): Promise<void> {
-    if (!this.canPublish()) {
-      console.log('[CHIT] Skipping attribution publish (disabled or disconnected)');
-      return;
-    }
-
+  ): Promise<boolean> {
     const payload: AttributionRecordedPayload = {
       chit_id: record.chitId,
       address: record.address,
@@ -152,16 +265,11 @@ export class CHITNATSPublisher {
       timestamp: new Date().toISOString(),
     };
 
-    try {
-      await this.client.publish(
-        CHIT_NATS_SUBJECTS.attributionRecorded,
-        payload
-      );
-      console.log(`[CHIT] Published attribution recorded: ${record.chitId} (${record.action})`);
-    } catch (error) {
-      console.error('[CHIT] Failed to publish attribution:', error);
-      // Best-effort: don't throw
-    }
+    return this.publishValidated(
+      CHIT_PUBLISH_SUBJECTS.attributionRecorded,
+      payload,
+      `[CHIT] Published attribution recorded: ${record.chitId} (${record.action})`,
+    );
   }
 
   /**
@@ -173,12 +281,7 @@ export class CHITNATSPublisher {
     week: number,
     cgp: CGPDocument,
     metrics?: { gini?: number; poverty_rate?: number; total_attributions?: number }
-  ): Promise<void> {
-    if (!this.canPublish()) {
-      console.log('[CHIT] Skipping CGP weekly publish (disabled or disconnected)');
-      return;
-    }
-
+  ): Promise<boolean> {
     const payload: CGPWeeklyPayload = {
       week,
       cgp,
@@ -189,16 +292,11 @@ export class CHITNATSPublisher {
       cgp_spec: cgp.spec,
     };
 
-    try {
-      await this.client.publish(
-        CHIT_NATS_SUBJECTS.cgpWeekly,
-        payload
-      );
-      console.log(`[CHIT] Published CGP weekly: week ${week}`);
-    } catch (error) {
-      console.error('[CHIT] Failed to publish CGP weekly:', error);
-      // Best-effort: don't throw
-    }
+    return this.publishValidated(
+      CHIT_PUBLISH_SUBJECTS.cgpWeekly,
+      payload,
+      `[CHIT] Published CGP weekly: week ${week}`,
+    );
   }
 
   /**
@@ -209,13 +307,8 @@ export class CHITNATSPublisher {
   async publishCGPReady(
     cgp: CGPDocument,
     metadata?: { week?: number; source?: string }
-  ): Promise<void> {
-    if (!this.canPublish()) {
-      console.log('[CHIT] Skipping CGP ready publish (disabled or disconnected)');
-      return;
-    }
-
-    const payload = {
+  ): Promise<boolean> {
+    const payload: CGPReadyPayload = {
       cgp,
       super_node_count: cgp.super_nodes?.length || 0,
       week: metadata?.week,
@@ -224,16 +317,11 @@ export class CHITNATSPublisher {
       timestamp: new Date().toISOString(),
     };
 
-    try {
-      await this.client.publish(
-        CHIT_NATS_SUBJECTS.cgpReady,
-        payload
-      );
-      console.log(`[CHIT] Published CGP ready: ${cgp.summary?.slice(0, 50)}...`);
-    } catch (error) {
-      console.error('[CHIT] Failed to publish CGP ready:', error);
-      // Best-effort: don't throw
-    }
+    return this.publishValidated(
+      CHIT_PUBLISH_SUBJECTS.cgpReady,
+      payload,
+      `[CHIT] Published CGP ready: ${cgp.summary?.slice(0, 50)}...`,
+    );
   }
 
   /**
@@ -254,8 +342,11 @@ export class CHITNATSPublisher {
 /**
  * Create a CHIT NATS publisher with the default client
  */
-export function createCHITPublisher(client: NATSClient): CHITNATSPublisher {
-  return new CHITNATSPublisher(client);
+export function createCHITPublisher(
+  client: NATSClient,
+  options: boolean | CHITPublisherOptions = true,
+): CHITNATSPublisher {
+  return new CHITNATSPublisher(client, options);
 }
 
 export default CHITNATSPublisher;
