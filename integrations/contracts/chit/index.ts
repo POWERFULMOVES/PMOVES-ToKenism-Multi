@@ -81,7 +81,7 @@ export {
   GenerationRecord,
 } from './swarm-attribution';
 
-// Zeta-Inspired Filter - Spectral analysis using Riemann zeta zeros
+// Zeta-Inspired Filter - zeta-zero-weighted heuristic spectral transform
 export {
   ZetaInspiredFilter,
   ZetaFilterConfig,
@@ -113,13 +113,13 @@ export {
  * });
  *
  * // Record attribution
- * const chitId = chit.attribution.recordAction({
- *   address: '0xABC...',
- *   action: 'spending',
- *   amount: 50,
- *   week: 1,
- *   category: 'groceries'
- * });
+ * const chitId = chit.attribution.recordAction(
+ *   '0xABC...',
+ *   'spending',
+ *   50,
+ *   1,
+ *   'groceries'
+ * );
  *
  * // Generate CGP document
  * const cgp = chit.generator.generateWeeklyCGP(weekData, chit.attribution);
