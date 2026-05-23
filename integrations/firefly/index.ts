@@ -29,4 +29,17 @@ export type {
   IntegrationResult,
 } from './firefly-integration';
 
+export { FireflySettlementExecutor } from './settlement-executor';
+export type {
+  FireflySettlementDraft,
+  FireflySettlementExecutionResult,
+  FireflySettlementExecutorConfig,
+  FireflySettlementSkip,
+  FireflyTransactionInput,
+  FireflyTransactionType,
+  FireflyWritableClient,
+  SettlementFailedEvent,
+  SettlementRecordedEvent,
+} from './settlement-executor';
+
 export { runIntegration } from './run-integration';

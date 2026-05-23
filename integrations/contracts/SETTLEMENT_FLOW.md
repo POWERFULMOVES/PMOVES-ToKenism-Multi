@@ -1,6 +1,6 @@
 # Tokenism Settlement Flow
 
-**Status:** Interface and planner implemented; live Firefly and chain execution remain gated.
+**Status:** Interface, planner, and Firefly dry-run executor implemented; live Firefly and chain execution remain gated.
 **Last updated:** 2026-05-22
 
 ## Scope
@@ -14,8 +14,9 @@ CHIT produces attribution. Settlement consumes attribution and creates auditable
 1. `tokenism.cgp.weekly.v1` publishes a validated CGP with attribution and Merkle proof roots.
 2. `SettlementPlanner` converts the CGP contributors into deterministic instructions.
 3. `tokenism.settlement.requested.v1` carries the signed settlement batch.
-4. A Firefly executor records accounting entries and emits `tokenism.settlement.recorded.v1` or `tokenism.settlement.failed.v1`.
-5. A contract executor mints/transfers/records on chain and emits the same recorded/failed result events.
+4. The Firefly executor dry-runs the batch by default, producing transaction drafts without writing to Firefly.
+5. In live mode, a Firefly executor records accounting entries and emits `tokenism.settlement.recorded.v1` or `tokenism.settlement.failed.v1`.
+6. A contract executor mints/transfers/records on chain and emits the same recorded/failed result events.
 
 ## Idempotency
 
@@ -44,9 +45,10 @@ Required before trusted live execution:
 
 - `contracts/solidity`: `npm ci && npm test` compiles 14 Solidity files and passes the existing 4 Hardhat tests.
 - `integrations/contracts/settlement-planner.ts` is deterministic and covered by Jest tests.
+- `integrations/firefly/settlement-executor.ts` validates dry-run behavior, live client writes, write failures, and duplicate idempotency-key rejection.
 
 ## Non-goals
 
-- This pass does not submit Firefly API requests.
+- Dry-run mode does not submit Firefly API requests. Live mode is implemented but should remain gated on executor identity and operator approval.
 - This pass does not deploy contracts or sign transactions.
 - This pass does not decide token monetary policy; it only makes the settlement path typed and replay-safe.
