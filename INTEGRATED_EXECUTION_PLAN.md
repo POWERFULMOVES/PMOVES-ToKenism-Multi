@@ -13,7 +13,7 @@
 - Establish an end-to-end pipeline connecting Firefly-iii, PMOVEStokensim, PMOVES-DoX, and on-chain contract primitives.
 - Provide repeatable validation, reporting, and operational workflows exercised through automated testing and documentation.
 
-**Current scope note:** CHIT core hardening has landed in the Tokenism library. Real token settlement, contract deployment, and optimizer-driven parameter changes remain separate workstreams and should not be inferred from Firefly calibration or CHIT CGP generation alone.
+**Current scope note:** CHIT core hardening has landed in the Tokenism library. Settlement now has typed requested/recorded/failed event contracts plus a deterministic planner, but live Firefly writes, contract deployment, and optimizer-driven parameter changes remain separate gated workstreams.
 
 ---
 
@@ -106,6 +106,7 @@ Mitigations: stagger feature flags, use mock services for CI, document fallback 
 | 2026-01-25 | BoTZ Claude Code skills and expertise guides added. |
 | 2026-01-29 | Branch consolidated to PMOVES.AI-Edition-Hardened; production configuration work progressed. |
 | 2026-05-22 | CHIT core hardening reviewed: real Merkle hashing, schema-validated publisher, fitness tracking only for ToKenism swarm, zeta still heuristic. |
+| 2026-05-22 | Settlement interface added: requested/recorded/failed schemas, deterministic planner, idempotency keys, and Hardhat harness validation. |
 
 ---
 

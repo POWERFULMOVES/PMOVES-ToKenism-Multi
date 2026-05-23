@@ -17,12 +17,14 @@ Working now:
 - SHA-256 uses Node `crypto`; keccak256 uses `ethers.keccak256(toUtf8Bytes(...))`.
 - Proof verification is order-preserving through `pathIndices` and fails on tampered leaf/path/root.
 - NATS publisher payloads are validated for the hardened Tokenism subjects before publish.
+- Settlement planning now has typed NATS contracts and deterministic idempotency keys for Firefly/contract executors.
 
 Bounded or planned:
 - Hyperbolic geometry is an embedding support layer, not a completed proof-backed fairness pillar.
 - Zeta filtering remains a heuristic until a method-design review validates the math.
 - `SwarmAttribution` records fitness/population metadata only; it does not perform mutation, crossover, selection, PSO, or RL.
 - Production token settlement should be implemented as an explicit NATS -> FireFly -> contract flow.
+- Live Firefly writes and blockchain transactions are still gated behind executor identity, dry-run validation, and deployment review.
 
 ---
 
@@ -40,12 +42,16 @@ Bounded or planned:
 | Swarm Attribution | `integrations/contracts/chit/swarm-attribution.ts` | ✅ Fitness tracking only |
 | Zeta Filter | `integrations/contracts/chit/zeta-filter.ts` | ◐ Heuristic |
 | NATS Publisher | `integrations/contracts/chit/chit-nats-publisher.ts` | ✅ Schema-validated |
+| Settlement Planner | `integrations/contracts/settlement-planner.ts` | ✅ Plan-only, deterministic |
 
 **NATS Subjects (GEOMETRY BUS):**
 - `tokenism.attribution.recorded.v1` - Attribution events
 - `tokenism.cgp.weekly.v1` - Weekly CGP exports
 - `tokenism.cgp.ready.v1` - CGP ready for consumption
 - `tokenism.swarm.population.v1` - Swarm population updates
+- `tokenism.settlement.requested.v1` - Signed settlement batch for executors
+- `tokenism.settlement.recorded.v1` - Settlement instruction recorded/skipped
+- `tokenism.settlement.failed.v1` - Settlement instruction failure
 
 **Legacy/service subjects still used outside the hardened publisher set:**
 - `tokenism.geometry.event.v1` - Direct voice geometry events
@@ -222,6 +228,8 @@ Bounded or planned:
 | Jest | 14 | ✅ Passing |
 | Firefly Export (dry-run) | 312 transactions | ✅ Historical verification |
 | CHIT focused Jest suites | 58 tests | ✅ Passing on 2026-05-22 |
+| Settlement planner Jest suite | 4 tests | ✅ Passing on 2026-05-22 |
+| Solidity Hardhat harness | 4 tests | ✅ Passing on 2026-05-22 |
 | CHIT CGP Generation | 7 super nodes | ✅ Verified |
 | Health Endpoints | 3 endpoints | ✅ Responding |
 
