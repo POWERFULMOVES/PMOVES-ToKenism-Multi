@@ -94,6 +94,15 @@
     "tokenism.swarm.population.v1": {
       "schema": "schemas/tokenism/swarm.population.v1.schema.json"
     },
+    "tokenism.settlement.requested.v1": {
+      "schema": "schemas/tokenism/settlement.requested.v1.schema.json"
+    },
+    "tokenism.settlement.recorded.v1": {
+      "schema": "schemas/tokenism/settlement.recorded.v1.schema.json"
+    },
+    "tokenism.settlement.failed.v1": {
+      "schema": "schemas/tokenism/settlement.failed.v1.schema.json"
+    },
     "geometry.cgp.v1": {
       "schema": "schemas/geometry/cgp.v1.schema.json"
     },

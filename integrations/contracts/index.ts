@@ -77,3 +77,16 @@ export {
   ContractConfig,
   NetworkConfig,
 } from './contract-listeners';
+
+// Settlement Planner
+export {
+  planTokenSettlement,
+  createSettlementRequestedEvent,
+  SettlementAction,
+  SettlementBatch,
+  SettlementInstruction,
+  SettlementLane,
+  SettlementPlannerConfig,
+  SettlementRequestedEvent,
+  SettlementSignature,
+} from './settlement-planner';
