@@ -18,6 +18,7 @@ Working now:
 - Proof verification is order-preserving through `pathIndices` and fails on tampered leaf/path/root.
 - NATS publisher payloads are validated for the hardened Tokenism subjects before publish.
 - Settlement planning now has typed NATS contracts and deterministic idempotency keys for Firefly/contract executors.
+- Firefly settlement dry-run executor maps signed settlement batches to transaction drafts without external writes.
 
 Bounded or planned:
 - Hyperbolic geometry is an embedding support layer, not a completed proof-backed fairness pillar.
@@ -43,6 +44,7 @@ Bounded or planned:
 | Zeta Filter | `integrations/contracts/chit/zeta-filter.ts` | ◐ Heuristic |
 | NATS Publisher | `integrations/contracts/chit/chit-nats-publisher.ts` | ✅ Schema-validated |
 | Settlement Planner | `integrations/contracts/settlement-planner.ts` | ✅ Plan-only, deterministic |
+| Firefly Settlement Executor | `integrations/firefly/settlement-executor.ts` | ✅ Dry-run default, live gated |
 
 **NATS Subjects (GEOMETRY BUS):**
 - `tokenism.attribution.recorded.v1` - Attribution events
@@ -229,6 +231,7 @@ Bounded or planned:
 | Firefly Export (dry-run) | 312 transactions | ✅ Historical verification |
 | CHIT focused Jest suites | 58 tests | ✅ Passing on 2026-05-22 |
 | Settlement planner Jest suite | 4 tests | ✅ Passing on 2026-05-22 |
+| Firefly settlement executor Jest suite | 5 tests | ✅ Passing on 2026-05-22 |
 | Solidity Hardhat harness | 4 tests | ✅ Passing on 2026-05-22 |
 | CHIT CGP Generation | 7 super nodes | ✅ Verified |
 | Health Endpoints | 3 endpoints | ✅ Responding |
