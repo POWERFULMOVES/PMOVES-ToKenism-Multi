@@ -1,7 +1,7 @@
 # Tokenism Settlement Flow
 
-**Status:** Interface, planner, and Firefly dry-run executor implemented; live Firefly and chain execution remain gated.
-**Last updated:** 2026-05-22
+**Status:** Interface, planner, Firefly dry-run executor, and signed result publisher implemented; live Firefly and chain execution remain gated.
+**Last updated:** 2026-05-24
 
 ## Scope
 
@@ -15,7 +15,7 @@ CHIT produces attribution. Settlement consumes attribution and creates auditable
 2. `SettlementPlanner` converts the CGP contributors into deterministic instructions.
 3. `tokenism.settlement.requested.v1` carries the signed settlement batch.
 4. The Firefly executor dry-runs the batch by default, producing transaction drafts without writing to Firefly.
-5. In live mode, a Firefly executor records accounting entries and emits `tokenism.settlement.recorded.v1` or `tokenism.settlement.failed.v1`.
+5. In live mode, a Firefly executor records accounting entries and the settlement publisher emits validated `tokenism.settlement.recorded.v1` or `tokenism.settlement.failed.v1` events.
 6. A contract executor mints/transfers/records on chain and emits the same recorded/failed result events.
 
 ## Idempotency
@@ -39,6 +39,7 @@ Required before trusted live execution:
 - Registered agent identity for the planner/executor.
 - CGP Merkle root present when `requireMerkleRoot=true`.
 - Firefly dry-run mode passing against the target instance.
+- Schema-validated signed result publishing passing for recorded and failed settlement events.
 - Hardhat harness passing for GroToken, FoodUSD, GroupPurchase, GroVault, and CoopGovernor.
 
 ## Current Validation
@@ -46,6 +47,7 @@ Required before trusted live execution:
 - `contracts/solidity`: `npm ci && npm test` compiles 14 Solidity files and passes the existing 4 Hardhat tests.
 - `integrations/contracts/settlement-planner.ts` is deterministic and covered by Jest tests.
 - `integrations/firefly/settlement-executor.ts` validates dry-run behavior, live client writes, write failures, and duplicate idempotency-key rejection.
+- `integrations/firefly/settlement-publisher.ts` validates recorded/failed events against Tokenism schemas before best-effort or strict NATS publish.
 
 ## Non-goals
 

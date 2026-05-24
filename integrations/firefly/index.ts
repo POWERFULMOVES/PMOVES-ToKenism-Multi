@@ -42,4 +42,15 @@ export type {
   SettlementRecordedEvent,
 } from './settlement-executor';
 
+export {
+  FireflySettlementPublisher,
+  TOKENISM_SETTLEMENT_SUBJECTS,
+  createFireflySettlementPublisher,
+} from './settlement-publisher';
+export type {
+  FireflySettlementPublisherOptions,
+  SettlementPublishClient,
+  SettlementPublishSummary,
+} from './settlement-publisher';
+
 export { runIntegration } from './run-integration';
