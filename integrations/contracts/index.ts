@@ -98,6 +98,15 @@ export {
 } from './settlement-results';
 
 export {
+  SettlementDeploymentApproval,
+  SettlementDeploymentAttestation,
+  SettlementDeploymentAttestationValidationOptions,
+  SettlementFireflyBinding,
+  SettlementWalletCustody,
+  validateSettlementDeploymentAttestation,
+} from './settlement-deployment-attestation';
+
+export {
   ContractDeploymentEntry,
   ContractDeploymentManifest,
   ContractSettlementCall,

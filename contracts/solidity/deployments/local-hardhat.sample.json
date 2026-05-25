@@ -2,6 +2,40 @@
   "chain_id": 31337,
   "network": "hardhat",
   "generated_at": "2026-05-25T00:00:00.000Z",
+  "attestation": {
+    "manifest_id": "tokenism-hardhat-local-sample",
+    "environment": "local",
+    "rpc_ref": "env:ETHEREUM_RPC_URL",
+    "wallet_custody": {
+      "custody_type": "local",
+      "signer_ref": "env:ETHEREUM_SETTLEMENT_SIGNER",
+      "policy_ref": "docs:tokenism-local-policy"
+    },
+    "firefly": {
+      "instance_ref": "env:FIREFLY_BASE_URL",
+      "environment": "local",
+      "account_ref": "Tokenism Settlement Pool"
+    },
+    "approvals": [
+      {
+        "approval_id": "approval_deployment_sample",
+        "scope": "settlement_deployment_manifest",
+        "approved_by": "PMOVES-OPERATOR",
+        "approved_at": "2026-05-25T00:00:00.000Z",
+        "signature": {
+          "alg": "HMAC-SHA256",
+          "kid": "operator-sample",
+          "hmac": "replace-with-real-signature"
+        }
+      }
+    ],
+    "signed_at": "2026-05-25T00:00:00.000Z",
+    "signature": {
+      "alg": "HMAC-SHA256",
+      "kid": "deployment-manifest-sample",
+      "hmac": "replace-with-real-signature"
+    }
+  },
   "contracts": {
     "GroToken": {
       "address": "0x1111111111111111111111111111111111111111",
