@@ -1,5 +1,8 @@
 import { FireflySettlementExecutor, FireflyWritableClient } from './settlement-executor';
-import { SettlementRequestedEvent } from '../contracts';
+import {
+  SettlementDeploymentAttestation,
+  SettlementRequestedEvent,
+} from '../contracts';
 
 const SIGNATURE = { alg: 'HMAC-SHA256', kid: 'agent-zero-test', hmac: 'abc123' };
 const EXECUTOR_SIGNATURE = { alg: 'HMAC-SHA256', kid: 'firefly-exec', hmac: 'execsig' };
@@ -11,6 +14,29 @@ const OPERATOR_APPROVAL = {
   approved_at: '2026-05-25T12:00:00Z',
   expires_at: '2099-01-01T00:00:00Z',
   signature: { alg: 'HMAC-SHA256', kid: 'operator-test', hmac: 'operatorsig' },
+};
+
+const DEPLOYMENT_ATTESTATION: SettlementDeploymentAttestation = {
+  manifest_id: 'tokenism-firefly-local-20260525',
+  environment: 'local',
+  firefly: {
+    instance_ref: 'env:FIREFLY_BASE_URL',
+    environment: 'local',
+    account_ref: 'Tokenism Settlement Pool',
+  },
+  approvals: [
+    {
+      approval_id: 'approval_deployment_1234abcd5678ef00',
+      scope: 'settlement_deployment_manifest',
+      approved_by: 'PMOVES-OPERATOR',
+      approved_at: '2026-05-25T12:00:00Z',
+      expires_at: '2099-01-01T00:00:00Z',
+      signature: { alg: 'HMAC-SHA256', kid: 'operator-test', hmac: 'deploymentsig' },
+    },
+  ],
+  signed_at: '2026-05-25T12:00:00Z',
+  expires_at: '2099-01-01T00:00:00Z',
+  signature: { alg: 'HMAC-SHA256', kid: 'deployment-manifest', hmac: 'manifestsig' },
 };
 
 function settlementRequest(): SettlementRequestedEvent {
@@ -118,6 +144,7 @@ describe('FireflySettlementExecutor', () => {
       executorAgentId: 'FIREFLY-SETTLEMENT-EXECUTOR',
       executorSignature: EXECUTOR_SIGNATURE,
       operatorApproval: OPERATOR_APPROVAL,
+      deploymentAttestation: DEPLOYMENT_ATTESTATION,
       trustedExecutorIds: ['FIREFLY-SETTLEMENT-EXECUTOR'],
     });
 
@@ -136,6 +163,7 @@ describe('FireflySettlementExecutor', () => {
         firefly_transaction_id: 'firefly-tx-1',
         agent_id: 'FIREFLY-SETTLEMENT-EXECUTOR',
         metadata: {
+          deployment_manifest_id: 'tokenism-firefly-local-20260525',
           operator_approval_id: 'approval_firefly_1234abcd5678ef00',
         },
       },
@@ -152,6 +180,7 @@ describe('FireflySettlementExecutor', () => {
       executorAgentId: 'FIREFLY-SETTLEMENT-EXECUTOR',
       executorSignature: EXECUTOR_SIGNATURE,
       operatorApproval: OPERATOR_APPROVAL,
+      deploymentAttestation: DEPLOYMENT_ATTESTATION,
     });
 
     const result = await executor.execute(settlementRequest());
@@ -202,6 +231,23 @@ describe('FireflySettlementExecutor', () => {
 
     await expect(executor.execute(settlementRequest())).rejects.toThrow(
       'Live Firefly settlement requires operator approval'
+    );
+    expect(client.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it('requires deployment attestation for live execution by default', async () => {
+    const client: FireflyWritableClient = {
+      createTransaction: jest.fn().mockResolvedValue({ id: 'firefly-tx-1' }),
+    };
+    const executor = new FireflySettlementExecutor(client, {
+      dryRun: false,
+      executorAgentId: 'FIREFLY-SETTLEMENT-EXECUTOR',
+      executorSignature: EXECUTOR_SIGNATURE,
+      operatorApproval: OPERATOR_APPROVAL,
+    });
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Deployment attestation is required'
     );
     expect(client.createTransaction).not.toHaveBeenCalled();
   });

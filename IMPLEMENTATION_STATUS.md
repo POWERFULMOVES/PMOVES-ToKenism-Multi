@@ -20,6 +20,7 @@ Working now:
 - Settlement planning now has typed NATS contracts and deterministic idempotency keys for Firefly/contract executors.
 - Firefly settlement dry-run executor maps signed settlement batches to transaction drafts without external writes.
 - Contract settlement dry-run executor maps signed settlement batches to manifest-backed chain call drafts without signing transactions.
+- Deployment attestations bind live settlement to signed environment, RPC, wallet custody, Firefly instance, and operator approval records.
 - Signed settlement recorded/failed events are schema-validated before NATS publish.
 
 Bounded or planned:
@@ -27,8 +28,8 @@ Bounded or planned:
 - Zeta filtering remains a heuristic until a method-design review validates the math.
 - `SwarmAttribution` records fitness/population metadata only; it does not perform mutation, crossover, selection, PSO, or RL.
 - Production token settlement uses an explicit NATS -> FireFly -> contract flow.
-- Live Firefly writes are gated behind signed executor identity, matching operator approval, dry-run validation, and deployment review.
-- Live contract writes are gated behind deployment manifests, signed executor identity, matching operator approval, dry-run validation, and deployment review.
+- Live Firefly writes are gated behind signed executor identity, matching operator approval, signed deployment attestation, dry-run validation, and deployment review.
+- Live contract writes are gated behind deployment manifests, signed deployment attestation, signed executor identity, matching operator approval, dry-run validation, and deployment review.
 
 ---
 
@@ -47,8 +48,9 @@ Bounded or planned:
 | Zeta Filter | `integrations/contracts/chit/zeta-filter.ts` | ◐ Heuristic |
 | NATS Publisher | `integrations/contracts/chit/chit-nats-publisher.ts` | ✅ Schema-validated |
 | Settlement Planner | `integrations/contracts/settlement-planner.ts` | ✅ Plan-only, deterministic |
+| Deployment Attestation | `integrations/contracts/settlement-deployment-attestation.ts` | ✅ Signed environment/custody gate |
 | Contract Settlement Executor | `integrations/contracts/contract-settlement-executor.ts` | ✅ Dry-run default, live approval/deployment gated |
-| Firefly Settlement Executor | `integrations/firefly/settlement-executor.ts` | ✅ Dry-run default, live approval gated |
+| Firefly Settlement Executor | `integrations/firefly/settlement-executor.ts` | ✅ Dry-run default, live approval/deployment gated |
 | Settlement Result Publisher | `integrations/firefly/settlement-publisher.ts` | ✅ Schema-validated NATS result events |
 
 **NATS Subjects (GEOMETRY BUS):**
@@ -236,9 +238,9 @@ Bounded or planned:
 | Firefly Export (dry-run) | 312 transactions | ✅ Historical verification |
 | CHIT focused Jest suites | 58 tests | ✅ Passing on 2026-05-22 |
 | Settlement planner Jest suite | 4 tests | ✅ Passing on 2026-05-22 |
-| Firefly settlement executor Jest suite | 10 tests | ✅ Passing on 2026-05-25 |
+| Firefly settlement executor Jest suite | 12 tests | ✅ Passing on 2026-05-25 |
 | Firefly settlement publisher Jest suite | 5 tests | ✅ Passing on 2026-05-24 |
-| Contract settlement executor Jest suite | 10 tests | ✅ Passing on 2026-05-25 |
+| Contract settlement executor Jest suite | 11 tests | ✅ Passing on 2026-05-25 |
 | Solidity Hardhat harness | 5 tests | ✅ Passing on 2026-05-25 |
 | CHIT CGP Generation | 7 super nodes | ✅ Verified |
 | Health Endpoints | 3 endpoints | ✅ Responding |

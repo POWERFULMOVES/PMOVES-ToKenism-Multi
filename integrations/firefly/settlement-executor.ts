@@ -17,6 +17,10 @@ import type {
   SettlementFailedEvent,
   SettlementRecordedEvent,
 } from '../contracts/settlement-results';
+import {
+  validateSettlementDeploymentAttestation,
+  type SettlementDeploymentAttestation,
+} from '../contracts/settlement-deployment-attestation';
 
 export type {
   SettlementFailedEvent,
@@ -63,6 +67,8 @@ export interface FireflySettlementExecutorConfig {
   requireOperatorApproval?: boolean;
   operatorApproval?: SettlementOperatorApproval;
   trustedExecutorIds?: string[];
+  deploymentAttestation?: SettlementDeploymentAttestation;
+  requireDeploymentAttestation?: boolean;
 }
 
 interface ResolvedFireflySettlementExecutorConfig {
@@ -76,6 +82,8 @@ interface ResolvedFireflySettlementExecutorConfig {
   requireOperatorApproval: boolean;
   operatorApproval?: SettlementOperatorApproval;
   trustedExecutorIds: string[];
+  deploymentAttestation?: SettlementDeploymentAttestation;
+  requireDeploymentAttestation: boolean;
 }
 
 export interface FireflySettlementDraft {
@@ -131,6 +139,8 @@ export class FireflySettlementExecutor {
       requireOperatorApproval: config.requireOperatorApproval ?? true,
       operatorApproval: config.operatorApproval,
       trustedExecutorIds: config.trustedExecutorIds ?? [],
+      deploymentAttestation: config.deploymentAttestation,
+      requireDeploymentAttestation: config.requireDeploymentAttestation ?? true,
     };
   }
 
@@ -261,6 +271,7 @@ export class FireflySettlementExecutor {
       metadata: {
         source_subject: request.source_subject,
         cgp_hash: request.cgp_hash,
+        deployment_manifest_id: this.config.deploymentAttestation?.manifest_id,
         operator_approval_id: this.config.operatorApproval?.approval_id,
       },
     };
@@ -286,6 +297,7 @@ export class FireflySettlementExecutor {
       metadata: {
         source_subject: request.source_subject,
         cgp_hash: request.cgp_hash,
+        deployment_manifest_id: this.config.deploymentAttestation?.manifest_id,
         operator_approval_id: this.config.operatorApproval?.approval_id,
       },
     };
@@ -318,34 +330,38 @@ export class FireflySettlementExecutor {
       throw new Error(`Live Firefly settlement executor is not trusted: ${executorAgentId}`);
     }
 
-    if (!this.config.requireOperatorApproval) {
-      return;
+    if (this.config.requireOperatorApproval) {
+      const approval = this.config.operatorApproval;
+      if (!approval) {
+        throw new Error('Live Firefly settlement requires operator approval');
+      }
+
+      if (approval.settlement_id !== request.settlement_id) {
+        throw new Error('Operator approval settlement_id does not match request');
+      }
+
+      if (approval.scope !== 'firefly_live_execution') {
+        throw new Error(`Operator approval scope is invalid: ${approval.scope}`);
+      }
+
+      if (!approval.approved_by) {
+        throw new Error('Operator approval must include approved_by');
+      }
+
+      if (!isSigned(approval.signature)) {
+        throw new Error('Operator approval must be signed');
+      }
+
+      parseDate(approval.approved_at);
+      if (approval.expires_at && parseDate(approval.expires_at).getTime() < Date.now()) {
+        throw new Error('Operator approval has expired');
+      }
     }
 
-    const approval = this.config.operatorApproval;
-    if (!approval) {
-      throw new Error('Live Firefly settlement requires operator approval');
-    }
-
-    if (approval.settlement_id !== request.settlement_id) {
-      throw new Error('Operator approval settlement_id does not match request');
-    }
-
-    if (approval.scope !== 'firefly_live_execution') {
-      throw new Error(`Operator approval scope is invalid: ${approval.scope}`);
-    }
-
-    if (!approval.approved_by) {
-      throw new Error('Operator approval must include approved_by');
-    }
-
-    if (!isSigned(approval.signature)) {
-      throw new Error('Operator approval must be signed');
-    }
-
-    parseDate(approval.approved_at);
-    if (approval.expires_at && parseDate(approval.expires_at).getTime() < Date.now()) {
-      throw new Error('Operator approval has expired');
+    if (this.config.requireDeploymentAttestation) {
+      validateSettlementDeploymentAttestation(this.config.deploymentAttestation, {
+        requireFirefly: true,
+      });
     }
   }
 

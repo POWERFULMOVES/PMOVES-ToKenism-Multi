@@ -18,6 +18,10 @@ import type {
   SettlementFailedEvent,
   SettlementRecordedEvent,
 } from './settlement-results';
+import {
+  validateSettlementDeploymentAttestation,
+  type SettlementDeploymentAttestation,
+} from './settlement-deployment-attestation';
 
 export type SettlementContractName =
   | 'GroToken'
@@ -40,6 +44,7 @@ export interface ContractDeploymentManifest {
   network: string;
   contracts: Partial<Record<SettlementContractName, ContractDeploymentEntry>>;
   generated_at?: string;
+  attestation?: SettlementDeploymentAttestation;
 }
 
 export interface ContractSettlementOperatorApproval {
@@ -65,6 +70,7 @@ export interface ContractSettlementExecutorConfig {
   operatorApproval?: ContractSettlementOperatorApproval;
   trustedExecutorIds?: string[];
   deploymentManifest?: ContractDeploymentManifest;
+  requireDeploymentAttestation?: boolean;
   assetDecimals?: Record<string, number>;
 }
 
@@ -77,6 +83,7 @@ interface ResolvedContractSettlementExecutorConfig {
   operatorApproval?: ContractSettlementOperatorApproval;
   trustedExecutorIds: string[];
   deploymentManifest?: ContractDeploymentManifest;
+  requireDeploymentAttestation: boolean;
   assetDecimals: Record<string, number>;
 }
 
@@ -140,6 +147,7 @@ export class ContractSettlementExecutor {
       operatorApproval: config.operatorApproval,
       trustedExecutorIds: config.trustedExecutorIds ?? [],
       deploymentManifest: config.deploymentManifest,
+      requireDeploymentAttestation: config.requireDeploymentAttestation ?? true,
       assetDecimals: { ...DEFAULT_ASSET_DECIMALS, ...(config.assetDecimals ?? {}) },
     };
   }
@@ -155,7 +163,7 @@ export class ContractSettlementExecutor {
     }
 
     if (!this.config.dryRun) {
-      this.validateLiveExecutionGate(request);
+      this.validateLiveExecutionGate(request, manifest);
     }
 
     const seen = new Set<string>();
@@ -345,6 +353,7 @@ export class ContractSettlementExecutor {
         network: call.network,
         contract: call.contract,
         method: call.method,
+        deployment_manifest_id: this.config.deploymentManifest?.attestation?.manifest_id,
         operator_approval_id: this.config.operatorApproval?.approval_id,
       },
     };
@@ -370,6 +379,7 @@ export class ContractSettlementExecutor {
       metadata: {
         source_subject: request.source_subject,
         cgp_hash: request.cgp_hash,
+        deployment_manifest_id: this.config.deploymentManifest?.attestation?.manifest_id,
         operator_approval_id: this.config.operatorApproval?.approval_id,
       },
     };
@@ -385,7 +395,10 @@ export class ContractSettlementExecutor {
     return manifest;
   }
 
-  private validateLiveExecutionGate(request: SettlementRequestedEvent): void {
+  private validateLiveExecutionGate(
+    request: SettlementRequestedEvent,
+    manifest: ContractDeploymentManifest
+  ): void {
     if (!this.config.executorAgentId) {
       throw new Error('Live contract settlement requires executorAgentId');
     }
@@ -401,34 +414,39 @@ export class ContractSettlementExecutor {
       throw new Error(`Live contract settlement executor is not trusted: ${this.config.executorAgentId}`);
     }
 
-    if (!this.config.requireOperatorApproval) {
-      return;
+    if (this.config.requireOperatorApproval) {
+      const approval = this.config.operatorApproval;
+      if (!approval) {
+        throw new Error('Live contract settlement requires operator approval');
+      }
+
+      if (approval.settlement_id !== request.settlement_id) {
+        throw new Error('Contract operator approval settlement_id does not match request');
+      }
+
+      if (approval.scope !== 'contract_live_execution') {
+        throw new Error(`Contract operator approval scope is invalid: ${approval.scope}`);
+      }
+
+      if (!approval.approved_by) {
+        throw new Error('Contract operator approval must include approved_by');
+      }
+
+      if (!isSigned(approval.signature)) {
+        throw new Error('Contract operator approval must be signed');
+      }
+
+      parseDate(approval.approved_at);
+      if (approval.expires_at && parseDate(approval.expires_at).getTime() < Date.now()) {
+        throw new Error('Contract operator approval has expired');
+      }
     }
 
-    const approval = this.config.operatorApproval;
-    if (!approval) {
-      throw new Error('Live contract settlement requires operator approval');
-    }
-
-    if (approval.settlement_id !== request.settlement_id) {
-      throw new Error('Contract operator approval settlement_id does not match request');
-    }
-
-    if (approval.scope !== 'contract_live_execution') {
-      throw new Error(`Contract operator approval scope is invalid: ${approval.scope}`);
-    }
-
-    if (!approval.approved_by) {
-      throw new Error('Contract operator approval must include approved_by');
-    }
-
-    if (!isSigned(approval.signature)) {
-      throw new Error('Contract operator approval must be signed');
-    }
-
-    parseDate(approval.approved_at);
-    if (approval.expires_at && parseDate(approval.expires_at).getTime() < Date.now()) {
-      throw new Error('Contract operator approval has expired');
+    if (this.config.requireDeploymentAttestation) {
+      validateSettlementDeploymentAttestation(manifest.attestation, {
+        requireRpc: true,
+        requireWalletCustody: true,
+      });
     }
   }
 }

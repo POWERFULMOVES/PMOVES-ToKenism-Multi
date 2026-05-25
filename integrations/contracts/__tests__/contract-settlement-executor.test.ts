@@ -3,7 +3,10 @@ import {
   ContractSettlementExecutor,
   ContractWritableClient,
 } from '../contract-settlement-executor';
-import { SettlementRequestedEvent } from '../settlement-planner';
+import {
+  SettlementDeploymentAttestation,
+  SettlementRequestedEvent,
+} from '../';
 
 const SIGNATURE = { alg: 'HMAC-SHA256', kid: 'agent-zero-test', hmac: 'abc123' };
 const EXECUTOR_SIGNATURE = { alg: 'HMAC-SHA256', kid: 'contract-exec', hmac: 'execsig' };
@@ -17,10 +20,35 @@ const OPERATOR_APPROVAL = {
   signature: { alg: 'HMAC-SHA256', kid: 'operator-test', hmac: 'operatorsig' },
 };
 
+const DEPLOYMENT_ATTESTATION: SettlementDeploymentAttestation = {
+  manifest_id: 'tokenism-hardhat-local-20260525',
+  environment: 'local',
+  rpc_ref: 'env:ETHEREUM_RPC_URL',
+  wallet_custody: {
+    custody_type: 'local',
+    signer_ref: 'env:ETHEREUM_SETTLEMENT_SIGNER',
+    policy_ref: 'docs:tokenism-local-policy',
+  },
+  approvals: [
+    {
+      approval_id: 'approval_deployment_1234abcd5678ef00',
+      scope: 'settlement_deployment_manifest',
+      approved_by: 'PMOVES-OPERATOR',
+      approved_at: '2026-05-25T12:00:00Z',
+      expires_at: '2099-01-01T00:00:00Z',
+      signature: { alg: 'HMAC-SHA256', kid: 'operator-test', hmac: 'deploymentsig' },
+    },
+  ],
+  signed_at: '2026-05-25T12:00:00Z',
+  expires_at: '2099-01-01T00:00:00Z',
+  signature: { alg: 'HMAC-SHA256', kid: 'deployment-manifest', hmac: 'manifestsig' },
+};
+
 const MANIFEST: ContractDeploymentManifest = {
   chain_id: 31337,
   network: 'hardhat',
   generated_at: '2026-05-25T12:00:00Z',
+  attestation: DEPLOYMENT_ATTESTATION,
   contracts: {
     GroToken: {
       address: '0x1111111111111111111111111111111111111111',
@@ -191,6 +219,7 @@ describe('ContractSettlementExecutor', () => {
           network: 'hardhat',
           contract: 'GroToken',
           method: 'mint',
+          deployment_manifest_id: 'tokenism-hardhat-local-20260525',
           operator_approval_id: 'approval_contract_1234abcd5678ef00',
         },
       },
@@ -211,6 +240,27 @@ describe('ContractSettlementExecutor', () => {
 
     await expect(executor.execute(settlementRequest())).rejects.toThrow(
       'Live contract settlement requires operator approval'
+    );
+    expect(client.executeContractCall).not.toHaveBeenCalled();
+  });
+
+  it('requires deployment attestation for live execution by default', async () => {
+    const client: ContractWritableClient = {
+      executeContractCall: jest.fn().mockResolvedValue({ hash: `0x${'c'.repeat(64)}` }),
+    };
+    const executor = new ContractSettlementExecutor(client, {
+      dryRun: false,
+      executorAgentId: 'CONTRACT-SETTLEMENT-EXECUTOR',
+      executorSignature: EXECUTOR_SIGNATURE,
+      operatorApproval: OPERATOR_APPROVAL,
+      deploymentManifest: {
+        ...MANIFEST,
+        attestation: undefined,
+      },
+    });
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Deployment attestation is required'
     );
     expect(client.executeContractCall).not.toHaveBeenCalled();
   });
