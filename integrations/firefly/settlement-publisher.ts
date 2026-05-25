@@ -10,10 +10,10 @@ import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import type { ErrorObject, ValidateFunction } from 'ajv';
 import type {
-  FireflySettlementExecutionResult,
+  SettlementExecutionResultEvents,
   SettlementFailedEvent,
   SettlementRecordedEvent,
-} from './settlement-executor';
+} from '../contracts/settlement-results';
 
 export const TOKENISM_SETTLEMENT_SUBJECTS = {
   recorded: 'tokenism.settlement.recorded.v1',
@@ -63,7 +63,7 @@ export class FireflySettlementPublisher {
   }
 
   async publishExecutionResult(
-    result: Pick<FireflySettlementExecutionResult, 'recorded' | 'failed' | 'settlement_id'>
+    result: Pick<SettlementExecutionResultEvents, 'recorded' | 'failed' | 'settlement_id'>
   ): Promise<SettlementPublishSummary> {
     const summary: SettlementPublishSummary = {
       ok: true,

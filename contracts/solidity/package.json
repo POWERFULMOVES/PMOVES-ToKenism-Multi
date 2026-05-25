@@ -4,7 +4,8 @@
   "private": true,
   "description": "Hardhat workspace for Food-USD / GroToken cooperative governance prototypes",
   "scripts": {
-    "test": "hardhat test"
+    "test": "hardhat test",
+    "manifest": "hardhat compile && node scripts/export-abi-manifest.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",

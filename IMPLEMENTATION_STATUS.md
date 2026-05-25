@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-05-25 (live settlement gate)
 **Branch:** codex/tokenism-chit-gap-closure
-**Status:** CHIT core hardened; production settlement and optimizer integration pending
+**Status:** CHIT core hardened; settlement executors guarded; production deployment and optimizer integration pending
 
 ---
 
@@ -19,6 +19,7 @@ Working now:
 - NATS publisher payloads are validated for the hardened Tokenism subjects before publish.
 - Settlement planning now has typed NATS contracts and deterministic idempotency keys for Firefly/contract executors.
 - Firefly settlement dry-run executor maps signed settlement batches to transaction drafts without external writes.
+- Contract settlement dry-run executor maps signed settlement batches to manifest-backed chain call drafts without signing transactions.
 - Signed settlement recorded/failed events are schema-validated before NATS publish.
 
 Bounded or planned:
@@ -27,7 +28,7 @@ Bounded or planned:
 - `SwarmAttribution` records fitness/population metadata only; it does not perform mutation, crossover, selection, PSO, or RL.
 - Production token settlement uses an explicit NATS -> FireFly -> contract flow.
 - Live Firefly writes are gated behind signed executor identity, matching operator approval, dry-run validation, and deployment review.
-- Blockchain transactions are still gated behind contract executor and deployment review.
+- Live contract writes are gated behind deployment manifests, signed executor identity, matching operator approval, dry-run validation, and deployment review.
 
 ---
 
@@ -46,6 +47,7 @@ Bounded or planned:
 | Zeta Filter | `integrations/contracts/chit/zeta-filter.ts` | ◐ Heuristic |
 | NATS Publisher | `integrations/contracts/chit/chit-nats-publisher.ts` | ✅ Schema-validated |
 | Settlement Planner | `integrations/contracts/settlement-planner.ts` | ✅ Plan-only, deterministic |
+| Contract Settlement Executor | `integrations/contracts/contract-settlement-executor.ts` | ✅ Dry-run default, live approval/deployment gated |
 | Firefly Settlement Executor | `integrations/firefly/settlement-executor.ts` | ✅ Dry-run default, live approval gated |
 | Settlement Result Publisher | `integrations/firefly/settlement-publisher.ts` | ✅ Schema-validated NATS result events |
 
@@ -171,8 +173,8 @@ Bounded or planned:
 | Feature | Reference | Status | Description |
 |---------|-----------|--------|-------------|
 | TTS Engine Integration | `agents/HARDWARE_TTS_REQUIREMENTS.md` §2 | 📋 Planned | KOKORO, Fish Speech, IndexTTS2, VibeVoice |
-| Hardhat Contract Tests | `INTEGRATED_EXECUTION_PLAN.md` §2.4 | ⏳ Phase 5 | GroVault, GroupPurchase governance |
-| Smart Contract Harness | `INTEGRATED_EXECUTION_PLAN.md` §2.4 | 📋 Planned | Python adapter for contract simulation |
+| Hardhat Contract Tests | `INTEGRATED_EXECUTION_PLAN.md` §2.4 | ✅ Initial harness | GroVault, GroupPurchase, CoopGovernor |
+| Smart Contract Harness | `INTEGRATED_EXECUTION_PLAN.md` §2.4 | ◐ TypeScript executor | Dry-run call drafts; live writes gated |
 
 ### Completed (Recently Verified)
 
@@ -236,7 +238,8 @@ Bounded or planned:
 | Settlement planner Jest suite | 4 tests | ✅ Passing on 2026-05-22 |
 | Firefly settlement executor Jest suite | 10 tests | ✅ Passing on 2026-05-25 |
 | Firefly settlement publisher Jest suite | 5 tests | ✅ Passing on 2026-05-24 |
-| Solidity Hardhat harness | 4 tests | ✅ Passing on 2026-05-22 |
+| Contract settlement executor Jest suite | 10 tests | ✅ Passing on 2026-05-25 |
+| Solidity Hardhat harness | 5 tests | ✅ Passing on 2026-05-25 |
 | CHIT CGP Generation | 7 super nodes | ✅ Verified |
 | Health Endpoints | 3 endpoints | ✅ Responding |
 
