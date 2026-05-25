@@ -90,3 +90,23 @@ export {
   SettlementRequestedEvent,
   SettlementSignature,
 } from './settlement-planner';
+
+export {
+  SettlementExecutionResultEvents,
+  SettlementFailedEvent,
+  SettlementRecordedEvent,
+} from './settlement-results';
+
+export {
+  ContractDeploymentEntry,
+  ContractDeploymentManifest,
+  ContractSettlementCall,
+  ContractSettlementExecutionResult,
+  ContractSettlementExecutor,
+  ContractSettlementExecutorConfig,
+  ContractSettlementOperatorApproval,
+  ContractSettlementSkip,
+  ContractWritableClient,
+  SettlementContractName,
+  validateManifest,
+} from './contract-settlement-executor';

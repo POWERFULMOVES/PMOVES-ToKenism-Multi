@@ -12,6 +12,16 @@ import type {
   SettlementRequestedEvent,
   SettlementSignature,
 } from '../contracts/settlement-planner';
+import type {
+  SettlementExecutionResultEvents,
+  SettlementFailedEvent,
+  SettlementRecordedEvent,
+} from '../contracts/settlement-results';
+
+export type {
+  SettlementFailedEvent,
+  SettlementRecordedEvent,
+} from '../contracts/settlement-results';
 
 export type FireflyTransactionType = 'withdrawal' | 'deposit' | 'transfer';
 
@@ -88,46 +98,13 @@ export interface FireflySettlementSkip {
   reason: string;
 }
 
-export interface SettlementRecordedEvent {
-  settlement_id: string;
-  instruction_id: string;
-  idempotency_key: string;
-  lane: 'firefly';
-  action: SettlementAction;
-  status: 'recorded' | 'skipped';
-  amount?: number;
-  asset?: string;
-  firefly_transaction_id?: string;
-  timestamp: string;
-  agent_id: string;
-  signature: SettlementSignature;
-  metadata?: Record<string, unknown>;
-}
-
-export interface SettlementFailedEvent {
-  settlement_id: string;
-  instruction_id?: string;
-  idempotency_key: string;
-  lane?: 'firefly';
-  action?: SettlementAction;
-  error_code: string;
-  error_message: string;
-  retryable: boolean;
-  timestamp: string;
-  agent_id: string;
-  signature: SettlementSignature;
-  metadata?: Record<string, unknown>;
-}
-
-export interface FireflySettlementExecutionResult {
+export interface FireflySettlementExecutionResult extends SettlementExecutionResultEvents {
   settlement_id: string;
   dry_run: boolean;
   requested: number;
   processed: number;
   skipped: FireflySettlementSkip[];
   drafts: FireflySettlementDraft[];
-  recorded: SettlementRecordedEvent[];
-  failed: SettlementFailedEvent[];
 }
 
 const DEFAULT_SOURCE_NAME = 'Tokenism Settlement Pool';
