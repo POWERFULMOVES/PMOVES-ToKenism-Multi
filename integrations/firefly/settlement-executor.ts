@@ -32,6 +32,16 @@ export interface FireflyWritableClient {
   createTransaction(data: FireflyTransactionInput): Promise<unknown>;
 }
 
+export interface SettlementOperatorApproval {
+  approval_id: string;
+  settlement_id: string;
+  scope: 'firefly_live_execution';
+  approved_by: string;
+  approved_at: string;
+  expires_at?: string;
+  signature: SettlementSignature;
+}
+
 export interface FireflySettlementExecutorConfig {
   dryRun?: boolean;
   sourceName?: string;
@@ -40,6 +50,22 @@ export interface FireflySettlementExecutorConfig {
   executorAgentId?: string;
   executorSignature?: SettlementSignature;
   retryableErrors?: boolean;
+  requireOperatorApproval?: boolean;
+  operatorApproval?: SettlementOperatorApproval;
+  trustedExecutorIds?: string[];
+}
+
+interface ResolvedFireflySettlementExecutorConfig {
+  dryRun: boolean;
+  sourceName: string;
+  destinationNamePrefix: string;
+  categoryPrefix: string;
+  executorAgentId: string;
+  executorSignature: SettlementSignature;
+  retryableErrors: boolean;
+  requireOperatorApproval: boolean;
+  operatorApproval?: SettlementOperatorApproval;
+  trustedExecutorIds: string[];
 }
 
 export interface FireflySettlementDraft {
@@ -110,7 +136,7 @@ const DEFAULT_CATEGORY_PREFIX = 'Tokenism';
 
 export class FireflySettlementExecutor {
   private client?: FireflyWritableClient;
-  private config: Required<FireflySettlementExecutorConfig>;
+  private config: ResolvedFireflySettlementExecutorConfig;
 
   constructor(
     client?: FireflyWritableClient,
@@ -125,6 +151,9 @@ export class FireflySettlementExecutor {
       executorAgentId: config.executorAgentId ?? '',
       executorSignature: config.executorSignature ?? { alg: '', kid: '', hmac: '' },
       retryableErrors: config.retryableErrors ?? true,
+      requireOperatorApproval: config.requireOperatorApproval ?? true,
+      operatorApproval: config.operatorApproval,
+      trustedExecutorIds: config.trustedExecutorIds ?? [],
     };
   }
 
@@ -135,6 +164,10 @@ export class FireflySettlementExecutor {
 
     if (!this.config.dryRun && !this.client) {
       throw new Error('Firefly client is required when dryRun=false');
+    }
+
+    if (!this.config.dryRun) {
+      this.validateLiveExecutionGate(request);
     }
 
     const seen = new Set<string>();
@@ -251,6 +284,7 @@ export class FireflySettlementExecutor {
       metadata: {
         source_subject: request.source_subject,
         cgp_hash: request.cgp_hash,
+        operator_approval_id: this.config.operatorApproval?.approval_id,
       },
     };
   }
@@ -275,6 +309,7 @@ export class FireflySettlementExecutor {
       metadata: {
         source_subject: request.source_subject,
         cgp_hash: request.cgp_hash,
+        operator_approval_id: this.config.operatorApproval?.approval_id,
       },
     };
   }
@@ -285,6 +320,56 @@ export class FireflySettlementExecutor {
 
   private executorSignature(request: SettlementRequestedEvent): SettlementSignature {
     return this.config.executorSignature.hmac ? this.config.executorSignature : request.signature;
+  }
+
+  private validateLiveExecutionGate(request: SettlementRequestedEvent): void {
+    const executorAgentId = this.config.executorAgentId;
+    const executorSignature = this.config.executorSignature;
+
+    if (!executorAgentId) {
+      throw new Error('Live Firefly settlement requires executorAgentId');
+    }
+
+    if (!isSigned(executorSignature)) {
+      throw new Error('Live Firefly settlement requires executorSignature');
+    }
+
+    if (
+      this.config.trustedExecutorIds.length > 0 &&
+      !this.config.trustedExecutorIds.includes(executorAgentId)
+    ) {
+      throw new Error(`Live Firefly settlement executor is not trusted: ${executorAgentId}`);
+    }
+
+    if (!this.config.requireOperatorApproval) {
+      return;
+    }
+
+    const approval = this.config.operatorApproval;
+    if (!approval) {
+      throw new Error('Live Firefly settlement requires operator approval');
+    }
+
+    if (approval.settlement_id !== request.settlement_id) {
+      throw new Error('Operator approval settlement_id does not match request');
+    }
+
+    if (approval.scope !== 'firefly_live_execution') {
+      throw new Error(`Operator approval scope is invalid: ${approval.scope}`);
+    }
+
+    if (!approval.approved_by) {
+      throw new Error('Operator approval must include approved_by');
+    }
+
+    if (!isSigned(approval.signature)) {
+      throw new Error('Operator approval must be signed');
+    }
+
+    parseDate(approval.approved_at);
+    if (approval.expires_at && parseDate(approval.expires_at).getTime() < Date.now()) {
+      throw new Error('Operator approval has expired');
+    }
   }
 
   private descriptionFor(
@@ -302,13 +387,17 @@ export class FireflySettlementExecutor {
 }
 
 function validateRequest(request: SettlementRequestedEvent): void {
-  if (!request.signature?.hmac) {
+  if (!isSigned(request.signature)) {
     throw new Error('Settlement request must be signed');
   }
 
   if (!request.instructions.length) {
     throw new Error('Settlement request must contain instructions');
   }
+}
+
+function isSigned(signature: SettlementSignature | undefined): signature is SettlementSignature {
+  return Boolean(signature?.alg && signature.kid && signature.hmac);
 }
 
 function defaultTransactionType(action: SettlementAction): FireflyTransactionType {

@@ -38,6 +38,7 @@ export type {
   FireflyTransactionInput,
   FireflyTransactionType,
   FireflyWritableClient,
+  SettlementOperatorApproval,
   SettlementFailedEvent,
   SettlementRecordedEvent,
 } from './settlement-executor';

@@ -1,6 +1,6 @@
 # PMOVES-ToKenism-Multi Implementation Status
 
-**Last Updated:** 2026-05-24 (settlement result publisher)
+**Last Updated:** 2026-05-25 (live settlement gate)
 **Branch:** codex/tokenism-chit-gap-closure
 **Status:** CHIT core hardened; production settlement and optimizer integration pending
 
@@ -25,8 +25,9 @@ Bounded or planned:
 - Hyperbolic geometry is an embedding support layer, not a completed proof-backed fairness pillar.
 - Zeta filtering remains a heuristic until a method-design review validates the math.
 - `SwarmAttribution` records fitness/population metadata only; it does not perform mutation, crossover, selection, PSO, or RL.
-- Production token settlement uses an explicit NATS -> FireFly -> contract flow, with live execution still gated.
-- Live Firefly writes and blockchain transactions are still gated behind executor identity, dry-run validation, and deployment review.
+- Production token settlement uses an explicit NATS -> FireFly -> contract flow.
+- Live Firefly writes are gated behind signed executor identity, matching operator approval, dry-run validation, and deployment review.
+- Blockchain transactions are still gated behind contract executor and deployment review.
 
 ---
 
@@ -45,7 +46,7 @@ Bounded or planned:
 | Zeta Filter | `integrations/contracts/chit/zeta-filter.ts` | ◐ Heuristic |
 | NATS Publisher | `integrations/contracts/chit/chit-nats-publisher.ts` | ✅ Schema-validated |
 | Settlement Planner | `integrations/contracts/settlement-planner.ts` | ✅ Plan-only, deterministic |
-| Firefly Settlement Executor | `integrations/firefly/settlement-executor.ts` | ✅ Dry-run default, live gated |
+| Firefly Settlement Executor | `integrations/firefly/settlement-executor.ts` | ✅ Dry-run default, live approval gated |
 | Settlement Result Publisher | `integrations/firefly/settlement-publisher.ts` | ✅ Schema-validated NATS result events |
 
 **NATS Subjects (GEOMETRY BUS):**
@@ -233,7 +234,7 @@ Bounded or planned:
 | Firefly Export (dry-run) | 312 transactions | ✅ Historical verification |
 | CHIT focused Jest suites | 58 tests | ✅ Passing on 2026-05-22 |
 | Settlement planner Jest suite | 4 tests | ✅ Passing on 2026-05-22 |
-| Firefly settlement executor Jest suite | 5 tests | ✅ Passing on 2026-05-24 |
+| Firefly settlement executor Jest suite | 10 tests | ✅ Passing on 2026-05-25 |
 | Firefly settlement publisher Jest suite | 5 tests | ✅ Passing on 2026-05-24 |
 | Solidity Hardhat harness | 4 tests | ✅ Passing on 2026-05-22 |
 | CHIT CGP Generation | 7 super nodes | ✅ Verified |

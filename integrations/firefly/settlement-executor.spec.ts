@@ -2,6 +2,16 @@ import { FireflySettlementExecutor, FireflyWritableClient } from './settlement-e
 import { SettlementRequestedEvent } from '../contracts';
 
 const SIGNATURE = { alg: 'HMAC-SHA256', kid: 'agent-zero-test', hmac: 'abc123' };
+const EXECUTOR_SIGNATURE = { alg: 'HMAC-SHA256', kid: 'firefly-exec', hmac: 'execsig' };
+const OPERATOR_APPROVAL = {
+  approval_id: 'approval_firefly_1234abcd5678ef00',
+  settlement_id: 'settlement_1234abcd5678ef00',
+  scope: 'firefly_live_execution' as const,
+  approved_by: 'PMOVES-OPERATOR',
+  approved_at: '2026-05-25T12:00:00Z',
+  expires_at: '2099-01-01T00:00:00Z',
+  signature: { alg: 'HMAC-SHA256', kid: 'operator-test', hmac: 'operatorsig' },
+};
 
 function settlementRequest(): SettlementRequestedEvent {
   return {
@@ -106,7 +116,9 @@ describe('FireflySettlementExecutor', () => {
     const executor = new FireflySettlementExecutor(client, {
       dryRun: false,
       executorAgentId: 'FIREFLY-SETTLEMENT-EXECUTOR',
-      executorSignature: { alg: 'HMAC-SHA256', kid: 'firefly-exec', hmac: 'execsig' },
+      executorSignature: EXECUTOR_SIGNATURE,
+      operatorApproval: OPERATOR_APPROVAL,
+      trustedExecutorIds: ['FIREFLY-SETTLEMENT-EXECUTOR'],
     });
 
     const result = await executor.execute(settlementRequest());
@@ -123,6 +135,9 @@ describe('FireflySettlementExecutor', () => {
         asset: 'GRO',
         firefly_transaction_id: 'firefly-tx-1',
         agent_id: 'FIREFLY-SETTLEMENT-EXECUTOR',
+        metadata: {
+          operator_approval_id: 'approval_firefly_1234abcd5678ef00',
+        },
       },
     ]);
     expect(result.failed).toHaveLength(0);
@@ -132,7 +147,12 @@ describe('FireflySettlementExecutor', () => {
     const client: FireflyWritableClient = {
       createTransaction: jest.fn().mockRejectedValue(new Error('Firefly down')),
     };
-    const executor = new FireflySettlementExecutor(client, { dryRun: false });
+    const executor = new FireflySettlementExecutor(client, {
+      dryRun: false,
+      executorAgentId: 'FIREFLY-SETTLEMENT-EXECUTOR',
+      executorSignature: EXECUTOR_SIGNATURE,
+      operatorApproval: OPERATOR_APPROVAL,
+    });
 
     const result = await executor.execute(settlementRequest());
 
@@ -146,7 +166,7 @@ describe('FireflySettlementExecutor', () => {
         error_code: 'FIREFLY_WRITE_FAILED',
         error_message: 'Firefly down',
         retryable: true,
-        agent_id: 'PMOVES-AGENT-ZERO-CODEX',
+        agent_id: 'FIREFLY-SETTLEMENT-EXECUTOR',
       },
     ]);
   });
@@ -168,5 +188,112 @@ describe('FireflySettlementExecutor', () => {
     await expect(executor.execute(settlementRequest())).rejects.toThrow(
       'Firefly client is required when dryRun=false'
     );
+  });
+
+  it('requires operator approval for live execution by default', async () => {
+    const client: FireflyWritableClient = {
+      createTransaction: jest.fn().mockResolvedValue({ id: 'firefly-tx-1' }),
+    };
+    const executor = new FireflySettlementExecutor(client, {
+      dryRun: false,
+      executorAgentId: 'FIREFLY-SETTLEMENT-EXECUTOR',
+      executorSignature: EXECUTOR_SIGNATURE,
+    });
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Live Firefly settlement requires operator approval'
+    );
+    expect(client.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it('requires a signed executor identity for live execution', async () => {
+    const client: FireflyWritableClient = {
+      createTransaction: jest.fn().mockResolvedValue({ id: 'firefly-tx-1' }),
+    };
+    const executor = new FireflySettlementExecutor(client, {
+      dryRun: false,
+      executorAgentId: 'FIREFLY-SETTLEMENT-EXECUTOR',
+      executorSignature: { alg: '', kid: '', hmac: '' },
+      operatorApproval: OPERATOR_APPROVAL,
+    });
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Live Firefly settlement requires executorSignature'
+    );
+    expect(client.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it('requires an explicit executor agent id for live execution', async () => {
+    const client: FireflyWritableClient = {
+      createTransaction: jest.fn().mockResolvedValue({ id: 'firefly-tx-1' }),
+    };
+    const executor = new FireflySettlementExecutor(client, {
+      dryRun: false,
+      executorSignature: EXECUTOR_SIGNATURE,
+      operatorApproval: OPERATOR_APPROVAL,
+    });
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Live Firefly settlement requires executorAgentId'
+    );
+    expect(client.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects untrusted live executors when an allowlist is configured', async () => {
+    const client: FireflyWritableClient = {
+      createTransaction: jest.fn().mockResolvedValue({ id: 'firefly-tx-1' }),
+    };
+    const executor = new FireflySettlementExecutor(client, {
+      dryRun: false,
+      executorAgentId: 'UNKNOWN-EXECUTOR',
+      executorSignature: EXECUTOR_SIGNATURE,
+      operatorApproval: OPERATOR_APPROVAL,
+      trustedExecutorIds: ['FIREFLY-SETTLEMENT-EXECUTOR'],
+    });
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Live Firefly settlement executor is not trusted: UNKNOWN-EXECUTOR'
+    );
+    expect(client.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects approval for a different settlement', async () => {
+    const client: FireflyWritableClient = {
+      createTransaction: jest.fn().mockResolvedValue({ id: 'firefly-tx-1' }),
+    };
+    const executor = new FireflySettlementExecutor(client, {
+      dryRun: false,
+      executorAgentId: 'FIREFLY-SETTLEMENT-EXECUTOR',
+      executorSignature: EXECUTOR_SIGNATURE,
+      operatorApproval: {
+        ...OPERATOR_APPROVAL,
+        settlement_id: 'settlement_ffffffffffffffff',
+      },
+    });
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Operator approval settlement_id does not match request'
+    );
+    expect(client.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects expired operator approval', async () => {
+    const client: FireflyWritableClient = {
+      createTransaction: jest.fn().mockResolvedValue({ id: 'firefly-tx-1' }),
+    };
+    const executor = new FireflySettlementExecutor(client, {
+      dryRun: false,
+      executorAgentId: 'FIREFLY-SETTLEMENT-EXECUTOR',
+      executorSignature: EXECUTOR_SIGNATURE,
+      operatorApproval: {
+        ...OPERATOR_APPROVAL,
+        expires_at: '2000-01-01T00:00:00Z',
+      },
+    });
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Operator approval has expired'
+    );
+    expect(client.createTransaction).not.toHaveBeenCalled();
   });
 });
