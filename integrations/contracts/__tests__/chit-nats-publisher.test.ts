@@ -52,6 +52,33 @@ describe('CHITNATSPublisher', () => {
     );
   });
 
+  test('publishes zero-count weekly CGP reports', async () => {
+    const publish = jest.fn().mockResolvedValue(undefined);
+    const client = mockClient(true, publish);
+    const publisher = new CHITNATSPublisher(client as any);
+
+    const result = await publisher.publishWeeklyCGP(
+      4,
+      {
+        spec: 'chit.cgp.v1.0',
+        summary: 'No ToKenism activity for week 4',
+        created_at: '2026-05-22T00:00:00Z',
+        super_nodes: [],
+      },
+      { total_attributions: 0 },
+    );
+
+    expect(result).toBe(true);
+    expect(publish).toHaveBeenCalledWith(
+      CHIT_NATS_SUBJECTS.cgpWeekly,
+      expect.objectContaining({
+        week: 4,
+        super_node_count: 0,
+        total_attributions: 0,
+      }),
+    );
+  });
+
   test('returns false and skips publish for validation failures by default', async () => {
     const publish = jest.fn().mockResolvedValue(undefined);
     const client = mockClient(true, publish);
