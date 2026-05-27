@@ -265,6 +265,30 @@ describe('ContractSettlementExecutor', () => {
     expect(client.executeContractCall).not.toHaveBeenCalled();
   });
 
+  it('rejects malformed deployment attestation approvals cleanly', async () => {
+    const client: ContractWritableClient = {
+      executeContractCall: jest.fn().mockResolvedValue({ hash: `0x${'c'.repeat(64)}` }),
+    };
+    const executor = new ContractSettlementExecutor(client, {
+      dryRun: false,
+      executorAgentId: 'CONTRACT-SETTLEMENT-EXECUTOR',
+      executorSignature: EXECUTOR_SIGNATURE,
+      operatorApproval: OPERATOR_APPROVAL,
+      deploymentManifest: {
+        ...MANIFEST,
+        attestation: {
+          ...DEPLOYMENT_ATTESTATION,
+          approvals: undefined as any,
+        },
+      },
+    });
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Deployment attestation requires at least one operator approval'
+    );
+    expect(client.executeContractCall).not.toHaveBeenCalled();
+  });
+
   it('requires a signed executor identity for live execution', async () => {
     const client: ContractWritableClient = {
       executeContractCall: jest.fn().mockResolvedValue({ hash: `0x${'c'.repeat(64)}` }),
