@@ -76,7 +76,7 @@ export function validateSettlementDeploymentAttestation(
     validateFireflyBinding(attestation.firefly);
   }
 
-  if (!attestation.approvals.length) {
+  if (!Array.isArray(attestation.approvals) || attestation.approvals.length === 0) {
     throw new Error('Deployment attestation requires at least one operator approval');
   }
 
