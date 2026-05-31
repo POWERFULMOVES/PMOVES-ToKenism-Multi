@@ -20,7 +20,8 @@ You are an expert AI agent working within the PMOVES.AI orchestration mesh - a d
 | `pmoves_common` | Shared utilities |
 
 ### Integration Points
-- **Parent Repo**: PMOVES.AI (C:\Users\russe\OneDrive\Documents\GitHub\PMOVES-DoX)
+- **Parent repo**: PMOVES.AI (this submodule lives at `PMOVES-ToKenism-Multi/` in the parent worktree)
+- **Sibling submodule**: `../PMOVES-DoX/` — financial DoX pipeline that consumes ToKenism shape attributions
 - **Firefly-iii**: Financial simulation export
 - **CHIT Geometry Bus**: Shape-attribution agents
 
