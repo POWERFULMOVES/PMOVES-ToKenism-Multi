@@ -1,4 +1,4 @@
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 LABEL org.opencontainers.image.source="https://github.com/POWERFULMOVES/PMOVES.AI"
 LABEL org.opencontainers.image.description="PMOVES Tokenism UI - Next.js Frontend"
@@ -14,7 +14,7 @@ COPY . .
 RUN npm run build
 
 # Production image
-FROM node:20-slim AS runner
+FROM node:22-slim AS runner
 WORKDIR /app
 
 # Install curl for health checks
