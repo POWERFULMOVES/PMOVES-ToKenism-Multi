@@ -94,6 +94,9 @@
     "tokenism.swarm.population.v1": {
       "schema": "schemas/tokenism/swarm.population.v1.schema.json"
     },
+    "tokenism.activation.pack.v1": {
+      "schema": "schemas/tokenism/activation.pack.v1.schema.json"
+    },
     "tokenism.settlement.requested.v1": {
       "schema": "schemas/tokenism/settlement.requested.v1.schema.json"
     },

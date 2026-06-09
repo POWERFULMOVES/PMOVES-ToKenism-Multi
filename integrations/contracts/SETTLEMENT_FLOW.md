@@ -1,7 +1,7 @@
 # Tokenism Settlement Flow
 
-**Status:** Interface, planner, Firefly executor, contract dry-run executor, signed deployment attestation gate, live approval gates, and signed result publisher implemented; production activation remains gated on real deployment credentials.
-**Last updated:** 2026-05-25
+**Status:** Interface, planner, Firefly executor, contract dry-run executor, signed deployment attestation gate, activation-pack validator, live approval gates, and signed result publisher implemented; production activation remains gated on real deployment credentials.
+**Last updated:** 2026-06-09
 
 ## Scope
 
@@ -42,6 +42,7 @@ Required before trusted live execution:
 - Registered agent identity for the planner/executor.
 - Matching signed operator approval for `firefly_live_execution` or `contract_live_execution`.
 - Signed deployment attestation with operator approval records.
+- Signed `tokenism.activation.pack.v1` artifact binding deployment manifest, endpoint references, dry-run evidence, rollback plan, and executor identity.
 - Firefly binding for Firefly live writes.
 - RPC reference and wallet custody reference for contract live writes.
 - Deployment manifest with validated contract addresses before contract-lane execution.
@@ -56,6 +57,7 @@ Required before trusted live execution:
 - `contracts/solidity`: `npm run manifest` exports an ABI manifest from Hardhat artifacts; deployment addresses are required when `REQUIRE_DEPLOYMENT_ADDRESSES=true`, and signed deployment metadata is required when `REQUIRE_DEPLOYMENT_ATTESTATION=true`.
 - `integrations/contracts/settlement-planner.ts` is deterministic and covered by Jest tests.
 - `integrations/contracts/settlement-deployment-attestation.ts` validates signed manifest, environment, RPC, wallet custody, Firefly binding, operator approvals, and expiry.
+- `integrations/contracts/tokenism-activation-pack.ts` validates the production activation artifact and rejects placeholders, raw RPC URLs, raw wallet keys, missing dry-run evidence, mismatched deployment manifest ids, and untrusted executor ids.
 - `integrations/contracts/contract-settlement-executor.ts` validates deployment manifests, signed deployment attestation, dry-run call drafts, live approval gating, write failures, and contract-lane result events.
 - `integrations/firefly/settlement-executor.ts` validates dry-run behavior, signed deployment attestation, live approval gating, live client writes, write failures, and duplicate idempotency-key rejection.
 - `integrations/firefly/settlement-publisher.ts` validates recorded/failed events against Tokenism schemas before best-effort or strict NATS publish.

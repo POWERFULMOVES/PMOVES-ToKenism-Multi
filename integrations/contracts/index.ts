@@ -119,3 +119,14 @@ export {
   SettlementContractName,
   validateManifest,
 } from './contract-settlement-executor';
+
+export {
+  toContractDeploymentManifest,
+  validateTokenismActivationPack,
+  TokenismActivationDryRunEvidence,
+  TokenismActivationIncidentContact,
+  TokenismActivationLane,
+  TokenismActivationPack,
+  TokenismActivationPackValidationOptions,
+  TokenismActivationRollbackPlan,
+} from './tokenism-activation-pack';

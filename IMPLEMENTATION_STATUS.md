@@ -21,6 +21,7 @@ Working now:
 - Firefly settlement dry-run executor maps signed settlement batches to transaction drafts without external writes.
 - Contract settlement dry-run executor maps signed settlement batches to manifest-backed chain call drafts without signing transactions.
 - Deployment attestations bind live settlement to signed environment, RPC, wallet custody, Firefly instance, and operator approval records.
+- Production activation packs are typed and validated before live settlement promotion.
 - Signed settlement recorded/failed events are schema-validated before NATS publish.
 
 Bounded or planned:
@@ -49,6 +50,7 @@ Bounded or planned:
 | NATS Publisher | `integrations/contracts/chit/chit-nats-publisher.ts` | ✅ Schema-validated |
 | Settlement Planner | `integrations/contracts/settlement-planner.ts` | ✅ Plan-only, deterministic |
 | Deployment Attestation | `integrations/contracts/settlement-deployment-attestation.ts` | ✅ Signed environment/custody gate |
+| Activation Pack | `integrations/contracts/tokenism-activation-pack.ts` | ✅ Signed artifact validator |
 | Contract Settlement Executor | `integrations/contracts/contract-settlement-executor.ts` | ✅ Dry-run default, live approval/deployment gated |
 | Firefly Settlement Executor | `integrations/firefly/settlement-executor.ts` | ✅ Dry-run default, live approval/deployment gated |
 | Settlement Result Publisher | `integrations/firefly/settlement-publisher.ts` | ✅ Schema-validated NATS result events |
@@ -58,6 +60,7 @@ Bounded or planned:
 - `tokenism.cgp.weekly.v1` - Weekly CGP exports
 - `tokenism.cgp.ready.v1` - CGP ready for consumption
 - `tokenism.swarm.population.v1` - Swarm population updates
+- `tokenism.activation.pack.v1` - Signed production activation artifact
 - `tokenism.settlement.requested.v1` - Signed settlement batch for executors
 - `tokenism.settlement.recorded.v1` - Settlement instruction recorded/skipped
 - `tokenism.settlement.failed.v1` - Settlement instruction failure
