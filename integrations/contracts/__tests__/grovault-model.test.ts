@@ -282,8 +282,8 @@ describe('GroVaultModel', () => {
         const address = `0xMEMBER${i}`;
         const balance = groToken.balanceOf(address);
 
-        if (balance >= 5.0) {
-          groVault.createLock(1, address, 5.0, (i % 4) + 1); // Duration 1-4
+        if (balance >= 1.0) {
+          groVault.createLock(1, address, 1.0, (i % 4) + 1); // Duration 1-4
         }
       }
 
