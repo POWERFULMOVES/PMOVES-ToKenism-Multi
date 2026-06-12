@@ -162,6 +162,38 @@ describe('ContractSettlementExecutor', () => {
     expect(result.failed).toHaveLength(0);
   });
 
+  it('formats tiny exponent amounts before converting to token units', async () => {
+    const request = settlementRequest();
+    request.totals = {
+      instruction_count: 1,
+      amount: 0.00000001,
+      asset: 'GRO',
+    };
+    request.instructions = [
+      {
+        ...request.instructions[0],
+        amount: 0.00000001,
+      },
+    ];
+
+    const executor = new ContractSettlementExecutor(undefined, {
+      deploymentManifest: MANIFEST,
+      assetDecimals: {
+        GRO: 8,
+      },
+    });
+
+    const result = await executor.execute(request);
+
+    expect(result.calls[0]).toMatchObject({
+      args: ['0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '1'],
+      metadata: {
+        amount: 0.00000001,
+        amount_units: '1',
+      },
+    });
+  });
+
   it('requires a deployment manifest', async () => {
     const executor = new ContractSettlementExecutor();
 

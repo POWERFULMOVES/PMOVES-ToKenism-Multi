@@ -324,7 +324,7 @@ export class ContractSettlementExecutor {
       throw new Error(`Invalid decimals for asset ${instruction.asset}: ${decimals}`);
     }
 
-    return parseUnits(instruction.amount.toString(), decimals).toString();
+    return parseUnits(formatAmountForParseUnits(instruction.amount, decimals), decimals).toString();
   }
 
   private createRecordedEvent(
@@ -480,6 +480,17 @@ function defaultArgs(
   }
 
   return [instruction.idempotency_key, instruction.address, amountUnits, instruction.source_ref.cgp_hash];
+}
+
+function formatAmountForParseUnits(amount: number, decimals: number): string {
+  const value = amount.toString();
+  if (!/[eE]/.test(value)) {
+    return value;
+  }
+
+  return amount
+    .toFixed(decimals)
+    .replace(/(?:\.0+|(\.\d*?)0+)$/, '$1');
 }
 
 function validateRequest(request: SettlementRequestedEvent): void {
