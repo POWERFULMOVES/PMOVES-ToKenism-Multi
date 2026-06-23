@@ -72,6 +72,9 @@ export function validateTokenismActivationPack(
   pack: TokenismActivationPack,
   options: TokenismActivationPackValidationOptions = {}
 ): void {
+  const requireContract = options.requireContract ?? true;
+  const requireFirefly = options.requireFirefly ?? true;
+
   if (!pack || pack.spec !== 'tokenism.activation.pack.v1') {
     throw new Error('Tokenism activation pack spec must be tokenism.activation.pack.v1');
   }
@@ -103,9 +106,9 @@ export function validateTokenismActivationPack(
   }
 
   validateSettlementDeploymentAttestation(pack.deployment_attestation, {
-    requireRpc: options.requireContract ?? true,
-    requireWalletCustody: options.requireContract ?? true,
-    requireFirefly: options.requireFirefly ?? true,
+    requireRpc: requireContract,
+    requireWalletCustody: requireContract,
+    requireFirefly,
     now: options.now,
   });
 
@@ -121,9 +124,34 @@ export function validateTokenismActivationPack(
     throw new Error('operator_approval_id must be present in deployment_attestation approvals');
   }
 
-  if (options.requireContract ?? true) {
+  if (requireContract) {
+    requireMatchingRef(
+      pack.rpc_endpoint_ref,
+      pack.deployment_attestation.rpc_ref,
+      'rpc_endpoint_ref',
+      'deployment_attestation.rpc_ref'
+    );
+    requireMatchingRef(
+      pack.wallet_custody_ref,
+      pack.deployment_attestation.wallet_custody?.signer_ref,
+      'wallet_custody_ref',
+      'deployment_attestation.wallet_custody.signer_ref'
+    );
     validateContractAddresses(pack.contract_addresses);
     validateManifest(toContractDeploymentManifest(pack));
+  }
+
+  if (requireFirefly) {
+    requireMatchingRef(
+      pack.firefly_endpoint_ref,
+      pack.deployment_attestation.firefly?.instance_ref,
+      'firefly_endpoint_ref',
+      'deployment_attestation.firefly.instance_ref'
+    );
+  }
+
+  if (!signaturesMatch(pack.deployment_attestation_sig, pack.deployment_attestation.signature)) {
+    throw new Error('deployment_attestation_sig must match deployment_attestation.signature');
   }
 
   validateDryRunEvidence(pack.dry_run_evidence, options);
@@ -253,10 +281,25 @@ function requireRealRef(value: string | undefined, field: string): void {
   }
 }
 
+function requireMatchingRef(
+  value: string,
+  expected: string | undefined,
+  field: string,
+  expectedField: string
+): void {
+  if (value !== expected) {
+    throw new Error(`${field} must match ${expectedField}`);
+  }
+}
+
 function validateSignature(signature: SettlementSignature | undefined, field: string): void {
   if (!signature?.alg || !signature.kid || !signature.hmac) {
     throw new Error(`${field} must be signed`);
   }
+}
+
+function signaturesMatch(left: SettlementSignature, right: SettlementSignature): boolean {
+  return left.alg === right.alg && left.kid === right.kid && left.hmac === right.hmac;
 }
 
 function assertNotExpired(expiresAt: string | undefined, now: Date | undefined, label: string): void {

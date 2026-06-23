@@ -153,6 +153,40 @@ describe('tokenism activation pack', () => {
     );
   });
 
+  it('requires activation refs to match the signed deployment attestation', () => {
+    const rpcMismatch = activationPack();
+    rpcMismatch.rpc_endpoint_ref = 'secret:tokenism/staging/other-rpc';
+
+    expect(() => validateTokenismActivationPack(rpcMismatch)).toThrow(
+      'rpc_endpoint_ref must match deployment_attestation.rpc_ref'
+    );
+
+    const walletMismatch = activationPack();
+    walletMismatch.wallet_custody_ref = 'vault:tokenism/staging/other-signer';
+
+    expect(() => validateTokenismActivationPack(walletMismatch)).toThrow(
+      'wallet_custody_ref must match deployment_attestation.wallet_custody.signer_ref'
+    );
+
+    const fireflyMismatch = activationPack();
+    fireflyMismatch.firefly_endpoint_ref = 'secret:firefly/staging/other-api';
+
+    expect(() => validateTokenismActivationPack(fireflyMismatch)).toThrow(
+      'firefly_endpoint_ref must match deployment_attestation.firefly.instance_ref'
+    );
+
+    const signatureMismatch = activationPack();
+    signatureMismatch.deployment_attestation_sig = {
+      alg: 'HMAC-SHA256',
+      kid: 'deployment-manifest',
+      hmac: 'other-manifest-sig',
+    };
+
+    expect(() => validateTokenismActivationPack(signatureMismatch)).toThrow(
+      'deployment_attestation_sig must match deployment_attestation.signature'
+    );
+  });
+
   it('requires passing dry-run evidence for both live lanes by default', () => {
     const pack = activationPack();
     pack.dry_run_evidence = pack.dry_run_evidence.filter((item) => item.lane === 'firefly');
