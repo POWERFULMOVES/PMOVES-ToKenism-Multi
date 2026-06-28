@@ -2,7 +2,7 @@
 
 **Project:** PMOVEStokensim Economic Validation & Integrations
 **Plan Start:** 2025-11-06
-**Last Updated:** 2026-01-29
+**Last Updated:** 2026-05-22
 **Owner:** PMOVES Engineering & Data Teams
 **Status Legend:** ☐ To Do · ◐ In Progress · ☐⧗ Blocked · ☑ Done
 
@@ -12,6 +12,8 @@
 - Deliver analytics, integrations, and governance features that align simulation outputs with real-world cooperative data.
 - Establish an end-to-end pipeline connecting Firefly-iii, PMOVEStokensim, PMOVES-DoX, and on-chain contract primitives.
 - Provide repeatable validation, reporting, and operational workflows exercised through automated testing and documentation.
+
+**Current scope note:** CHIT core hardening has landed in the Tokenism library. Settlement now has typed requested/recorded/failed event contracts plus a deterministic planner, but live Firefly writes, contract deployment, and optimizer-driven parameter changes remain separate gated workstreams.
 
 ---
 
@@ -102,7 +104,9 @@ Mitigations: stagger feature flags, use mock services for CI, document fallback 
 | 2026-01-15 | Firefly-iii TypeScript client complete with tests (PR #30). |
 | 2026-01-20 | CHIT Geometry Bus implemented with NATS publisher. |
 | 2026-01-25 | BoTZ Claude Code skills and expertise guides added. |
-| 2026-01-29 | Branch consolidated to PMOVES.AI-Edition-Hardened. Production ready. |
+| 2026-01-29 | Branch consolidated to PMOVES.AI-Edition-Hardened; production configuration work progressed. |
+| 2026-05-22 | CHIT core hardening reviewed: real Merkle hashing, schema-validated publisher, fitness tracking only for ToKenism swarm, zeta still heuristic. |
+| 2026-05-22 | Settlement interface added: requested/recorded/failed schemas, deterministic planner, idempotency keys, and Hardhat harness validation. |
 
 ---
 
@@ -117,6 +121,6 @@ Mitigations: stagger feature flags, use mock services for CI, document fallback 
 
 ---
 
-**Current Focus:** Frontend UI enhancements and production environment configuration.
+**Current Focus:** Tokenism settlement design, contract harness validation, and PMOVES model-fitness/EvoSwarm handoff.
 
 *Update this plan as milestones are reached and risks evolve. Link to this document from team status reports to centralize execution tracking.*

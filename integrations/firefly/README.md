@@ -160,6 +160,40 @@ const integration = new FireflyIntegration({
 const result = await integration.run(AI_ENHANCED_LOCAL_SERVICE);
 ```
 
+### 5. FireflySettlementExecutor (`settlement-executor.ts`)
+
+**Purpose:** Consume signed `tokenism.settlement.requested.v1` batches and map Firefly-lane instructions into Firefly transaction drafts.
+
+Dry-run is the default. In dry-run mode the executor validates the batch, builds transaction drafts, skips non-Firefly lanes, and never calls the Firefly API. Live mode requires an injected client with `createTransaction()`.
+
+**Example:**
+```typescript
+import { FireflySettlementExecutor } from './firefly';
+
+const executor = new FireflySettlementExecutor(undefined, { dryRun: true });
+const result = await executor.execute(settlementRequestedEvent);
+
+console.log(result.drafts.length);  // Firefly transactions that would be created
+console.log(result.skipped.length); // Contract/manual lanes ignored by this executor
+```
+
+**Live mode gate:**
+```typescript
+const executor = new FireflySettlementExecutor(fireflyClient, {
+  dryRun: false,
+  executorAgentId: 'FIREFLY-SETTLEMENT-EXECUTOR',
+  executorSignature: {
+    alg: 'HMAC-SHA256',
+    kid: 'firefly-exec',
+    hmac: process.env.FIREFLY_EXECUTOR_HMAC!,
+  },
+});
+
+const result = await executor.execute(settlementRequestedEvent);
+```
+
+Live mode emits recorded/failed result objects for publishing to `tokenism.settlement.recorded.v1` or `tokenism.settlement.failed.v1`. The executor does not publish to NATS directly; callers own the bus client and strict-publish policy.
+
 ## Installation
 
 ```bash

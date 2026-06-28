@@ -69,4 +69,13 @@ describe("GroVault & CoopGovernor", function () {
       .to.emit(governor, "ProposalExecuted")
       .withArgs(proposalId, 130n, 0n);
   });
+
+  it("restricts governance config changes to the chair", async function () {
+    const { alice, treasury, governor } = await loadFixture(deployCoreFixture);
+
+    await expect(governor.connect(alice).updateGovernanceConfig(1, 10)).to.be.revertedWith("not chair");
+    await expect(governor.connect(treasury).updateGovernanceConfig(1, 10))
+      .to.emit(governor, "GovernanceConfigUpdated")
+      .withArgs(1, 10);
+  });
 });

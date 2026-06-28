@@ -5,8 +5,8 @@
  * - Dirichlet-weighted contribution attribution
  * - Hyperbolic (Poincaré disk) encoding for hierarchical data
  * - Merkle tree proofs for verifiable attribution
- * - CGP (CHIT Geometry Packet) v2 document generation
- * - Swarm optimization integration
+ * - CGP (CHIT Geometry Packet) v1.0 document generation
+ * - Swarm fitness and population tracking
  *
  * @packageDocumentation
  * @module chit
@@ -81,7 +81,7 @@ export {
   GenerationRecord,
 } from './swarm-attribution';
 
-// Zeta-Inspired Filter - Spectral analysis using Riemann zeta zeros
+// Zeta-Inspired Filter - zeta-zero-weighted heuristic spectral transform
 export {
   ZetaInspiredFilter,
   ZetaFilterConfig,
@@ -92,9 +92,11 @@ export {
 export {
   CHITNATSPublisher,
   createCHITPublisher,
+  CHITPublisherOptions,
   SwarmPopulationPayload,
   AttributionRecordedPayload,
   CGPWeeklyPayload,
+  CGPReadyPayload,
 } from './chit-nats-publisher';
 
 /**
@@ -111,13 +113,13 @@ export {
  * });
  *
  * // Record attribution
- * const chitId = chit.attribution.recordAction({
- *   address: '0xABC...',
- *   action: 'spending',
- *   amount: 50,
- *   week: 1,
- *   category: 'groceries'
- * });
+ * const chitId = chit.attribution.recordAction(
+ *   '0xABC...',
+ *   'spending',
+ *   50,
+ *   1,
+ *   'groceries'
+ * );
  *
  * // Generate CGP document
  * const cgp = chit.generator.generateWeeklyCGP(weekData, chit.attribution);
@@ -135,9 +137,9 @@ export interface CHITSystem {
   attribution: _ShapeAttribution;
   /** CGP document generator */
   generator: _CGPGenerator;
-  /** Swarm optimization tracker */
+  /** Swarm fitness and population tracker */
   swarm: _SwarmAttribution;
-  /** Zeta-inspired spectral filter */
+  /** Zeta-zero-weighted heuristic spectral filter */
   zeta: _ZetaInspiredFilter;
 }
 

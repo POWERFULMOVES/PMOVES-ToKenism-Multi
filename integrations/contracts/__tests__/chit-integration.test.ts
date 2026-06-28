@@ -9,6 +9,8 @@
  * - SwarmAttribution: swarm.meta.v1 integration
  */
 
+import { createHash } from 'crypto';
+import { keccak256, toUtf8Bytes } from 'ethers';
 import {
   DirichletWeights,
   HyperbolicEncoder,
@@ -290,6 +292,85 @@ describe('CHIT Integration Module', () => {
       expect(Array.isArray(record!.proof.path)).toBe(true);
     });
 
+    test('should hash Merkle leaves with SHA-256', () => {
+      const chitId = attribution.recordAction('0xABC', 'spending', 100, 1, 'groceries');
+      const record = attribution.getRecord(chitId)!;
+      const leafPayload = JSON.stringify({
+        address: '0xABC',
+        action: 'spending',
+        amount: 100,
+        week: 1,
+        category: 'groceries',
+      });
+      const expected = `0x${createHash('sha256').update(leafPayload, 'utf8').digest('hex')}`;
+
+      expect(record.proof.leafHash).toBe(expected);
+      expect(record.proof.leafHash).toMatch(/^0x[a-f0-9]{64}$/);
+    });
+
+    test('should hash Merkle leaves with keccak256 when configured', () => {
+      const keccakAttribution = new ShapeAttribution({
+        merkle: { strategy: 'per_week', hashAlgorithm: 'keccak256', signProofs: false },
+      });
+      const chitId = keccakAttribution.recordAction('0xABC', 'spending', 100, 1, 'groceries');
+      const record = keccakAttribution.getRecord(chitId)!;
+      const leafPayload = JSON.stringify({
+        address: '0xABC',
+        action: 'spending',
+        amount: 100,
+        week: 1,
+        category: 'groceries',
+      });
+
+      expect(record.proof.leafHash).toBe(keccak256(toUtf8Bytes(leafPayload)));
+      expect(record.proof.leafHash).toMatch(/^0x[a-f0-9]{64}$/);
+    });
+
+    test('should not return repeated synthetic hash output', () => {
+      const chitId = attribution.recordAction('0xABC', 'spending', 100, 1, 'groceries');
+      const record = attribution.getRecord(chitId)!;
+      const chunks = record.proof.leafHash.slice(2).match(/.{8}/g) ?? [];
+
+      expect(new Set(chunks).size).toBeGreaterThan(1);
+    });
+
+    test('should reject tampered Merkle leaf path and root', () => {
+      const firstId = attribution.recordAction('0xAAA', 'spending', 100, 1, 'groceries');
+      attribution.recordAction('0xBBB', 'spending', 50, 1, 'groceries');
+      attribution.recordAction('0xCCC', 'spending', 25, 1, 'groceries');
+
+      const record = attribution.getRecord(firstId)!;
+      expect(attribution.verifyProof(record.proof.leafHash, record.proof)).toBe(true);
+
+      const tamperedLeaf = `0x${'0'.repeat(64)}`;
+      expect(attribution.verifyProof(tamperedLeaf, record.proof)).toBe(false);
+
+      const tamperedPath = {
+        ...record.proof,
+        path: [`0x${'1'.repeat(64)}`, ...record.proof.path.slice(1)],
+        pathIndices: [...record.proof.pathIndices],
+      };
+      expect(attribution.verifyProof(record.proof.leafHash, tamperedPath)).toBe(false);
+
+      const tamperedIndex = {
+        ...record.proof,
+        path: [...record.proof.path],
+        pathIndices: [
+          record.proof.pathIndices[0] === 0 ? 1 : 0,
+          ...record.proof.pathIndices.slice(1),
+        ],
+      };
+      expect(attribution.verifyProof(record.proof.leafHash, tamperedIndex)).toBe(false);
+
+      const tamperedRoot = {
+        ...record.proof,
+        path: [...record.proof.path],
+        pathIndices: [...record.proof.pathIndices],
+        merkleRoot: `0x${'2'.repeat(64)}`,
+      };
+      expect(attribution.verifyProof(record.proof.leafHash, tamperedRoot)).toBe(false);
+    });
+
     test('should verify attribution records', () => {
       attribution.recordAction('0xABC', 'spending', 100, 1, 'groceries');
 
@@ -443,6 +524,36 @@ describe('CHIT Integration Module', () => {
 
       expect(cgp.hyperbolic).toBeDefined();
       expect(cgp.hyperbolic?.space).toBe('poincare_disk');
+      expect(cgp.hyperbolic?.points?.length).toBeGreaterThan(0);
+    });
+
+    test('should generate deterministic encoded record points', () => {
+      attribution.recordAction('0xABC', 'spending', 100, 1, 'groceries');
+      attribution.recordAction('0xDEF', 'spending', 50, 1, 'groceries');
+
+      const weekData = {
+        week: 1,
+        gini: 0.4,
+        povertyRate: 0.15,
+        totalWealth: 100000,
+        totalSpending: 5000,
+        totalSavings: 1000,
+        participantCount: 50,
+      };
+
+      const first = generator.generateWeeklyCGP(weekData, attribution, encoder);
+      const second = generator.generateWeeklyCGP(weekData, attribution, encoder);
+
+      const firstPoints = first.super_nodes.flatMap((node) =>
+        node.constellations.flatMap((constellation) => constellation.points)
+      );
+      const secondPoints = second.super_nodes.flatMap((node) =>
+        node.constellations.flatMap((constellation) => constellation.points)
+      );
+
+      expect(firstPoints.map((point) => [point.id, point.x, point.y])).toEqual(
+        secondPoints.map((point) => [point.id, point.x, point.y])
+      );
     });
   });
 

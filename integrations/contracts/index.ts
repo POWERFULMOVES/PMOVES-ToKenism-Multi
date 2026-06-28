@@ -77,3 +77,56 @@ export {
   ContractConfig,
   NetworkConfig,
 } from './contract-listeners';
+
+// Settlement Planner
+export {
+  planTokenSettlement,
+  createSettlementRequestedEvent,
+  SettlementAction,
+  SettlementBatch,
+  SettlementInstruction,
+  SettlementLane,
+  SettlementPlannerConfig,
+  SettlementRequestedEvent,
+  SettlementSignature,
+} from './settlement-planner';
+
+export {
+  SettlementExecutionResultEvents,
+  SettlementFailedEvent,
+  SettlementRecordedEvent,
+} from './settlement-results';
+
+export {
+  SettlementDeploymentApproval,
+  SettlementDeploymentAttestation,
+  SettlementDeploymentAttestationValidationOptions,
+  SettlementFireflyBinding,
+  SettlementWalletCustody,
+  validateSettlementDeploymentAttestation,
+} from './settlement-deployment-attestation';
+
+export {
+  ContractDeploymentEntry,
+  ContractDeploymentManifest,
+  ContractSettlementCall,
+  ContractSettlementExecutionResult,
+  ContractSettlementExecutor,
+  ContractSettlementExecutorConfig,
+  ContractSettlementOperatorApproval,
+  ContractSettlementSkip,
+  ContractWritableClient,
+  SettlementContractName,
+  validateManifest,
+} from './contract-settlement-executor';
+
+export {
+  toContractDeploymentManifest,
+  validateTokenismActivationPack,
+  TokenismActivationDryRunEvidence,
+  TokenismActivationIncidentContact,
+  TokenismActivationLane,
+  TokenismActivationPack,
+  TokenismActivationPackValidationOptions,
+  TokenismActivationRollbackPlan,
+} from './tokenism-activation-pack';

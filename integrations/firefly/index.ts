@@ -29,4 +29,29 @@ export type {
   IntegrationResult,
 } from './firefly-integration';
 
+export { FireflySettlementExecutor } from './settlement-executor';
+export type {
+  FireflySettlementDraft,
+  FireflySettlementExecutionResult,
+  FireflySettlementExecutorConfig,
+  FireflySettlementSkip,
+  FireflyTransactionInput,
+  FireflyTransactionType,
+  FireflyWritableClient,
+  SettlementOperatorApproval,
+  SettlementFailedEvent,
+  SettlementRecordedEvent,
+} from './settlement-executor';
+
+export {
+  FireflySettlementPublisher,
+  TOKENISM_SETTLEMENT_SUBJECTS,
+  createFireflySettlementPublisher,
+} from './settlement-publisher';
+export type {
+  FireflySettlementPublisherOptions,
+  SettlementPublishClient,
+  SettlementPublishSummary,
+} from './settlement-publisher';
+
 export { runIntegration } from './run-integration';
