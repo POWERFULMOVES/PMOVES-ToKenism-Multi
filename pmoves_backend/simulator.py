@@ -48,6 +48,13 @@ def run_simulation(params: Dict[str, float]) -> Dict[str, object]:
     for week in range(int(sim_params["SIMULATION_WEEKS"])):
         current_wealth_A_list: List[float] = []
         current_wealth_B_list: List[float] = []
+        # Weekly cash-flow aggregates. The Firefly export bridge
+        # (adapters.firefly.transform_simulation_to_transactions) consumes
+        # these keys; without them a history export produces zero transactions.
+        week_external_spend_A = 0.0
+        week_internal_tx_B = 0.0
+        week_external_spend_B = 0.0
+        week_coop_fees_B = 0.0
 
         for member in members:
             try:
@@ -56,6 +63,7 @@ def run_simulation(params: Dict[str, float]) -> Dict[str, object]:
 
                 actual_spending_A = min(member.weekly_food_budget, member.wealth_scenario_A)
                 member.wealth_scenario_A = max(0, member.wealth_scenario_A - actual_spending_A)
+                week_external_spend_A += actual_spending_A
 
                 budget_to_spend = member.weekly_food_budget
                 intended_spend_internal = budget_to_spend * member.propensity_to_spend_internal
@@ -71,9 +79,15 @@ def run_simulation(params: Dict[str, float]) -> Dict[str, object]:
 
                 actual_total_spending_B = min(total_effective_cost, member.food_usd_balance)
                 member.food_usd_balance = max(0, member.food_usd_balance - actual_total_spending_B)
+                if total_effective_cost > 0:
+                    # Balance-capped spend keeps the intended internal/external split.
+                    spend_ratio = actual_total_spending_B / total_effective_cost
+                    week_internal_tx_B += effective_cost_internal * spend_ratio
+                    week_external_spend_B += effective_cost_external * spend_ratio
 
                 actual_coop_fee = min(sim_params["WEEKLY_COOP_FEE_B"], member.food_usd_balance)
                 member.food_usd_balance = max(0, member.food_usd_balance - actual_coop_fee)
+                week_coop_fees_B += actual_coop_fee
 
                 reward = max(
                     0,
@@ -102,6 +116,12 @@ def run_simulation(params: Dict[str, float]) -> Dict[str, object]:
             weekly_metrics = metrics_calculator.calculate_metrics(
                 current_wealth_A_list, current_wealth_B_list, week + 1
             )
+            # Scenario A has no internal economy, so InternalTx_A is deliberately
+            # absent — the export transformer treats missing keys as no-flow.
+            weekly_metrics["ExternalSpend_A"] = round(week_external_spend_A, 2)
+            weekly_metrics["InternalTx_B"] = round(week_internal_tx_B, 2)
+            weekly_metrics["ExternalSpend_B"] = round(week_external_spend_B, 2)
+            weekly_metrics["CoopFees_B"] = round(week_coop_fees_B, 2)
             simulation_history.append(weekly_metrics)
 
             if week > 0:

@@ -203,6 +203,27 @@ npm install
 
 ## Usage
 
+### HTTP trigger (dry-run export service)
+
+The CLI exporter below now has a token-gated HTTP twin for room UIs:
+`pmoves_backend/export_service.py` (Flask). It resolves scenarios from the
+demo library (`pmoves_backend/scenarios.py`), runs the Python simulator, and
+returns the dry-run Firefly transaction summary — a live-write path does not
+exist in the service (TAC_TOKENISM settlement gate governs any future one).
+
+```bash
+# token comes from the env-tier secrets pipeline; example var name:
+#   TOKENISM_EXPORT_TOKEN
+python -m pmoves_backend.export_service   # serves 127.0.0.1:8118
+
+curl -s -X POST http://127.0.0.1:8118/v1/tokenism/export/wealth \
+  -H "Authorization: Bearer $TOKENISM_EXPORT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"scenario_id": "baseline"}'
+```
+
+Publishes `tokenism.export.result.v1` to NATS when `NATS_URL` is set.
+
 ### Quick Start
 
 1. **Set up Firefly-iii API token:**
