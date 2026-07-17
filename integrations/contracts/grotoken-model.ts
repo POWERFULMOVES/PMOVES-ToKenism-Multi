@@ -147,6 +147,50 @@ export class GroTokenDistribution {
   }
 
   /**
+   * Distribute a weekly token pool proportionally to Dirichlet attribution
+   * weight (token-structure refresh). Tokens track real recorded contribution
+   * rather than a Gaussian random draw, so distribution is deterministic and
+   * auditable. See docs/architecture/TOKEN_STRUCTURE_REFRESH.md §4.3.
+   */
+  distributeByAttribution(
+    attribution: Array<{ address: string; weight: number }>,
+    weeklyPool: number,
+    week: number
+  ): DistributionEvent[] {
+    const events: DistributionEvent[] = [];
+    for (const { address, weight } of attribution) {
+      const amount = weight * weeklyPool;
+
+      // Respect max supply (same constraint as distributeWeekly).
+      if (this.currentSupply + amount > this.config.totalSupply) {
+        console.warn(
+          `[GroToken] Max supply reached, skipping attribution mint for ${address}`
+        );
+        continue;
+      }
+
+      const holder = this.holders.get(address);
+      if (holder) {
+        holder.balance += amount;
+        holder.totalReceived += amount;
+        holder.lastDistributionWeek = week;
+      }
+      this.currentSupply += amount;
+
+      const event: DistributionEvent = {
+        week,
+        recipient: address,
+        amount,
+        dollarValue: amount * this.config.tokenValue,
+        totalSupplyAfter: this.currentSupply,
+      };
+      events.push(event);
+      this.distributionHistory.push(event);
+    }
+    return events;
+  }
+
+  /**
    * Transfer tokens between holders
    */
   transfer(from: string, to: string, amount: number): boolean {
