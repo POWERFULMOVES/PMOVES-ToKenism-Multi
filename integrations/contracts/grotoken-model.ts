@@ -147,6 +147,70 @@ export class GroTokenDistribution {
   }
 
   /**
+   * Distribute a weekly token pool proportionally to Dirichlet attribution
+   * weight (token-structure refresh). Tokens track real recorded contribution
+   * rather than a Gaussian random draw, so distribution is deterministic and
+   * auditable. See docs/architecture/TOKEN_STRUCTURE_REFRESH.md §4.3.
+   */
+  distributeByAttribution(
+    attribution: Array<{ address: string; weight: number }>,
+    weeklyPool: number,
+    week: number
+  ): DistributionEvent[] {
+    // Contract: `attribution` is a SINGLE normalized distribution (Σweight ≈ 1),
+    // e.g. DirichletWeights.getExpectedAttribution(category) for ONE category.
+    // A concatenation of N categories (each summing to 1) would mint N× the pool,
+    // so reject anything that is not normalized rather than over-mint silently.
+    const totalWeight = attribution.reduce((sum, a) => sum + a.weight, 0);
+    if (Math.abs(totalWeight - 1) > 1e-6) {
+      throw new Error(
+        `distributeByAttribution expects a single normalized attribution ` +
+          `(Σweight ≈ 1); got ${totalWeight}. Pass one category's weights.`
+      );
+    }
+
+    const events: DistributionEvent[] = [];
+    for (const { address, weight } of attribution) {
+      const holder = this.holders.get(address);
+      if (!holder) {
+        // Only initialized holders can be credited. Never inflate supply for an
+        // unknown address — that would mint tokens no balance ever receives and
+        // break the currentSupply === Σ(holder.balance) invariant.
+        console.warn(
+          `[GroToken] attribution address ${address} is not a holder — skipping`
+        );
+        continue;
+      }
+
+      const amount = weight * weeklyPool;
+
+      // Respect max supply (same constraint as distributeWeekly).
+      if (this.currentSupply + amount > this.config.totalSupply) {
+        console.warn(
+          `[GroToken] Max supply reached, skipping attribution mint for ${address}`
+        );
+        continue;
+      }
+
+      holder.balance += amount;
+      holder.totalReceived += amount;
+      holder.lastDistributionWeek = week;
+      this.currentSupply += amount;
+
+      const event: DistributionEvent = {
+        week,
+        recipient: address,
+        amount,
+        dollarValue: amount * this.config.tokenValue,
+        totalSupplyAfter: this.currentSupply,
+      };
+      events.push(event);
+      this.distributionHistory.push(event);
+    }
+    return events;
+  }
+
+  /**
    * Transfer tokens between holders
    */
   transfer(from: string, to: string, amount: number): boolean {
