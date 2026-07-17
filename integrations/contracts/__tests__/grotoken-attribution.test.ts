@@ -89,6 +89,28 @@ describe('GroTokenDistribution.distributeByAttribution', () => {
     });
   });
 
+  // Policy variable (open decision #4 — left OPEN to test): earned GroToken can
+  // be made soul-bound (non-transferable) to satisfy the non-transferable-
+  // reputation boundary. Default is transferable (current behaviour).
+  describe('soulbound policy', () => {
+    const funded = (opts: Record<string, unknown> = {}) => {
+      const g = new GroTokenDistribution(opts);
+      g.initializeHolders(['0xA', '0xB']);
+      g.distributeByAttribution([{ address: '0xA', weight: 1 }], 10, 1);
+      return g;
+    };
+
+    it('allows transfer by default (transferable)', () => {
+      const g = funded();
+      expect(g.transfer('0xA', '0xB', 1)).toBe(true);
+    });
+
+    it('rejects transfer when soulbound', () => {
+      const g = funded({ soulbound: true });
+      expect(() => g.transfer('0xA', '0xB', 1)).toThrow(/soulbound/i);
+    });
+  });
+
   // Guards found in review: unknown-holder mint + multi-category over-mint.
   describe('guards', () => {
     it('skips an attribution address that is not a holder (no mint into the void)', () => {

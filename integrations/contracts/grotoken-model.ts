@@ -17,6 +17,11 @@ export interface GroTokenConfig {
   // Treasury
   totalSupply: number;
   treasuryAddress: string;
+
+  // Policy variable (open decision #4): when true, earned GroToken is
+  // soul-bound — non-transferable — to satisfy the non-transferable-reputation
+  // boundary ($WORK direction). Default false (transferable). Left OPEN to test.
+  soulbound: boolean;
 }
 
 export interface TokenHolder {
@@ -51,6 +56,7 @@ export class GroTokenDistribution {
       maxTokensPerDistribution: 2.0,
       totalSupply: 1000000, // 1M tokens max supply
       treasuryAddress: '0xTREASURY',
+      soulbound: false,
       ...config,
     };
   }
@@ -214,6 +220,12 @@ export class GroTokenDistribution {
    * Transfer tokens between holders
    */
   transfer(from: string, to: string, amount: number): boolean {
+    // Policy variable: under a soul-bound policy GroToken is non-transferable
+    // (earned reputation, not a tradeable asset — the $WORK direction).
+    if (this.config.soulbound) {
+      throw new Error('GroToken is soulbound (non-transferable) under current policy');
+    }
+
     const fromHolder = this.holders.get(from);
     const toHolder = this.holders.get(to);
 

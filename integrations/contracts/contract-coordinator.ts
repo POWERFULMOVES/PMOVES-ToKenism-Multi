@@ -55,7 +55,20 @@ export interface ContractCoordinatorConfig {
   chit?: Partial<CHITConfig>;
   /** GroToken minted per participating household per week (flat commitment share). Default 0.5. */
   groTokenWeeklyPerCapita?: number;
+  /**
+   * Policy knob (open decision — left OPEN to test where outcomes land):
+   * which contribution measure a household's weekly commitment share is drawn
+   * from. `flat` = one-member-one-share (egalitarian, default); `income` /
+   * `foodBudget` = weighted by that real signal. This is a testable variable,
+   * not an endorsement — sweeping it reveals the Gini/concentration outcome of
+   * each policy. Dirichlet smoothing (D12) keeps every participant non-zero
+   * regardless of the measure.
+   */
+  contributionMeasure?: ContributionMeasure;
 }
+
+/** Contribution measure for the weekly commitment share (policy variable). */
+export type ContributionMeasure = 'flat' | 'income' | 'foodBudget';
 
 export interface PopulationConfig {
   addresses: string[];
@@ -83,6 +96,7 @@ export class ContractCoordinator {
   // feed Dirichlet attribution that drives the weekly GroToken mint.
   private commitments: CommitmentModel = new CommitmentModel();
   private groTokenWeeklyPerCapita: number;
+  private contributionMeasure: ContributionMeasure;
 
   // Event bus for integration
   private eventBus?: EventBus;
@@ -110,6 +124,7 @@ export class ContractCoordinator {
     this.groVault = new GroVaultModel(this.groToken, config.groVault);
     this.governance = new CoopGovernorModel(this.groVault, config.governance);
     this.groTokenWeeklyPerCapita = config.groTokenWeeklyPerCapita ?? 0.5;
+    this.contributionMeasure = config.contributionMeasure ?? 'flat';
 
     this.eventBus = eventBus;
 
@@ -192,6 +207,31 @@ export class ContractCoordinator {
   }
 
   /**
+   * The commitment share for a household under the configured contribution
+   * measure (policy variable). Floored to a small positive value so the
+   * commitment is valid (shares must be > 0); Dirichlet smoothing then
+   * guarantees non-zero standing (D12) regardless of the measure.
+   */
+  private contributionShare(
+    budget?: { foodBudget: number; totalIncome: number }
+  ): number {
+    let raw: number;
+    switch (this.contributionMeasure) {
+      case 'income':
+        raw = budget?.totalIncome ?? 0;
+        break;
+      case 'foodBudget':
+        raw = budget?.foodBudget ?? 0;
+        break;
+      case 'flat':
+      default:
+        raw = 1;
+        break;
+    }
+    return raw > 0 ? raw : 1e-6;
+  }
+
+  /**
    * Distribute the weekly GroToken pool by kept-commitment attribution
    * (token-structure refresh §4.3). Each participating household keeps a flat
    * weekly commitment; those kept commitments feed Dirichlet attribution, which
@@ -210,10 +250,12 @@ export class ContractCoordinator {
 
     const dirichlet = new DirichletWeights();
     for (const address of participants) {
-      // A household's weekly participation is a kept commitment (flat share).
+      // A household's weekly participation is a kept commitment. Its share is
+      // drawn from the configured contribution measure (policy variable).
+      const share = this.contributionShare(householdBudgets.get(address));
       const id = this.commitments.createCommitment({
         deliverable: `weekly participation w${week}`,
-        parties: [{ address, share: 1 }],
+        parties: [{ address, share }],
         category: 'weekly',
         deadline: week,
         week,
