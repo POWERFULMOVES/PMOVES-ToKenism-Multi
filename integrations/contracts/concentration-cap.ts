@@ -16,9 +16,18 @@ export function capWeights(weights: number[], cap: number): number[] {
 
   const w = weights.map((x) => x / s0); // normalize to sum 1
 
-  // If the cap is too low to be satisfiable (cap·n <= 1), the closest feasible
-  // distribution is the flattest one — equal shares.
-  if (cap * n <= 1) return w.map(() => 1 / n);
+  // If the cap is too low to be satisfiable (cap·n <= 1), NO distribution can
+  // keep every holder at/under `cap` (they would sum to < 1). The flattest
+  // possible distribution is equal shares (1/n each) — but note 1/n >= cap here,
+  // so the cap is NOT actually enforced. Warn loudly so an operator relying on a
+  // hard guardrail (e.g. Fordham <15% with a small cohort) is not misled.
+  if (cap * n <= 1) {
+    console.warn(
+      `[capWeights] cap ${cap} is infeasible for ${n} holders (cap*n=${cap * n} <= 1): ` +
+        `returning an equal 1/${n} split — the concentration cap is NOT enforceable at this cohort size.`
+    );
+    return w.map(() => 1 / n);
+  }
 
   for (let iter = 0; iter < 1000; iter++) {
     let excess = 0;

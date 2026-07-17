@@ -29,4 +29,24 @@ describe('capWeights', () => {
     expect(max(out)).toBeLessThanOrEqual(0.6 + 1e-9);
     expect(sum(out)).toBeCloseTo(1, 9);
   });
+
+  it('converges when redistribution pushes a holder over the cap (multi-pass)', () => {
+    // 0.7→0.4 excess 0.3 → 0.28 becomes 0.56 (over cap) → must re-clamp next pass.
+    const out = capWeights([0.7, 0.28, 0.02], 0.4);
+    expect(max(out)).toBeLessThanOrEqual(0.4 + 1e-9);
+    expect(sum(out)).toBeCloseTo(1, 9);
+  });
+
+  it('warns and returns an equal split when the cap is infeasible (cap*n <= 1)', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const out = capWeights([0.5, 0.3, 0.2], 0.1); // 0.1*3 = 0.3 <= 1
+    expect(out).toEqual([1 / 3, 1 / 3, 1 / 3]);
+    expect(warn).toHaveBeenCalled(); // operator is signalled the cap did not hold
+    warn.mockRestore();
+  });
+
+  it('handles degenerate input', () => {
+    expect(capWeights([], 0.4)).toEqual([]);
+    expect(capWeights([0, 0], 0.4)).toEqual([0.5, 0.5]); // all-zero → equal split
+  });
 });
