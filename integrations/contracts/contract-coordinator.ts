@@ -8,7 +8,9 @@
  * - Swarm optimization integration
  */
 
-import { GroTokenDistribution, GroTokenConfig } from './grotoken-model';
+import { GroTokenDistribution, GroTokenConfig, DistributionEvent } from './grotoken-model';
+import { CommitmentModel } from './commitment-model';
+import { DirichletWeights } from './chit/dirichlet-weights';
 import { FoodUSDModel, FoodUSDConfig } from './foodusd-model';
 import { GroupPurchaseModel, GroupPurchaseConfig } from './grouppurchase-model';
 import { GroVaultModel, GroVaultConfig } from './grovault-model';
@@ -51,6 +53,8 @@ export interface ContractCoordinatorConfig {
   governance?: Partial<GovernanceConfig>;
   /** CHIT integration configuration */
   chit?: Partial<CHITConfig>;
+  /** GroToken minted per participating household per week (flat commitment share). Default 0.5. */
+  groTokenWeeklyPerCapita?: number;
 }
 
 export interface PopulationConfig {
@@ -74,6 +78,11 @@ export class ContractCoordinator {
   private groupPurchase: GroupPurchaseModel;
   private groVault: GroVaultModel;
   private governance: CoopGovernorModel;
+
+  // Commitment-first distribution (token-structure refresh): kept commitments
+  // feed Dirichlet attribution that drives the weekly GroToken mint.
+  private commitments: CommitmentModel = new CommitmentModel();
+  private groTokenWeeklyPerCapita: number;
 
   // Event bus for integration
   private eventBus?: EventBus;
@@ -100,6 +109,7 @@ export class ContractCoordinator {
     this.groupPurchase = new GroupPurchaseModel(this.foodUSD, config.groupPurchase);
     this.groVault = new GroVaultModel(this.groToken, config.groVault);
     this.governance = new CoopGovernorModel(this.groVault, config.governance);
+    this.groTokenWeeklyPerCapita = config.groTokenWeeklyPerCapita ?? 0.5;
 
     this.eventBus = eventBus;
 
@@ -182,6 +192,44 @@ export class ContractCoordinator {
   }
 
   /**
+   * Distribute the weekly GroToken pool by kept-commitment attribution
+   * (token-structure refresh §4.3). Each participating household keeps a flat
+   * weekly commitment; those kept commitments feed Dirichlet attribution, which
+   * drives the mint via distributeByAttribution — deterministic and
+   * contribution-anchored, replacing the Gaussian random draw.
+   *
+   * Flat per-capita share is the simulation default; swap for a real
+   * contribution measure (hosting / uplink / verified workload) once specced.
+   */
+  private distributeByCommitments(
+    week: number,
+    householdBudgets: Map<string, { foodBudget: number; totalIncome: number }>
+  ): DistributionEvent[] {
+    const participants = Array.from(householdBudgets.keys());
+    if (participants.length === 0) return [];
+
+    const dirichlet = new DirichletWeights();
+    for (const address of participants) {
+      // A household's weekly participation is a kept commitment (flat share).
+      const id = this.commitments.createCommitment({
+        deliverable: `weekly participation w${week}`,
+        parties: [{ address, share: 1 }],
+        category: 'weekly',
+        deadline: week,
+        week,
+      });
+      const records = this.commitments.markKept(id, week);
+      for (const r of records) {
+        dirichlet.addContribution(r.address, r.amount, r.category, r.week);
+      }
+    }
+
+    const attribution = dirichlet.getExpectedAttribution('weekly');
+    const pool = participants.length * this.groTokenWeeklyPerCapita;
+    return this.groToken.distributeByAttribution(attribution, pool, week);
+  }
+
+  /**
    * Process a week of simulation
    */
   async processWeek(
@@ -192,8 +240,10 @@ export class ContractCoordinator {
 
     console.log(`\n[ContractCoordinator] Processing week ${week}`);
 
-    // 1. Distribute GroTokens
-    const tokenEvents = this.groToken.distributeWeekly(week);
+    // 1. Distribute GroTokens by kept-commitment attribution (refresh §4.3),
+    //    replacing the Gaussian random draw — distribution now tracks
+    //    contribution and is deterministic/auditable.
+    const tokenEvents = this.distributeByCommitments(week, householdBudgets);
 
     console.log(`  - Distributed ${tokenEvents.length} GroToken events`);
 

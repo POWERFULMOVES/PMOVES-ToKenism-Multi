@@ -106,6 +106,34 @@ describe('ContractCoordinator', () => {
     });
   });
 
+  describe('contribution-based distribution (token-structure refresh)', () => {
+    const build = () => {
+      const c = new ContractCoordinator({ groToken: { tokenValue: 2.0 } });
+      c.initialize({ addresses: ['0xA', '0xB', '0xC'], initialWealth: [0, 0, 0] });
+      return c;
+    };
+    const budgets = () =>
+      new Map([
+        ['0xA', { foodBudget: 100, totalIncome: 1000 }],
+        ['0xB', { foodBudget: 100, totalIncome: 1000 }],
+        ['0xC', { foodBudget: 100, totalIncome: 1000 }],
+      ]);
+
+    it('distributes GroToken deterministically by contribution, not a random draw', async () => {
+      const c1 = build();
+      await c1.processWeek(1, budgets());
+      const c2 = build();
+      await c2.processWeek(1, budgets());
+
+      const b1 = c1.getModels().groToken.balanceOf('0xA');
+      const b2 = c2.getModels().groToken.balanceOf('0xA');
+      // Every participating household gets a non-zero, IDENTICAL share across runs —
+      // the retired Gaussian draw would differ run to run.
+      expect(b1).toBeGreaterThan(0);
+      expect(b1).toBe(b2);
+    });
+  });
+
   describe('group purchasing', () => {
     beforeEach(() => {
       const addresses = Array.from({ length: 50 }, (_, i) => `0xMEMBER${i}`);
