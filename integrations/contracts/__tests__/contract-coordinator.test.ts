@@ -148,9 +148,10 @@ describe('ContractCoordinator', () => {
 
       const rich = c.getModels().groToken.balanceOf('0xRICH');
       const poor = c.getModels().groToken.balanceOf('0xPOOR');
-      // Contribution-weighted (not flat headcount): higher income → larger share.
-      expect(rich).toBeGreaterThan(poor);
-      // ...but D12 still holds — the lower contributor is never zeroed.
+      // Contribution-weighted by magnitude, not merely ordered: 3000 vs 1000
+      // income → alpha 3000.1 vs 1000.1 → shares in ~3:1 proportion.
+      expect(rich / poor).toBeCloseTo(3, 1);
+      // ...and D12 still holds — the lower contributor is never zeroed.
       expect(poor).toBeGreaterThan(0);
     });
 
