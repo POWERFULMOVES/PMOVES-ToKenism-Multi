@@ -14,6 +14,13 @@ export interface FoodUSDConfig {
   // Minting/Burning
   allowUserMinting: boolean;
   requireTreasuryApproval: boolean;
+
+  // Policy variable (open decision #7): when true, FoodUSD is spend-limited —
+  // it may only be transferred TO an approved vendor, not peer-to-peer. This
+  // narrows FoodUSD toward the vendor-redeemable $CRED model. Default false
+  // (free-floating 1:1 utility). Left OPEN to test the utility-vs-speculation line.
+  vendorLocked: boolean;
+  approvedVendors: string[];
 }
 
 export interface FoodUSDHolder {
@@ -55,6 +62,8 @@ export class FoodUSDModel {
       ],
       allowUserMinting: false,
       requireTreasuryApproval: true,
+      vendorLocked: false,
+      approvedVendors: [],
       ...config,
     };
   }
@@ -134,6 +143,14 @@ export class FoodUSDModel {
    * Transfer FoodUSD between holders
    */
   transfer(from: string, to: string, amount: number): boolean {
+    // Policy variable: under vendor-lock, FoodUSD is spend-limited — it may only
+    // move to an approved vendor (toward the $CRED model), never peer-to-peer.
+    if (this.config.vendorLocked && !this.config.approvedVendors.includes(to)) {
+      throw new Error(
+        `FoodUSD is vendor-locked: ${to} is not an approved vendor (spend-limited under current policy)`
+      );
+    }
+
     const fromHolder = this.holders.get(from);
     const toHolder = this.holders.get(to);
 
