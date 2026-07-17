@@ -25,4 +25,21 @@ describe('FoodUSD vendor-lock policy', () => {
     expect(f.transfer('0xA', '0xVENDOR', 1)).toBe(true);
     expect(() => f.transfer('0xA', '0xB', 1)).toThrow(/vendor/i);
   });
+
+  it('exempts internal addresses (escrow/refund) in both directions — no fund-trap', () => {
+    const f = new FoodUSDModel({
+      vendorLocked: true,
+      approvedVendors: ['0xVENDOR'],
+      internalAddresses: ['0xESCROW'],
+    });
+    f.initializeHolders(['0xA', '0xESCROW', '0xB']);
+    f.mint('0xA', 10);
+    f.mint('0xESCROW', 10);
+
+    // deposit to escrow (to is internal) is allowed...
+    expect(f.transfer('0xA', '0xESCROW', 1)).toBe(true);
+    // ...and a refund from escrow back to a regular (non-vendor) user is allowed,
+    // so escrowed funds can never get stuck under the lock.
+    expect(f.transfer('0xESCROW', '0xB', 1)).toBe(true);
+  });
 });

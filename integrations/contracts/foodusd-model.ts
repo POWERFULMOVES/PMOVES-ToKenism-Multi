@@ -21,6 +21,11 @@ export interface FoodUSDConfig {
   // (free-floating 1:1 utility). Left OPEN to test the utility-vs-speculation line.
   vendorLocked: boolean;
   approvedVendors: string[];
+  // Internal plumbing addresses (e.g. the GroupPurchase escrow contract) whose
+  // transfers bypass vendor-lock in BOTH directions — so escrow deposits,
+  // supplier payouts, and refunds-to-users keep working under a spend-limited
+  // policy (otherwise a refund back to a non-vendor user would trap funds).
+  internalAddresses: string[];
 }
 
 export interface FoodUSDHolder {
@@ -64,6 +69,7 @@ export class FoodUSDModel {
       requireTreasuryApproval: true,
       vendorLocked: false,
       approvedVendors: [],
+      internalAddresses: [],
       ...config,
     };
   }
@@ -143,12 +149,20 @@ export class FoodUSDModel {
    * Transfer FoodUSD between holders
    */
   transfer(from: string, to: string, amount: number): boolean {
-    // Policy variable: under vendor-lock, FoodUSD is spend-limited — it may only
-    // move to an approved vendor (toward the $CRED model), never peer-to-peer.
-    if (this.config.vendorLocked && !this.config.approvedVendors.includes(to)) {
-      throw new Error(
-        `FoodUSD is vendor-locked: ${to} is not an approved vendor (spend-limited under current policy)`
-      );
+    // Policy variable: under vendor-lock, FoodUSD is spend-limited — a user may
+    // only send to an approved vendor (toward the $CRED model). Internal plumbing
+    // (escrow deposits, payouts, refunds) is exempt in both directions so funds
+    // are never trapped.
+    if (this.config.vendorLocked) {
+      const vendors = this.config.approvedVendors ?? [];
+      const internal = this.config.internalAddresses ?? [];
+      const exempt =
+        vendors.includes(to) || internal.includes(to) || internal.includes(from);
+      if (!exempt) {
+        throw new Error(
+          `FoodUSD is vendor-locked: ${to} is not an approved vendor (spend-limited under current policy)`
+        );
+      }
     }
 
     const fromHolder = this.holders.get(from);
