@@ -132,6 +132,43 @@ describe('ContractCoordinator', () => {
       expect(b1).toBeGreaterThan(0);
       expect(b1).toBe(b2);
     });
+
+    it('weights distribution by the configured contribution measure (income)', async () => {
+      const c = new ContractCoordinator({
+        groToken: { tokenValue: 2.0 },
+        contributionMeasure: 'income',
+      });
+      c.initialize({ addresses: ['0xRICH', '0xPOOR'], initialWealth: [0, 0] });
+      const budgets = new Map([
+        ['0xRICH', { foodBudget: 100, totalIncome: 3000 }],
+        ['0xPOOR', { foodBudget: 100, totalIncome: 1000 }],
+      ]);
+
+      await c.processWeek(1, budgets);
+
+      const rich = c.getModels().groToken.balanceOf('0xRICH');
+      const poor = c.getModels().groToken.balanceOf('0xPOOR');
+      // Contribution-weighted (not flat headcount): higher income → larger share.
+      expect(rich).toBeGreaterThan(poor);
+      // ...but D12 still holds — the lower contributor is never zeroed.
+      expect(poor).toBeGreaterThan(0);
+    });
+
+    it('stays flat (equal shares) by default', async () => {
+      const c = new ContractCoordinator({ groToken: { tokenValue: 2.0 } });
+      c.initialize({ addresses: ['0xRICH', '0xPOOR'], initialWealth: [0, 0] });
+      const budgets = new Map([
+        ['0xRICH', { foodBudget: 100, totalIncome: 3000 }],
+        ['0xPOOR', { foodBudget: 100, totalIncome: 1000 }],
+      ]);
+
+      await c.processWeek(1, budgets);
+
+      const rich = c.getModels().groToken.balanceOf('0xRICH');
+      const poor = c.getModels().groToken.balanceOf('0xPOOR');
+      // Default measure is flat: equal shares regardless of income.
+      expect(rich).toBeCloseTo(poor, 6);
+    });
   });
 
   describe('group purchasing', () => {
