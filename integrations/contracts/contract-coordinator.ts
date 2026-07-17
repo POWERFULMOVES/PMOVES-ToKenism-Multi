@@ -11,6 +11,7 @@
 import { GroTokenDistribution, GroTokenConfig, DistributionEvent } from './grotoken-model';
 import { CommitmentModel } from './commitment-model';
 import { DirichletWeights } from './chit/dirichlet-weights';
+import { capWeights } from './concentration-cap';
 import { FoodUSDModel, FoodUSDConfig } from './foodusd-model';
 import { GroupPurchaseModel, GroupPurchaseConfig } from './grouppurchase-model';
 import { GroVaultModel, GroVaultConfig } from './grovault-model';
@@ -65,6 +66,13 @@ export interface ContractCoordinatorConfig {
    * regardless of the measure.
    */
   contributionMeasure?: ContributionMeasure;
+  /**
+   * Policy knob (open decision #6): max share of a single weekly distribution any
+   * one holder may receive (0..1). Excess is redistributed to smaller holders
+   * (water-filling). Undefined = no cap (default). A wealth-concentration
+   * guardrail (e.g. Fordham <15% ⇒ 0.15). Left OPEN to test its effect.
+   */
+  maxConcentration?: number;
 }
 
 /** Contribution measure for the weekly commitment share (policy variable). */
@@ -97,6 +105,7 @@ export class ContractCoordinator {
   private commitments: CommitmentModel = new CommitmentModel();
   private groTokenWeeklyPerCapita: number;
   private contributionMeasure: ContributionMeasure;
+  private maxConcentration?: number;
 
   // Event bus for integration
   private eventBus?: EventBus;
@@ -125,6 +134,7 @@ export class ContractCoordinator {
     this.governance = new CoopGovernorModel(this.groVault, config.governance);
     this.groTokenWeeklyPerCapita = config.groTokenWeeklyPerCapita ?? 0.5;
     this.contributionMeasure = config.contributionMeasure ?? 'flat';
+    this.maxConcentration = config.maxConcentration;
 
     this.eventBus = eventBus;
 
@@ -266,7 +276,17 @@ export class ContractCoordinator {
       }
     }
 
-    const attribution = dirichlet.getExpectedAttribution('weekly');
+    let attribution = dirichlet.getExpectedAttribution('weekly');
+    if (this.maxConcentration !== undefined && this.maxConcentration < 1) {
+      // Concentration cap (#6): clamp any holder's weekly share, redistribute
+      // the excess to smaller holders. Σweight stays 1 (distributeByAttribution
+      // requires that), and Dirichlet smoothing already keeps everyone non-zero.
+      const capped = capWeights(
+        attribution.map((a) => a.weight),
+        this.maxConcentration
+      );
+      attribution = attribution.map((a, i) => ({ ...a, weight: capped[i] }));
+    }
     const pool = participants.length * this.groTokenWeeklyPerCapita;
     return this.groToken.distributeByAttribution(attribution, pool, week);
   }

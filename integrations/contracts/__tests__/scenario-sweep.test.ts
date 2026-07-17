@@ -39,4 +39,29 @@ describe('sweepScenarios', () => {
     // Concentration (top holder's share) is higher under income-weighting.
     expect(income.topShare).toBeGreaterThan(flat.topShare);
   });
+
+  it('a concentration cap lowers top-holder share vs uncapped income', async () => {
+    const outcomes = await sweepScenarios(
+      [
+        { name: 'income', config: { contributionMeasure: 'income' } },
+        {
+          name: 'income+cap',
+          config: { contributionMeasure: 'income', maxConcentration: 0.4 },
+        },
+      ],
+      population,
+      budgets(),
+      4
+    );
+
+    const uncapped = outcomes.find((o) => o.name === 'income')!;
+    const capped = outcomes.find((o) => o.name === 'income+cap')!;
+
+    // The cap guardrail visibly reduces concentration...
+    expect(capped.topShare).toBeLessThan(uncapped.topShare);
+    expect(capped.topShare).toBeLessThanOrEqual(0.4 + 0.02);
+    // ...and it also lowers overall inequality, while D12 still holds.
+    expect(capped.gini).toBeLessThan(uncapped.gini);
+    expect(capped.minShare).toBeGreaterThan(0);
+  });
 });
