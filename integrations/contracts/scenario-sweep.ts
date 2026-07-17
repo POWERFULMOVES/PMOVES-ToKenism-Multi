@@ -25,8 +25,12 @@ export interface ScenarioOutcome {
   gini: number;
   /** Top holder's share of all distributed GroToken (concentration). */
   topShare: number;
-  /** Smallest non-zero holder's share — a live check that D12 held (must be > 0). */
-  minNonZeroShare: number;
+  /**
+   * Smallest holder's share across ALL holders — a live D12 check: it is > 0
+   * only if every participant kept non-zero standing, and drops to 0 the moment
+   * any holder is zeroed out (a real D12 violation), so the check can actually fail.
+   */
+  minShare: number;
   /** Total GroToken distributed over the run. */
   totalDistributed: number;
 }
@@ -71,15 +75,17 @@ export async function sweepScenarios(
       .getModels()
       .groToken.getHolders()
       .map((holder) => holder.balance);
+    // reduce-based max/min (spreading the whole array overflows the stack at large N)
     const total = balances.reduce((sum, b) => sum + b, 0);
-    const nonZero = balances.filter((b) => b > 0);
+    const maxBal = balances.reduce((m, b) => (b > m ? b : m), 0);
+    const minBal = balances.reduce((m, b) => (b < m ? b : m), Infinity);
 
     outcomes.push({
       name: scenario.name,
       gini: gini(balances),
-      topShare: total > 0 ? Math.max(0, ...balances) / total : 0,
-      minNonZeroShare:
-        total > 0 && nonZero.length > 0 ? Math.min(...nonZero) / total : 0,
+      topShare: total > 0 ? maxBal / total : 0,
+      // min over ALL holders → 0 if anyone was zeroed (catches a real D12 violation).
+      minShare: total > 0 && balances.length > 0 ? minBal / total : 0,
       totalDistributed: total,
     });
   }

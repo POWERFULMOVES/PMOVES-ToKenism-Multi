@@ -33,9 +33,9 @@ describe('sweepScenarios', () => {
     expect(income.gini).toBeGreaterThan(flat.gini);
     // Flat distributes equally → near-zero inequality.
     expect(flat.gini).toBeCloseTo(0, 2);
-    // D12 holds under both: every participant keeps non-zero standing.
-    expect(flat.minNonZeroShare).toBeGreaterThan(0);
-    expect(income.minNonZeroShare).toBeGreaterThan(0);
+    // D12 holds under both: min over ALL holders is > 0 (would be 0 if anyone zeroed).
+    expect(flat.minShare).toBeGreaterThan(0);
+    expect(income.minShare).toBeGreaterThan(0);
     // Concentration (top holder's share) is higher under income-weighting.
     expect(income.topShare).toBeGreaterThan(flat.topShare);
   });
