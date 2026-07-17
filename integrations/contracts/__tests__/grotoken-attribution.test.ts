@@ -88,4 +88,37 @@ describe('GroTokenDistribution.distributeByAttribution', () => {
       expect(run()).toEqual(run());
     });
   });
+
+  // Guards found in review: unknown-holder mint + multi-category over-mint.
+  describe('guards', () => {
+    it('skips an attribution address that is not a holder (no mint into the void)', () => {
+      const attribution = [
+        { address: '0xALICE', weight: 0.75 },
+        { address: '0xGHOST', weight: 0.25 }, // never initialized
+      ];
+      const groToken = new GroTokenDistribution();
+      groToken.initializeHolders(['0xALICE']); // ghost is NOT a holder
+
+      const events = groToken.distributeByAttribution(attribution, 100, 1);
+
+      expect(groToken.balanceOf('0xGHOST')).toBe(0);
+      expect(events.find((e) => e.recipient === '0xGHOST')).toBeUndefined();
+      // Supply must equal the sum of real balances — no tokens minted into the void.
+      expect(groToken.totalSupply()).toBeCloseTo(groToken.balanceOf('0xALICE'), 6);
+    });
+
+    it('rejects attribution whose weights do not sum to ~1 (guards multi-category over-mint)', () => {
+      // Two single-category distributions (each Σ=1) concatenated → Σ=2 would mint 2× pool.
+      const attribution = [
+        { address: '0xALICE', weight: 1.0 },
+        { address: '0xBOB', weight: 1.0 },
+      ];
+      const groToken = new GroTokenDistribution();
+      groToken.initializeHolders(['0xALICE', '0xBOB']);
+
+      expect(() => groToken.distributeByAttribution(attribution, 100, 1)).toThrow(
+        /normali|sum|weight/i
+      );
+    });
+  });
 });

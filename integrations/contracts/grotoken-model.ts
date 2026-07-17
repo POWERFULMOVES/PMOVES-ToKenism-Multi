@@ -157,8 +157,31 @@ export class GroTokenDistribution {
     weeklyPool: number,
     week: number
   ): DistributionEvent[] {
+    // Contract: `attribution` is a SINGLE normalized distribution (Σweight ≈ 1),
+    // e.g. DirichletWeights.getExpectedAttribution(category) for ONE category.
+    // A concatenation of N categories (each summing to 1) would mint N× the pool,
+    // so reject anything that is not normalized rather than over-mint silently.
+    const totalWeight = attribution.reduce((sum, a) => sum + a.weight, 0);
+    if (Math.abs(totalWeight - 1) > 1e-6) {
+      throw new Error(
+        `distributeByAttribution expects a single normalized attribution ` +
+          `(Σweight ≈ 1); got ${totalWeight}. Pass one category's weights.`
+      );
+    }
+
     const events: DistributionEvent[] = [];
     for (const { address, weight } of attribution) {
+      const holder = this.holders.get(address);
+      if (!holder) {
+        // Only initialized holders can be credited. Never inflate supply for an
+        // unknown address — that would mint tokens no balance ever receives and
+        // break the currentSupply === Σ(holder.balance) invariant.
+        console.warn(
+          `[GroToken] attribution address ${address} is not a holder — skipping`
+        );
+        continue;
+      }
+
       const amount = weight * weeklyPool;
 
       // Respect max supply (same constraint as distributeWeekly).
@@ -169,12 +192,9 @@ export class GroTokenDistribution {
         continue;
       }
 
-      const holder = this.holders.get(address);
-      if (holder) {
-        holder.balance += amount;
-        holder.totalReceived += amount;
-        holder.lastDistributionWeek = week;
-      }
+      holder.balance += amount;
+      holder.totalReceived += amount;
+      holder.lastDistributionWeek = week;
       this.currentSupply += amount;
 
       const event: DistributionEvent = {
