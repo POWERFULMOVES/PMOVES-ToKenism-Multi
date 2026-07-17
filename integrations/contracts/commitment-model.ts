@@ -54,8 +54,19 @@ export class CommitmentModel {
     if (params.parties.length === 0) {
       throw new Error('Commitment needs at least one party');
     }
-    if (params.parties.some((p) => p.share <= 0)) {
-      throw new Error('Every party must have a positive agreed share');
+    // `!(share > 0)` rejects <=0 AND NaN; the finite check rejects Infinity — a
+    // NaN/Infinity share would poison the whole Dirichlet category (alpha = NaN).
+    if (params.parties.some((p) => !Number.isFinite(p.share) || p.share <= 0)) {
+      throw new Error('Every party must have a finite positive agreed share');
+    }
+    // No duplicate addresses: a party listed twice would accrue the summed alpha
+    // in DirichletWeights while appearing as one keep — an attribution-gaming vector.
+    const seen = new Set<string>();
+    for (const p of params.parties) {
+      if (seen.has(p.address)) {
+        throw new Error(`Duplicate party address in commitment: ${p.address}`);
+      }
+      seen.add(p.address);
     }
     const id = this.nextId++;
     this.commitments.set(id, { id, ...params, state: 'agreed' });
@@ -66,7 +77,7 @@ export class CommitmentModel {
    * Mark a commitment kept. Attribution accrues to each party proportional to
    * the share agreed at creation.
    */
-  markKept(id: number, week: number, now: number): AttributionRecord[] {
+  markKept(id: number, now: number): AttributionRecord[] {
     const commitment = this.commitments.get(id);
     if (!commitment) {
       throw new Error(`Commitment ${id} not found`);
@@ -87,7 +98,7 @@ export class CommitmentModel {
       address: party.address,
       amount: party.share,
       category: commitment.category,
-      week,
+      week: commitment.week,
     }));
   }
 }

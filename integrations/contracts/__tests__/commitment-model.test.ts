@@ -26,7 +26,7 @@ describe('CommitmentModel', () => {
     });
 
     // Kept on time (now <= deadline).
-    const records = commitments.markKept(id, 1, 1000);
+    const records = commitments.markKept(id, 1000);
 
     const alice = records.find((r) => r.address === '0xALICE')!;
     const bob = records.find((r) => r.address === '0xBOB')!;
@@ -45,7 +45,7 @@ describe('CommitmentModel', () => {
     });
 
     // now (1000) is past the deadline (500) — the commitment was not kept in time.
-    expect(() => commitments.markKept(id, 1, 1000)).toThrow(/deadline/i);
+    expect(() => commitments.markKept(id, 1000)).toThrow(/deadline/i);
   });
 
   it('rejects a commitment with no parties or a non-positive share', () => {
@@ -58,6 +58,34 @@ describe('CommitmentModel', () => {
     ).toThrow();
   });
 
+  it('rejects a NaN or Infinity share (would poison the whole attribution category)', () => {
+    const commitments = new CommitmentModel();
+    const base = { deliverable: 'x', category: 'popup', deadline: 1000, week: 1 };
+
+    expect(() =>
+      commitments.createCommitment({ ...base, parties: [{ address: '0xA', share: NaN }] })
+    ).toThrow();
+    expect(() =>
+      commitments.createCommitment({ ...base, parties: [{ address: '0xA', share: Infinity }] })
+    ).toThrow();
+  });
+
+  it('rejects duplicate party addresses in one commitment (anti-gaming)', () => {
+    const commitments = new CommitmentModel();
+    expect(() =>
+      commitments.createCommitment({
+        deliverable: 'x',
+        parties: [
+          { address: '0xA', share: 1 },
+          { address: '0xA', share: 2 },
+        ],
+        category: 'popup',
+        deadline: 1000,
+        week: 1,
+      })
+    ).toThrow(/duplicate/i);
+  });
+
   it('cannot be kept twice (no double credit)', () => {
     const commitments = new CommitmentModel();
     const id = commitments.createCommitment({
@@ -68,8 +96,25 @@ describe('CommitmentModel', () => {
       week: 1,
     });
 
-    commitments.markKept(id, 1, 1000);
-    expect(() => commitments.markKept(id, 1, 1000)).toThrow(/already|kept/i);
+    commitments.markKept(id, 1000);
+    expect(() => commitments.markKept(id, 1000)).toThrow(/already|kept/i);
+  });
+
+  it('attributes at the commitment agreed week (no caller-supplied week to decouple)', () => {
+    const commitments = new CommitmentModel();
+    const id = commitments.createCommitment({
+      deliverable: 'x',
+      parties: [{ address: '0xA', share: 1 }],
+      category: 'popup',
+      deadline: 2000,
+      week: 7,
+    });
+
+    const records = commitments.markKept(id, 1000);
+
+    // Attribution belongs to the week the commitment was agreed, not to anything
+    // the caller could pass in independently.
+    expect(records[0].week).toBe(7);
   });
 
   // Integration: the kept commitment IS the contribution source that feeds
@@ -86,7 +131,7 @@ describe('CommitmentModel', () => {
       deadline: 2000,
       week: 1,
     });
-    const records = commitments.markKept(id, 1, 1000);
+    const records = commitments.markKept(id, 1000);
 
     const dirichlet = new DirichletWeights();
     for (const r of records) dirichlet.addContribution(r.address, r.amount, r.category, r.week);
