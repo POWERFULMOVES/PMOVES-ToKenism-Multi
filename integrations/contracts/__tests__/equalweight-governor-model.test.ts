@@ -2,6 +2,7 @@
 import {
   EqualWeightGovernorModel,
   MockThresholdSigner,
+  assertCommitteeThreshold,
 } from '../equalweight-governor-model';
 
 describe('EqualWeightGovernorModel', () => {
@@ -186,6 +187,26 @@ describe('EqualWeightGovernorModel', () => {
       expect(() =>
         signer.sign(tally, ['0xC1', '0xC1'], ['0xC1', '0xC2', '0xC3'], 2)
       ).toThrow(/threshold/i);
+    });
+  });
+
+  describe('assertCommitteeThreshold (shared M-of-N gate)', () => {
+    const committee = ['0xC1', '0xC2', '0xC3'];
+
+    it('returns the deduped approvers when threshold is met', () => {
+      expect(assertCommitteeThreshold(['0xC1', '0xC2'], committee, 2).sort()).toEqual(['0xC1', '0xC2']);
+    });
+
+    it('throws below threshold', () => {
+      expect(() => assertCommitteeThreshold(['0xC1'], committee, 2)).toThrow(/threshold/i);
+    });
+
+    it('dedupes a repeated approver (counts once)', () => {
+      expect(() => assertCommitteeThreshold(['0xC1', '0xC1'], committee, 2)).toThrow(/threshold/i);
+    });
+
+    it('rejects an approver not on the committee', () => {
+      expect(() => assertCommitteeThreshold(['0xC1', '0xSTRANGER'], committee, 2)).toThrow(/committee/i);
     });
   });
 });

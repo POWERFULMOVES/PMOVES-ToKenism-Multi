@@ -31,7 +31,8 @@ export interface TallyResult {
 export interface TallyAttestation {
   algo: string;
   approvers: string[];
-  signature: string;
+  signature?: string;
+  signatures?: Record<string, string>;
 }
 
 export interface TallySigner {
@@ -43,6 +44,26 @@ export interface TallySigner {
   ): TallyAttestation;
 }
 
+// Shared anti-forgery gate: dedupe approvers, require all on the committee,
+// require >= threshold DISTINCT approvers. One definition, used by the mock
+// and by the real Ed25519 signer.
+export function assertCommitteeThreshold(
+  approvers: string[],
+  committee: string[],
+  threshold: number
+): string[] {
+  const unique = Array.from(new Set(approvers));
+  for (const a of unique) {
+    if (!committee.includes(a)) {
+      throw new Error(`Approver ${a} is not on the committee`);
+    }
+  }
+  if (unique.length < threshold) {
+    throw new Error(`Below committee threshold: ${unique.length} approvers < ${threshold}`);
+  }
+  return unique;
+}
+
 // Sim stub: models the k-of-n GATE (the anti-forgery property); the signature
 // bytes are stubbed. Real Ed25519/FROST implements this same interface later.
 export class MockThresholdSigner implements TallySigner {
@@ -52,17 +73,7 @@ export class MockThresholdSigner implements TallySigner {
     committee: string[],
     threshold: number
   ): TallyAttestation {
-    const unique = Array.from(new Set(approvers));
-    for (const a of unique) {
-      if (!committee.includes(a)) {
-        throw new Error(`Approver ${a} is not on the committee`);
-      }
-    }
-    if (unique.length < threshold) {
-      throw new Error(
-        `Below committee threshold: ${unique.length} approvers < ${threshold}`
-      );
-    }
+    const unique = assertCommitteeThreshold(approvers, committee, threshold);
     return { algo: 'stub-mofn', approvers: unique, signature: `stub:${tally.proposalId}` };
   }
 }
