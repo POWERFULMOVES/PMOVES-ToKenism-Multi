@@ -46,6 +46,14 @@ export function tallyPreimage(tally: TallyResult): Buffer {
     tally.quorumMet ? '1' : '0',
     tally.passed ? '1' : '0',
   ];
+  // Backward-compatible provenance binding: only when a ballotRef is present do we
+  // append its sentinel + fields. A tally without ballotRef yields byte-identical
+  // output to before, so existing signatures/tests still hold; because the
+  // signature covers the whole byte string, a ballotRef cannot be stripped from a
+  // signed tally and still verify.
+  if (tally.ballotRef) {
+    fields.push('ballotref.v1', tally.ballotRef.ballotId, tally.ballotRef.receiptLogDigest);
+  }
   return Buffer.concat(fields.map(ns));
 }
 

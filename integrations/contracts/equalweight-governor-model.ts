@@ -1,4 +1,6 @@
 // contracts/equalweight-governor-model.ts
+import { AbstentionPolicy, BallotRef, SecretTallyCounts, computeSecretOutcome } from './mode-a-tally';
+
 export type VotingBasis = 'member' | 'unit' | 'share';
 
 export interface EligibleMember {
@@ -8,6 +10,7 @@ export interface EligibleMember {
 }
 
 export interface EqualWeightGovernorConfig {
+  abstentionPolicy: AbstentionPolicy;
   votingBasis: VotingBasis;
   quorumPercentage: number;
   passThreshold: number;
@@ -26,6 +29,7 @@ export interface TallyResult {
   passed: boolean;
   finalized: boolean;
   attestation?: TallyAttestation;
+  ballotRef?: BallotRef;
 }
 
 export interface TallyAttestation {
@@ -86,6 +90,8 @@ interface Proposal {
   title: string;
   closesAtWeek?: number;
   votes: Map<string, boolean>; // voter -> support
+  mode?: 'named' | 'secret';       // set on first intake; locks the proposal to one path
+  ingestedTally?: TallyResult;     // secret proposals: the precomputed result tally() returns
 }
 
 export class EqualWeightGovernorModel {
@@ -100,6 +106,7 @@ export class EqualWeightGovernorModel {
     signer: TallySigner = new MockThresholdSigner()
   ) {
     this.config = {
+      abstentionPolicy: 'quorum',
       votingBasis: 'member',
       quorumPercentage: 0.5,
       passThreshold: 0.5,
@@ -122,6 +129,10 @@ export class EqualWeightGovernorModel {
 
   setCommittee(memberIds: string[]): void {
     this.committee = new Set(memberIds);
+  }
+
+  private cloneTally(t: TallyResult): TallyResult {
+    return { ...t, ...(t.ballotRef ? { ballotRef: { ...t.ballotRef } } : {}) };
   }
 
   finalize(proposalId: string, approvers: string[]): TallyResult {
@@ -162,18 +173,59 @@ export class EqualWeightGovernorModel {
   castVote(proposalId: string, voter: string, support: boolean): void {
     const proposal = this.proposals.get(proposalId);
     if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
+    if (proposal.mode === 'secret') {
+      throw new Error(`Proposal ${proposalId} is in secret mode; named castVote is not allowed`);
+    }
     if (!this.roll.has(voter)) {
       throw new Error(`${voter} is not on the eligible roll`);
     }
     if (proposal.votes.has(voter)) {
       throw new Error(`${voter} has already voted on ${proposalId}`);
     }
+    // lock on first SUCCESSFUL named vote — a rejected attempt does not lock the mode
+    proposal.mode = 'named';
     proposal.votes.set(voter, support);
+  }
+
+  ingestSecretTally(proposalId: string, counts: SecretTallyCounts): TallyResult {
+    const proposal = this.proposals.get(proposalId);
+    if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
+    if (proposal.mode === 'named') {
+      throw new Error(`Proposal ${proposalId} is in named mode; secret ingestion is not allowed`);
+    }
+    const outcome = computeSecretOutcome(
+      { votesFor: counts.votesFor, votesAgainst: counts.votesAgainst, abstentions: counts.abstentions },
+      this.roll.size,
+      {
+        abstentionPolicy: this.config.abstentionPolicy,
+        quorumPercentage: this.config.quorumPercentage,
+        passThreshold: this.config.passThreshold,
+      }
+    );
+    const result: TallyResult = {
+      proposalId,
+      votesFor: outcome.votesFor,
+      votesAgainst: outcome.votesAgainst,
+      eligibleCount: outcome.eligibleCount,
+      voterCount: outcome.voterCount,
+      turnout: outcome.turnout,
+      quorumMet: outcome.quorumMet,
+      passed: outcome.passed,
+      finalized: false,
+      ...(counts.ballotRef ? { ballotRef: { ...counts.ballotRef } } : {}),
+    };
+    // lock on first SUCCESSFUL ingest — a rejected attempt does not lock the mode
+    proposal.mode = 'secret';
+    proposal.ingestedTally = result;
+    return this.cloneTally(result);
   }
 
   tally(proposalId: string): TallyResult {
     const proposal = this.proposals.get(proposalId);
     if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
+    if (proposal.mode === 'secret' && proposal.ingestedTally) {
+      return this.cloneTally(proposal.ingestedTally);
+    }
 
     let votesFor = 0;
     let votesAgainst = 0;
