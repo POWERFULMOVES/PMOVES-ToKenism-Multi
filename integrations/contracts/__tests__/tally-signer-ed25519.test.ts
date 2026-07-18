@@ -206,6 +206,13 @@ describe('verifyTallyAttestation', () => {
     expect(res.valid).toBe(false);
     expect(res.reason).toMatch(/invalid signature/i);
   });
+
+  it('rejects a non-positive threshold (fail-closed against misconfiguration)', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    const res = verifyTallyAttestation(baseTally(), att, pubKeyring(keyring), 0);
+    expect(res.valid).toBe(false);
+    expect(res.reason).toMatch(/threshold/i);
+  });
 });
 
 describe('integration: governor.finalize() with the real signer', () => {

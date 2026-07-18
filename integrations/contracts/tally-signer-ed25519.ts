@@ -26,9 +26,15 @@ function ns(s: string): Buffer {
   return Buffer.concat([Buffer.from(`${body.length}:`, 'utf8'), body, Buffer.from(',', 'utf8')]);
 }
 
-// Canonical signed bytes: domain tag + INTEGER/BOOLEAN result fields only.
-// turnout/forShare are derived floats and are deliberately excluded — floats
-// serialize non-deterministically and would break verification.
+// Canonical signed bytes: encodes the domain tag + result fields: proposalId,
+// the four vote/eligibility counts, and the quorumMet/passed booleans. Counts
+// are integers under member-basis (the contested-ballot case); under
+// share/unit basis they may be fractional but verification still reconciles
+// because signer and verifier serialize the same transmitted value with
+// String(). turnout/forShare are excluded (derived floats). NOTE: this binds
+// the transmitted numeric value, not a recomputation — a consumer that
+// RE-TALLIES on another platform under a weighted basis must use a
+// scaled-integer representation instead.
 export function tallyPreimage(tally: TallyResult): Buffer {
   const fields = [
     TALLY_DOMAIN,
@@ -98,13 +104,18 @@ export interface VerifyResult {
 // governor. An AG/bank runs this with the published committee public keys.
 // Requires EVERY listed signature to verify AND at least `threshold` distinct
 // committee signers. Any unknown id, bad signature, or short count => invalid,
-// with a reason (informing, not just a boolean).
+// with a reason (informing, not just a boolean). Consumers should recompute
+// `turnout` from the verified counts rather than trusting the transmitted
+// float — it is excluded from the signed bytes by design.
 export function verifyTallyAttestation(
   tally: TallyResult,
   attestation: TallyAttestation,
   publicKeyring: Record<string, string>,
   threshold: number
 ): VerifyResult {
+  if (threshold < 1) {
+    return { valid: false, signers: [], reason: `invalid threshold: ${threshold} < 1` };
+  }
   const sigs = attestation.signatures;
   if (!sigs || Object.keys(sigs).length === 0) {
     return { valid: false, signers: [], reason: 'no signatures present' };
