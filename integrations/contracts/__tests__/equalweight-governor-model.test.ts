@@ -33,4 +33,28 @@ describe('EqualWeightGovernorModel', () => {
     gov.castVote('p1', '0xA', true);
     expect(() => gov.castVote('p1', '0xA', false)).toThrow(/already voted/i);
   });
+
+  it('member basis ignores shares; share basis lets a whale dominate', () => {
+    const roll = [{ id: '0xWHALE', shares: 1000 }, { id: '0xA' }, { id: '0xB' }];
+
+    const byMember = new EqualWeightGovernorModel({ votingBasis: 'member' });
+    byMember.setRoll(roll);
+    byMember.createProposal('p', 'x');
+    byMember.castVote('p', '0xWHALE', true);
+    byMember.castVote('p', '0xA', false);
+    byMember.castVote('p', '0xB', false);
+    const m = byMember.tally('p');
+    expect(m.votesFor).toBe(1); // whale counts as one member
+    expect(m.votesAgainst).toBe(2);
+
+    const byShare = new EqualWeightGovernorModel({ votingBasis: 'share' });
+    byShare.setRoll(roll);
+    byShare.createProposal('p', 'x');
+    byShare.castVote('p', '0xWHALE', true);
+    byShare.castVote('p', '0xA', false);
+    byShare.castVote('p', '0xB', false);
+    const s = byShare.tally('p');
+    expect(s.votesFor).toBe(1000); // plutocratic: whale dominates
+    expect(s.votesAgainst).toBe(2);
+  });
 });
