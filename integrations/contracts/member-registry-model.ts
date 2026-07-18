@@ -2,10 +2,7 @@
 import { EligibleMember } from './equalweight-governor-model';
 
 export interface MemberRegistryConfig {
-  // NOTE: `committeeSize` is only a constructor-time bound-check input for `committeeThreshold`
-  // (see the constructor: threshold must be <= this value). It does NOT constrain the actual
-  // committee membership installed later via `setCommittee` — that set's size can differ from
-  // (and is not validated against) `committeeSize`.
+  // The trusted-genesis committee must contain exactly this many distinct ids.
   committeeSize: number;
   committeeThreshold: number;
 }
@@ -24,8 +21,11 @@ export class MemberRegistryModel {
 
   constructor(config: Partial<MemberRegistryConfig> = {}) {
     this.config = { committeeSize: 3, committeeThreshold: 2, ...config };
-    if (this.config.committeeThreshold < 1) {
-      throw new Error('committeeThreshold must be >= 1');
+    if (!Number.isSafeInteger(this.config.committeeSize) || this.config.committeeSize < 2) {
+      throw new Error('committeeSize must be an integer >= 2');
+    }
+    if (!Number.isSafeInteger(this.config.committeeThreshold) || this.config.committeeThreshold < 2) {
+      throw new Error('committeeThreshold must be an integer >= 2');
     }
     if (this.config.committeeThreshold > this.config.committeeSize) {
       throw new Error('committeeThreshold must be <= committeeSize');
@@ -38,6 +38,12 @@ export class MemberRegistryModel {
   // Runtime committee rotation (adding/removing committee members under M-of-N approval of the
   // existing committee) is a later arc stage and is intentionally out of scope here.
   setCommittee(ids: string[]): void {
+    if (ids.length !== this.config.committeeSize) {
+      throw new Error(`committee must contain exactly ${this.config.committeeSize} members`);
+    }
+    if (new Set(ids).size !== ids.length) {
+      throw new Error('committee contains duplicate member ids');
+    }
     this.committee = new Set(ids);
   }
 
@@ -49,9 +55,7 @@ export class MemberRegistryModel {
       }
     }
     if (unique.length < this.config.committeeThreshold) {
-      throw new Error(
-        `Below committee threshold: ${unique.length} approvers < ${this.config.committeeThreshold}`
-      );
+      throw new Error(`Below committee threshold: ${unique.length} approvers < ${this.config.committeeThreshold}`);
     }
     return unique;
   }
@@ -67,7 +71,7 @@ export class MemberRegistryModel {
       member: { ...member },
       status: 'active',
       approvers: unique,
-      signature: `stub-mofn:${member.id}`,
+      signature: `stub-mofn:${member.id}`
     };
     this.members.set(member.id, credential);
     return credential;

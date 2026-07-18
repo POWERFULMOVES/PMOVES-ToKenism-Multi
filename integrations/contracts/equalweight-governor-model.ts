@@ -40,28 +40,26 @@ export interface TallyAttestation {
 }
 
 export interface TallySigner {
-  sign(
-    tally: TallyResult,
-    approvers: string[],
-    committee: string[],
-    threshold: number
-  ): TallyAttestation;
+  sign(tally: TallyResult, approvers: string[], committee: string[], threshold: number): TallyAttestation;
 }
 
 // Shared anti-forgery gate: dedupe approvers, require all on the committee,
 // require >= threshold DISTINCT approvers. One definition, used by the mock
 // and by the real Ed25519 signer.
-export function assertCommitteeThreshold(
-  approvers: string[],
-  committee: string[],
-  threshold: number
-): string[] {
-  if (!Number.isSafeInteger(threshold) || threshold < 1) {
+export function assertCommitteeThreshold(approvers: string[], committee: string[], threshold: number): string[] {
+  if (!Number.isSafeInteger(threshold) || threshold < 2) {
     throw new Error(`invalid threshold: ${threshold}`);
+  }
+  const uniqueCommittee = new Set(committee);
+  if (uniqueCommittee.size !== committee.length) {
+    throw new Error('committee contains duplicate member ids');
+  }
+  if (uniqueCommittee.size < threshold) {
+    throw new Error(`committee size ${uniqueCommittee.size} is below threshold ${threshold}`);
   }
   const unique = Array.from(new Set(approvers));
   for (const a of unique) {
-    if (!committee.includes(a)) {
+    if (!uniqueCommittee.has(a)) {
       throw new Error(`Approver ${a} is not on the committee`);
     }
   }
@@ -74,14 +72,13 @@ export function assertCommitteeThreshold(
 // Sim stub: models the k-of-n GATE (the anti-forgery property); the signature
 // bytes are stubbed. Real Ed25519/FROST implements this same interface later.
 export class MockThresholdSigner implements TallySigner {
-  sign(
-    tally: TallyResult,
-    approvers: string[],
-    committee: string[],
-    threshold: number
-  ): TallyAttestation {
+  sign(tally: TallyResult, approvers: string[], committee: string[], threshold: number): TallyAttestation {
     const unique = assertCommitteeThreshold(approvers, committee, threshold);
-    return { algo: 'stub-mofn', approvers: unique, signature: `stub:${tally.proposalId}` };
+    return {
+      algo: 'stub-mofn',
+      approvers: unique,
+      signature: `stub:${tally.proposalId}`
+    };
   }
 }
 
@@ -89,9 +86,11 @@ interface Proposal {
   id: string;
   title: string;
   closesAtWeek?: number;
+  roll: Map<string, EligibleMember>;
   votes: Map<string, boolean>; // voter -> support
-  mode?: 'named' | 'secret';       // set on first intake; locks the proposal to one path
-  ingestedTally?: TallyResult;     // secret proposals: the precomputed result tally() returns
+  mode?: 'named' | 'secret'; // set on first intake; locks the proposal to one path
+  ingestedTally?: TallyResult; // secret proposals: the precomputed result tally() returns
+  finalizedTally?: TallyResult;
 }
 
 export class EqualWeightGovernorModel {
@@ -101,10 +100,7 @@ export class EqualWeightGovernorModel {
   private committee: Set<string> = new Set();
   private signer: TallySigner;
 
-  constructor(
-    config: Partial<EqualWeightGovernorConfig> = {},
-    signer: TallySigner = new MockThresholdSigner()
-  ) {
+  constructor(config: Partial<EqualWeightGovernorConfig> = {}, signer: TallySigner = new MockThresholdSigner()) {
     this.config = {
       abstentionPolicy: 'quorum',
       votingBasis: 'member',
@@ -112,12 +108,23 @@ export class EqualWeightGovernorModel {
       passThreshold: 0.5,
       committeeSize: 3,
       committeeThreshold: 2,
-      ...config,
+      ...config
     };
-    if (this.config.committeeThreshold < 1) {
-      throw new Error(
-        `committeeThreshold must be >= 1 (got ${this.config.committeeThreshold})`
-      );
+    if (
+      !Number.isFinite(this.config.quorumPercentage) ||
+      this.config.quorumPercentage < 0 ||
+      this.config.quorumPercentage > 1
+    ) {
+      throw new Error(`quorumPercentage must be between 0 and 1 (got ${this.config.quorumPercentage})`);
+    }
+    if (!Number.isFinite(this.config.passThreshold) || this.config.passThreshold < 0 || this.config.passThreshold > 1) {
+      throw new Error(`passThreshold must be between 0 and 1 (got ${this.config.passThreshold})`);
+    }
+    if (!Number.isSafeInteger(this.config.committeeSize) || this.config.committeeSize < 2) {
+      throw new Error(`committeeSize must be an integer >= 2 (got ${this.config.committeeSize})`);
+    }
+    if (!Number.isSafeInteger(this.config.committeeThreshold) || this.config.committeeThreshold < 2) {
+      throw new Error(`committeeThreshold must be an integer >= 2 (got ${this.config.committeeThreshold})`);
     }
     if (this.config.committeeThreshold > this.config.committeeSize) {
       throw new Error(
@@ -128,30 +135,62 @@ export class EqualWeightGovernorModel {
   }
 
   setCommittee(memberIds: string[]): void {
+    if (memberIds.length !== this.config.committeeSize) {
+      throw new Error(`committee must contain exactly ${this.config.committeeSize} members (got ${memberIds.length})`);
+    }
+    if (new Set(memberIds).size !== memberIds.length) {
+      throw new Error('committee contains duplicate member ids');
+    }
     this.committee = new Set(memberIds);
   }
 
   private cloneTally(t: TallyResult): TallyResult {
-    return { ...t, ...(t.ballotRef ? { ballotRef: { ...t.ballotRef } } : {}) };
+    return {
+      ...t,
+      ...(t.ballotRef ? { ballotRef: { ...t.ballotRef } } : {}),
+      ...(t.attestation
+        ? {
+            attestation: {
+              ...t.attestation,
+              approvers: [...t.attestation.approvers],
+              ...(t.attestation.signatures ? { signatures: { ...t.attestation.signatures } } : {})
+            }
+          }
+        : {})
+    };
   }
 
   finalize(proposalId: string, approvers: string[]): TallyResult {
+    const proposal = this.proposals.get(proposalId);
+    if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
+    if (proposal.finalizedTally) return this.cloneTally(proposal.finalizedTally);
+
     const result = this.tally(proposalId);
-    const attestation = this.signer.sign(
-      result,
-      approvers,
-      Array.from(this.committee),
-      this.config.committeeThreshold
-    );
-    return { ...result, finalized: true, attestation };
+    const attestation = this.signer.sign(result, approvers, Array.from(this.committee), this.config.committeeThreshold);
+    proposal.finalizedTally = this.cloneTally({
+      ...result,
+      finalized: true,
+      attestation
+    });
+    return this.cloneTally(proposal.finalizedTally);
   }
 
   setRoll(members: EligibleMember[]): void {
-    this.roll = new Map(members.map((m) => [m.id, m]));
+    if (new Set(members.map((m) => m.id)).size !== members.length) {
+      throw new Error('eligible roll contains duplicate member ids');
+    }
+    this.roll = new Map(members.map((m) => [m.id, { ...m }]));
   }
 
   createProposal(id: string, title: string, closesAtWeek?: number): void {
-    this.proposals.set(id, { id, title, closesAtWeek, votes: new Map() });
+    if (this.proposals.has(id)) {
+      throw new Error(`Proposal ${id} already exists`);
+    }
+    if (closesAtWeek !== undefined && (!Number.isSafeInteger(closesAtWeek) || closesAtWeek < 0)) {
+      throw new Error(`closesAtWeek must be a non-negative safe integer (got ${closesAtWeek})`);
+    }
+    const roll = new Map(Array.from(this.roll, ([memberId, member]) => [memberId, { ...member }]));
+    this.proposals.set(id, { id, title, closesAtWeek, roll, votes: new Map() });
   }
 
   private weightOf(member: EligibleMember): number {
@@ -170,13 +209,24 @@ export class EqualWeightGovernorModel {
     return Number.isFinite(raw) && raw >= 0 ? raw : 0;
   }
 
-  castVote(proposalId: string, voter: string, support: boolean): void {
+  castVote(proposalId: string, voter: string, support: boolean, currentWeek?: number): void {
     const proposal = this.proposals.get(proposalId);
     if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
+    if (proposal.finalizedTally) {
+      throw new Error(`Proposal ${proposalId} is finalized`);
+    }
+    if (proposal.closesAtWeek !== undefined) {
+      if (currentWeek === undefined || !Number.isSafeInteger(currentWeek) || currentWeek < 0) {
+        throw new Error(`A non-negative currentWeek is required for proposal ${proposalId}`);
+      }
+      if (currentWeek > proposal.closesAtWeek) {
+        throw new Error(`Proposal ${proposalId} closed at week ${proposal.closesAtWeek}`);
+      }
+    }
     if (proposal.mode === 'secret') {
       throw new Error(`Proposal ${proposalId} is in secret mode; named castVote is not allowed`);
     }
-    if (!this.roll.has(voter)) {
+    if (!proposal.roll.has(voter)) {
       throw new Error(`${voter} is not on the eligible roll`);
     }
     if (proposal.votes.has(voter)) {
@@ -187,19 +237,34 @@ export class EqualWeightGovernorModel {
     proposal.votes.set(voter, support);
   }
 
-  ingestSecretTally(proposalId: string, counts: SecretTallyCounts): TallyResult {
+  ingestSecretTally(proposalId: string, counts: SecretTallyCounts, currentWeek?: number): TallyResult {
     const proposal = this.proposals.get(proposalId);
     if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
+    if (proposal.finalizedTally) {
+      throw new Error(`Proposal ${proposalId} is finalized`);
+    }
+    if (proposal.closesAtWeek !== undefined) {
+      if (currentWeek === undefined || !Number.isSafeInteger(currentWeek) || currentWeek < 0) {
+        throw new Error(`A non-negative currentWeek is required for proposal ${proposalId}`);
+      }
+      if (currentWeek <= proposal.closesAtWeek) {
+        throw new Error(`Proposal ${proposalId} remains open through week ${proposal.closesAtWeek}`);
+      }
+    }
     if (proposal.mode === 'named') {
       throw new Error(`Proposal ${proposalId} is in named mode; secret ingestion is not allowed`);
     }
     const outcome = computeSecretOutcome(
-      { votesFor: counts.votesFor, votesAgainst: counts.votesAgainst, abstentions: counts.abstentions },
-      this.roll.size,
+      {
+        votesFor: counts.votesFor,
+        votesAgainst: counts.votesAgainst,
+        abstentions: counts.abstentions
+      },
+      proposal.roll.size,
       {
         abstentionPolicy: this.config.abstentionPolicy,
         quorumPercentage: this.config.quorumPercentage,
-        passThreshold: this.config.passThreshold,
+        passThreshold: this.config.passThreshold
       }
     );
     const result: TallyResult = {
@@ -212,7 +277,7 @@ export class EqualWeightGovernorModel {
       quorumMet: outcome.quorumMet,
       passed: outcome.passed,
       finalized: false,
-      ...(counts.ballotRef ? { ballotRef: { ...counts.ballotRef } } : {}),
+      ...(counts.ballotRef ? { ballotRef: { ...counts.ballotRef } } : {})
     };
     // lock on first SUCCESSFUL ingest — a rejected attempt does not lock the mode
     proposal.mode = 'secret';
@@ -223,6 +288,9 @@ export class EqualWeightGovernorModel {
   tally(proposalId: string): TallyResult {
     const proposal = this.proposals.get(proposalId);
     if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
+    if (proposal.finalizedTally) {
+      return this.cloneTally(proposal.finalizedTally);
+    }
     if (proposal.mode === 'secret' && proposal.ingestedTally) {
       return this.cloneTally(proposal.ingestedTally);
     }
@@ -231,7 +299,7 @@ export class EqualWeightGovernorModel {
     let votesAgainst = 0;
     let voterCount = 0;
     for (const [voter, support] of proposal.votes) {
-      const member = this.roll.get(voter);
+      const member = proposal.roll.get(voter);
       if (!member) continue;
       voterCount += 1;
       const w = this.weightOf(member);
@@ -239,7 +307,7 @@ export class EqualWeightGovernorModel {
       else votesAgainst += w;
     }
 
-    const eligibleCount = this.roll.size;
+    const eligibleCount = proposal.roll.size;
     const turnout = eligibleCount > 0 ? voterCount / eligibleCount : 0;
     const quorumMet = turnout >= this.config.quorumPercentage;
     const decided = votesFor + votesAgainst;
@@ -255,7 +323,7 @@ export class EqualWeightGovernorModel {
       turnout,
       quorumMet,
       passed,
-      finalized: false,
+      finalized: false
     };
   }
 }

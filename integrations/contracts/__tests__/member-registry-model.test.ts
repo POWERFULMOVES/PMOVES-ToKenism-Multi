@@ -29,7 +29,19 @@ describe('MemberRegistryModel', () => {
 
   it('validates committee config bounds', () => {
     expect(() => new MemberRegistryModel({ committeeThreshold: 0 })).toThrow();
+    expect(() => new MemberRegistryModel({ committeeThreshold: 1 })).toThrow();
     expect(() => new MemberRegistryModel({ committeeThreshold: 4, committeeSize: 3 })).toThrow();
+    expect(() => new MemberRegistryModel({ committeeSize: 1 })).toThrow();
+    expect(() => new MemberRegistryModel({ committeeSize: 2.5 })).toThrow();
+  });
+
+  it('requires exactly committeeSize distinct committee members', () => {
+    const r = new MemberRegistryModel({
+      committeeSize: 3,
+      committeeThreshold: 2
+    });
+    expect(() => r.setCommittee(['0xC1', '0xC2'])).toThrow(/exactly 3/i);
+    expect(() => r.setCommittee(['0xC1', '0xC1', '0xC2'])).toThrow(/duplicate/i);
   });
 
   it('revoke requires k-of-n and removes the member from the roll', () => {
@@ -51,7 +63,12 @@ describe('MemberRegistryModel', () => {
     r.enrol({ id: '0xA' }, ['0xC1', '0xC2']);
     r.enrol({ id: '0xB' }, ['0xC1', '0xC2']);
     r.revoke('0xB', ['0xC1', '0xC2']);
-    expect(r.roll().map((m) => m.id).sort()).toEqual(['0xA']);
+    expect(
+      r
+        .roll()
+        .map((m) => m.id)
+        .sort()
+    ).toEqual(['0xA']);
   });
 
   it('roll() returns defensive copies: mutating a returned member does not affect the registry', () => {
