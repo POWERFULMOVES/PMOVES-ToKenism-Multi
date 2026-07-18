@@ -94,6 +94,20 @@ describe('EqualWeightGovernorModel.ingestSecretTally', () => {
     expect(() => g.ingestSecretTally('p1', { votesFor: 4, votesAgainst: 2, abstentions: 0 })).toThrow(/exceeds|eligible/i);
   });
 
+  it('a rejected ingest does NOT lock the mode — a later named castVote still works', () => {
+    const g = gov(); // 5-member roll, proposal p1 (reuse the existing gov() helper in this file)
+    expect(() => g.ingestSecretTally('p1', { votesFor: 4, votesAgainst: 2, abstentions: 0 })).toThrow(/exceeds|eligible/i); // voterCount 6 > 5
+    // mode must NOT be locked to secret; named voting still allowed
+    expect(() => g.castVote('p1', 'A', true)).not.toThrow();
+  });
+
+  it('a rejected named castVote does NOT lock the mode — a later ingest still works', () => {
+    const g = gov();
+    expect(() => g.castVote('p1', 'STRANGER', true)).toThrow(); // not on the roll
+    // mode must NOT be locked to named; secret ingestion still allowed
+    expect(() => g.ingestSecretTally('p1', { votesFor: 3, votesAgainst: 1, abstentions: 0 })).not.toThrow();
+  });
+
   it('tally() returns the ingested result for a secret proposal', () => {
     const g = gov();
     const ingested = g.ingestSecretTally('p1', { votesFor: 3, votesAgainst: 1, abstentions: 0 });

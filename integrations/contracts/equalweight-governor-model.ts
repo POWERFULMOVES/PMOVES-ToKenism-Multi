@@ -172,13 +172,14 @@ export class EqualWeightGovernorModel {
     if (proposal.mode === 'secret') {
       throw new Error(`Proposal ${proposalId} is in secret mode; named castVote is not allowed`);
     }
-    proposal.mode = 'named';
     if (!this.roll.has(voter)) {
       throw new Error(`${voter} is not on the eligible roll`);
     }
     if (proposal.votes.has(voter)) {
       throw new Error(`${voter} has already voted on ${proposalId}`);
     }
+    // lock on first SUCCESSFUL named vote — a rejected attempt does not lock the mode
+    proposal.mode = 'named';
     proposal.votes.set(voter, support);
   }
 
@@ -188,7 +189,6 @@ export class EqualWeightGovernorModel {
     if (proposal.mode === 'named') {
       throw new Error(`Proposal ${proposalId} is in named mode; secret ingestion is not allowed`);
     }
-    proposal.mode = 'secret';
     const outcome = computeSecretOutcome(
       { votesFor: counts.votesFor, votesAgainst: counts.votesAgainst, abstentions: counts.abstentions },
       this.roll.size,
@@ -210,6 +210,8 @@ export class EqualWeightGovernorModel {
       finalized: false,
       ...(counts.ballotRef ? { ballotRef: counts.ballotRef } : {}),
     };
+    // lock on first SUCCESSFUL ingest — a rejected attempt does not lock the mode
+    proposal.mode = 'secret';
     proposal.ingestedTally = result;
     return result;
   }
