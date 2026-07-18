@@ -54,6 +54,23 @@ describe('MemberRegistryModel', () => {
     expect(r.roll().map((m) => m.id).sort()).toEqual(['0xA']);
   });
 
+  it('roll() returns defensive copies: mutating a returned member does not affect the registry', () => {
+    const r = withCommittee();
+    const original = { id: '0xA', units: 1 };
+    r.enrol(original, ['0xC1', '0xC2']);
+
+    // Mutate the object returned by roll() — this must not corrupt the registry's stored copy.
+    const first = r.roll();
+    (first[0] as { units: number }).units = 999;
+    const second = r.roll();
+    expect(second[0].units).toBe(1);
+
+    // Mutate the ORIGINAL object passed into enrol AFTER enrolling — the registry must have
+    // already severed its reference to it.
+    original.units = 42;
+    expect(r.roll()[0].units).toBe(1);
+  });
+
   it('roll() drives the governor: only enrolled members can vote', () => {
     const r = withCommittee();
     r.enrol({ id: '0xA' }, ['0xC1', '0xC2']);

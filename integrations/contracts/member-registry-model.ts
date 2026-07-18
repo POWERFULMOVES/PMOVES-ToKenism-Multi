@@ -2,6 +2,10 @@
 import { EligibleMember } from './equalweight-governor-model';
 
 export interface MemberRegistryConfig {
+  // NOTE: `committeeSize` is only a constructor-time bound-check input for `committeeThreshold`
+  // (see the constructor: threshold must be <= this value). It does NOT constrain the actual
+  // committee membership installed later via `setCommittee` — that set's size can differ from
+  // (and is not validated against) `committeeSize`.
   committeeSize: number;
   committeeThreshold: number;
 }
@@ -28,6 +32,11 @@ export class MemberRegistryModel {
     }
   }
 
+  // TRUSTED GENESIS: this constitutes the election committee. The anti-chokepoint
+  // (no-single-party) guarantee this registry provides holds GIVEN a trustworthily-constituted
+  // committee — it does not itself vet or bootstrap trust in the committee membership.
+  // Runtime committee rotation (adding/removing committee members under M-of-N approval of the
+  // existing committee) is a later arc stage and is intentionally out of scope here.
   setCommittee(ids: string[]): void {
     this.committee = new Set(ids);
   }
@@ -47,10 +56,15 @@ export class MemberRegistryModel {
     return unique;
   }
 
+  // Enrolling an already-active member intentionally OVERWRITES its existing credential. This is
+  // also the mechanism for a committee-approved re-enrol/update (e.g. changed units/shares) and
+  // for reactivating a member after revoke — there is no separate "update" or "reactivate" path.
   enrol(member: EligibleMember, approvers: string[]): MembershipCredential {
     const unique = this.assertCommitteeApproval(approvers);
+    // Shallow-copy the member so the registry does not hold a live reference to the caller's
+    // object — mutating the caller's original after enrolling must not affect the registry.
     const credential: MembershipCredential = {
-      member,
+      member: { ...member },
       status: 'active',
       approvers: unique,
       signature: `stub-mofn:${member.id}`,
@@ -73,8 +87,10 @@ export class MemberRegistryModel {
   }
 
   roll(): EligibleMember[] {
+    // Return shallow copies, not the stored references — callers mutating the returned array's
+    // entries must not be able to corrupt the registry's internal state.
     return Array.from(this.members.values())
       .filter((c) => c.status === 'active')
-      .map((c) => c.member);
+      .map((c) => ({ ...c.member }));
   }
 }
