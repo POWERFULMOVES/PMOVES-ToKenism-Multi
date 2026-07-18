@@ -99,6 +99,10 @@ export class EqualWeightGovernorModel {
     const eligibleCount = this.roll.size;
     const voterCount = proposal.votes.size;
     const turnout = eligibleCount > 0 ? voterCount / eligibleCount : 0;
+    const quorumMet = turnout >= this.config.quorumPercentage;
+    const decided = votesFor + votesAgainst;
+    const forShare = decided > 0 ? votesFor / decided : 0;
+    const passed = quorumMet && forShare >= this.config.passThreshold;
 
     return {
       proposalId,
@@ -107,8 +111,8 @@ export class EqualWeightGovernorModel {
       eligibleCount,
       voterCount,
       turnout,
-      quorumMet: false,
-      passed: false,
+      quorumMet,
+      passed,
       finalized: false,
     };
   }

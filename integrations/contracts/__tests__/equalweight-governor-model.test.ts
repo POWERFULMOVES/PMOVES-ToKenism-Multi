@@ -57,4 +57,26 @@ describe('EqualWeightGovernorModel', () => {
     expect(s.votesFor).toBe(1000); // plutocratic: whale dominates
     expect(s.votesAgainst).toBe(2);
   });
+
+  it('fails quorum below the roll-percentage threshold even if unanimous', () => {
+    const gov = new EqualWeightGovernorModel({ quorumPercentage: 0.5 });
+    gov.setRoll([{ id: '0xA' }, { id: '0xB' }, { id: '0xC' }, { id: '0xD' }]);
+    gov.createProposal('p', 'x');
+    gov.castVote('p', '0xA', true); // 1/4 = 25% turnout < 50%
+    const t = gov.tally('p');
+    expect(t.quorumMet).toBe(false);
+    expect(t.passed).toBe(false);
+  });
+
+  it('passes on majority once quorum is met', () => {
+    const gov = new EqualWeightGovernorModel({ quorumPercentage: 0.5, passThreshold: 0.5 });
+    gov.setRoll([{ id: '0xA' }, { id: '0xB' }, { id: '0xC' }, { id: '0xD' }]);
+    gov.createProposal('p', 'x');
+    gov.castVote('p', '0xA', true);
+    gov.castVote('p', '0xB', true);
+    gov.castVote('p', '0xC', false); // 3/4 turnout, for-share 2/3 >= 0.5
+    const t = gov.tally('p');
+    expect(t.quorumMet).toBe(true);
+    expect(t.passed).toBe(true);
+  });
 });
