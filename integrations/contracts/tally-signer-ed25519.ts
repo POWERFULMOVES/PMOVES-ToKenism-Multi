@@ -3,7 +3,17 @@
 // Third-party verifiable on public keys only. Replaces MockThresholdSigner's
 // stubbed bytes behind the same TallySigner interface. See
 // docs/superpowers/specs/2026-07-18-tally-signer-ed25519-design.md.
-import { TallyResult } from './equalweight-governor-model';
+import {
+  generateKeyPairSync,
+  sign as edSign,
+  createPrivateKey,
+} from 'crypto';
+import {
+  TallyResult,
+  TallyAttestation,
+  TallySigner,
+  assertCommitteeThreshold,
+} from './equalweight-governor-model';
 
 const TALLY_DOMAIN = 'pmoves.tally.v1';
 
@@ -29,4 +39,49 @@ export function tallyPreimage(tally: TallyResult): Buffer {
     tally.passed ? '1' : '0',
   ];
   return Buffer.concat(fields.map(ns));
+}
+
+// Ed25519 committee keypair, hex-encoded DER (SPKI public / PKCS8 private).
+export interface CommitteeKeypair {
+  publicKey: string;
+  privateKey: string;
+}
+
+// Sim/test convenience. Real deployments supply keys out of band (custody is a
+// counsel-gated decision — hardware token / per-device / paper-backed — and is
+// deliberately NOT coded here; keys are injected).
+export function generateCommitteeKeypair(): CommitteeKeypair {
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+  return {
+    publicKey: (publicKey.export({ type: 'spki', format: 'der' }) as Buffer).toString('hex'),
+    privateKey: (privateKey.export({ type: 'pkcs8', format: 'der' }) as Buffer).toString('hex'),
+  };
+}
+
+// Real Ed25519 k-of-n multisig. The sim signer holds committee keypairs to
+// model the signing ceremony; a production deployment collects independently
+// produced per-member signatures. The interface (approvers in -> per-approver
+// signatures out) is ceremony-agnostic.
+export class Ed25519MultisigSigner implements TallySigner {
+  constructor(private keyring: Record<string, CommitteeKeypair>) {}
+
+  sign(
+    tally: TallyResult,
+    approvers: string[],
+    committee: string[],
+    threshold: number
+  ): TallyAttestation {
+    const unique = assertCommitteeThreshold(approvers, committee, threshold);
+    const msg = tallyPreimage(tally);
+    const signatures: Record<string, string> = {};
+    for (const id of unique) {
+      const kp = this.keyring[id];
+      if (!kp || !kp.privateKey) {
+        throw new Error(`No private key for approver ${id}`);
+      }
+      const priv = createPrivateKey({ key: Buffer.from(kp.privateKey, 'hex'), type: 'pkcs8', format: 'der' });
+      signatures[id] = (edSign(null, msg, priv) as Buffer).toString('hex');
+    }
+    return { algo: 'ed25519-multisig', approvers: unique, signatures };
+  }
 }
