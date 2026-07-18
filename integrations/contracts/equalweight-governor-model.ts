@@ -220,7 +220,7 @@ export class EqualWeightGovernorModel {
     const proposal = this.proposals.get(proposalId);
     if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
     if (proposal.mode === 'secret' && proposal.ingestedTally) {
-      return proposal.ingestedTally;
+      return { ...proposal.ingestedTally };
     }
 
     let votesFor = 0;

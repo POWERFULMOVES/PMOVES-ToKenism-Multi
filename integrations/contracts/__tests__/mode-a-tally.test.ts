@@ -132,4 +132,13 @@ describe('EqualWeightGovernorModel.ingestSecretTally', () => {
     const tampered = { ...result, ballotRef: { ballotId: 'b1', receiptLogDigest: 'HACKED' } };
     expect(verifyTallyAttestation(tampered, result.attestation!, pub, 2).valid).toBe(false);
   });
+
+  it('tally() returns a defensive copy — mutating it does not corrupt stored state', () => {
+    const g = gov(); // reuse the file's existing gov() helper (5-member roll, proposal p1)
+    g.ingestSecretTally('p1', { votesFor: 3, votesAgainst: 1, abstentions: 0 });
+    const t1 = g.tally('p1');
+    t1.votesFor = 999;               // caller mutates the returned object
+    const t2 = g.tally('p1');
+    expect(t2.votesFor).toBe(3);     // stored state is unaffected
+  });
 });
