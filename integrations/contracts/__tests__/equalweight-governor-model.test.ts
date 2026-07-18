@@ -18,4 +18,19 @@ describe('EqualWeightGovernorModel', () => {
     expect(t.turnout).toBeCloseTo(0.75, 6);
     expect(t.finalized).toBe(false);
   });
+
+  it('rejects a voter not on the roll', () => {
+    const gov = new EqualWeightGovernorModel();
+    gov.setRoll([{ id: '0xA' }]);
+    gov.createProposal('p1', 'x');
+    expect(() => gov.castVote('p1', '0xSTRANGER', true)).toThrow(/roll|eligible/i);
+  });
+
+  it('rejects a second vote by the same member (one vote per member)', () => {
+    const gov = new EqualWeightGovernorModel();
+    gov.setRoll([{ id: '0xA' }]);
+    gov.createProposal('p1', 'x');
+    gov.castVote('p1', '0xA', true);
+    expect(() => gov.castVote('p1', '0xA', false)).toThrow(/already voted/i);
+  });
 });

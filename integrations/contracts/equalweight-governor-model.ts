@@ -73,6 +73,12 @@ export class EqualWeightGovernorModel {
   castVote(proposalId: string, voter: string, support: boolean): void {
     const proposal = this.proposals.get(proposalId);
     if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
+    if (!this.roll.has(voter)) {
+      throw new Error(`${voter} is not on the eligible roll`);
+    }
+    if (proposal.votes.has(voter)) {
+      throw new Error(`${voter} has already voted on ${proposalId}`);
+    }
     proposal.votes.set(voter, support);
   }
 
