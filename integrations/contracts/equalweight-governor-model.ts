@@ -237,11 +237,19 @@ export class EqualWeightGovernorModel {
     proposal.votes.set(voter, support);
   }
 
-  ingestSecretTally(proposalId: string, counts: SecretTallyCounts): TallyResult {
+  ingestSecretTally(proposalId: string, counts: SecretTallyCounts, currentWeek?: number): TallyResult {
     const proposal = this.proposals.get(proposalId);
     if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
     if (proposal.finalizedTally) {
       throw new Error(`Proposal ${proposalId} is finalized`);
+    }
+    if (proposal.closesAtWeek !== undefined) {
+      if (currentWeek === undefined || !Number.isSafeInteger(currentWeek) || currentWeek < 0) {
+        throw new Error(`A non-negative currentWeek is required for proposal ${proposalId}`);
+      }
+      if (currentWeek <= proposal.closesAtWeek) {
+        throw new Error(`Proposal ${proposalId} remains open through week ${proposal.closesAtWeek}`);
+      }
     }
     if (proposal.mode === 'named') {
       throw new Error(`Proposal ${proposalId} is in named mode; secret ingestion is not allowed`);

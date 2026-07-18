@@ -152,6 +152,18 @@ describe('EqualWeightGovernorModel', () => {
     expect(() => gov.castVote('p', '0xB', true, 13)).toThrow(/closed/i);
   });
 
+  it('only ingests a secret tally after a proposal close week', () => {
+    const gov = new EqualWeightGovernorModel();
+    gov.setRoll([{ id: '0xA' }, { id: '0xB' }]);
+    gov.createProposal('p', 'time bounded secret proposal', 12);
+    const counts = { votesFor: 1, votesAgainst: 1, abstentions: 0 };
+
+    expect(() => gov.ingestSecretTally('p', counts)).toThrow(/currentWeek/i);
+    expect(() => gov.ingestSecretTally('p', counts, 11)).toThrow(/remains open/i);
+    expect(() => gov.ingestSecretTally('p', counts, 12)).toThrow(/remains open/i);
+    expect(() => gov.ingestSecretTally('p', counts, 13)).not.toThrow();
+  });
+
   describe('committee config validation', () => {
     it('rejects a non-positive committeeThreshold', () => {
       expect(() => new EqualWeightGovernorModel({ committeeThreshold: 0 })).toThrow(/committeeThreshold/i);
