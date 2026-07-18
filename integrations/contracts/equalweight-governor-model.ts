@@ -93,6 +93,16 @@ export class EqualWeightGovernorModel {
       committeeThreshold: 2,
       ...config,
     };
+    if (this.config.committeeThreshold < 1) {
+      throw new Error(
+        `committeeThreshold must be >= 1 (got ${this.config.committeeThreshold})`
+      );
+    }
+    if (this.config.committeeThreshold > this.config.committeeSize) {
+      throw new Error(
+        `committeeThreshold (${this.config.committeeThreshold}) cannot exceed committeeSize (${this.config.committeeSize})`
+      );
+    }
     this.signer = signer;
   }
 
@@ -120,15 +130,19 @@ export class EqualWeightGovernorModel {
   }
 
   private weightOf(member: EligibleMember): number {
+    let raw: number;
     switch (this.config.votingBasis) {
       case 'unit':
-        return member.units ?? 1;
+        raw = member.units ?? 1;
+        break;
       case 'share':
-        return member.shares ?? 1;
+        raw = member.shares ?? 1;
+        break;
       case 'member':
       default:
         return 1;
     }
+    return Number.isFinite(raw) && raw >= 0 ? raw : 0;
   }
 
   castVote(proposalId: string, voter: string, support: boolean): void {
@@ -149,16 +163,17 @@ export class EqualWeightGovernorModel {
 
     let votesFor = 0;
     let votesAgainst = 0;
+    let voterCount = 0;
     for (const [voter, support] of proposal.votes) {
       const member = this.roll.get(voter);
       if (!member) continue;
+      voterCount += 1;
       const w = this.weightOf(member);
       if (support) votesFor += w;
       else votesAgainst += w;
     }
 
     const eligibleCount = this.roll.size;
-    const voterCount = proposal.votes.size;
     const turnout = eligibleCount > 0 ? voterCount / eligibleCount : 0;
     const quorumMet = turnout >= this.config.quorumPercentage;
     const decided = votesFor + votesAgainst;

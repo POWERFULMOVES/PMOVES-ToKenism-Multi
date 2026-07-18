@@ -83,6 +83,63 @@ describe('EqualWeightGovernorModel', () => {
     expect(t.passed).toBe(true);
   });
 
+  it('sanitizes negative unit weights so votesFor stays non-negative and finite', () => {
+    const gov = new EqualWeightGovernorModel({ votingBasis: 'unit' });
+    gov.setRoll([{ id: '0xA', units: -5 }, { id: '0xB', units: 3 }]);
+    gov.createProposal('p', 'x');
+    gov.castVote('p', '0xA', true);
+    gov.castVote('p', '0xB', true);
+
+    const t = gov.tally('p');
+    expect(t.votesFor).toBeGreaterThanOrEqual(0);
+    expect(Number.isFinite(t.votesFor)).toBe(true);
+  });
+
+  it('sanitizes NaN share weights so votesFor is never NaN', () => {
+    const gov = new EqualWeightGovernorModel({ votingBasis: 'share' });
+    gov.setRoll([{ id: '0xA', shares: NaN }, { id: '0xB', shares: 3 }]);
+    gov.createProposal('p', 'x');
+    gov.castVote('p', '0xA', true);
+    gov.castVote('p', '0xB', true);
+
+    const t = gov.tally('p');
+    expect(Number.isNaN(t.votesFor)).toBe(false);
+  });
+
+  it('counts voterCount/turnout against the CURRENT roll after a voter is removed', () => {
+    const gov = new EqualWeightGovernorModel();
+    gov.setRoll([{ id: '0xA' }, { id: '0xB' }, { id: '0xC' }, { id: '0xD' }]);
+    gov.createProposal('p', 'x');
+    gov.castVote('p', '0xA', true);
+    gov.castVote('p', '0xB', true);
+
+    // A votes then is removed from the roll (roll mutation after voting)
+    gov.setRoll([{ id: '0xB' }, { id: '0xC' }, { id: '0xD' }]);
+
+    const t = gov.tally('p');
+    expect(t.voterCount).toBe(1); // only B is still on the roll
+    expect(t.turnout).toBeCloseTo(1 / 3, 6); // NOT 2/4
+    expect(t.turnout).toBeLessThanOrEqual(1);
+  });
+
+  describe('committee config validation', () => {
+    it('rejects a non-positive committeeThreshold', () => {
+      expect(() => new EqualWeightGovernorModel({ committeeThreshold: 0 })).toThrow(
+        /committeeThreshold/i
+      );
+    });
+
+    it('rejects committeeThreshold greater than committeeSize', () => {
+      expect(
+        () => new EqualWeightGovernorModel({ committeeThreshold: 4, committeeSize: 3 })
+      ).toThrow(/committeeThreshold/i);
+    });
+
+    it('a default construct still works', () => {
+      expect(() => new EqualWeightGovernorModel()).not.toThrow();
+    });
+  });
+
   describe('committee finalize (M-of-N)', () => {
     const build = () => {
       const gov = new EqualWeightGovernorModel({ committeeThreshold: 2, committeeSize: 3 });
@@ -116,6 +173,19 @@ describe('EqualWeightGovernorModel', () => {
       const signer = new MockThresholdSigner();
       const tally = { proposalId: 'p' } as any;
       expect(() => signer.sign(tally, ['0xC1'], ['0xC1', '0xC2', '0xC3'], 2)).toThrow(/threshold/i);
+    });
+
+    it('rejects duplicate approvers collapsing to fewer distinct approvers than threshold', () => {
+      const gov = build();
+      expect(() => gov.finalize('p', ['0xC1', '0xC1'])).toThrow(/threshold|approv/i);
+    });
+
+    it('MockThresholdSigner rejects duplicate approvers directly (dedup replay defense)', () => {
+      const signer = new MockThresholdSigner();
+      const tally = { proposalId: 'p' } as any;
+      expect(() =>
+        signer.sign(tally, ['0xC1', '0xC1'], ['0xC1', '0xC2', '0xC3'], 2)
+      ).toThrow(/threshold/i);
     });
   });
 });
