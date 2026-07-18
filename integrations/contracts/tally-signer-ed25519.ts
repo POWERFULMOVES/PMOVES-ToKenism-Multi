@@ -3,19 +3,8 @@
 // Third-party verifiable on public keys only. Replaces MockThresholdSigner's
 // stubbed bytes behind the same TallySigner interface. See
 // docs/superpowers/specs/2026-07-18-tally-signer-ed25519-design.md.
-import {
-  generateKeyPairSync,
-  sign as edSign,
-  createPrivateKey,
-  verify as edVerify,
-  createPublicKey,
-} from 'crypto';
-import {
-  TallyResult,
-  TallyAttestation,
-  TallySigner,
-  assertCommitteeThreshold,
-} from './equalweight-governor-model';
+import { generateKeyPairSync, sign as edSign, createPrivateKey, verify as edVerify, createPublicKey } from 'crypto';
+import { TallyResult, TallyAttestation, TallySigner, assertCommitteeThreshold } from './equalweight-governor-model';
 
 const TALLY_DOMAIN = 'pmoves.tally.v1';
 
@@ -26,16 +15,30 @@ function ns(s: string): Buffer {
   return Buffer.concat([Buffer.from(`${body.length}:`, 'utf8'), body, Buffer.from(',', 'utf8')]);
 }
 
+function assertCanonicalTally(tally: TallyResult): void {
+  const counts: Array<[string, number]> = [
+    ['votesFor', tally.votesFor],
+    ['votesAgainst', tally.votesAgainst],
+    ['eligibleCount', tally.eligibleCount],
+    ['voterCount', tally.voterCount]
+  ];
+  for (const [label, value] of counts) {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(`${label} must be a non-negative safe integer (got ${value})`);
+    }
+  }
+  if (tally.voterCount > tally.eligibleCount) {
+    throw new Error(`voterCount ${tally.voterCount} cannot exceed eligibleCount ${tally.eligibleCount}`);
+  }
+}
+
 // Canonical signed bytes: encodes the domain tag + result fields: proposalId,
-// the four vote/eligibility counts, and the quorumMet/passed booleans. Counts
-// are integers under member-basis (the contested-ballot case); under
-// share/unit basis they may be fractional but verification still reconciles
-// because signer and verifier serialize the same transmitted value with
-// String(). turnout/forShare are excluded (derived floats). NOTE: this binds
-// the transmitted numeric value, not a recomputation — a consumer that
-// RE-TALLIES on another platform under a weighted basis must use a
-// scaled-integer representation instead.
+// the four vote/eligibility counts, and the quorumMet/passed booleans. Signed
+// counts must be non-negative safe integers. Weighted deployments must convert
+// fractional unit/share weights to a documented scaled-integer representation
+// before signing. turnout/forShare are excluded because they are derived floats.
 export function tallyPreimage(tally: TallyResult): Buffer {
+  assertCanonicalTally(tally);
   const fields = [
     TALLY_DOMAIN,
     tally.proposalId,
@@ -44,7 +47,7 @@ export function tallyPreimage(tally: TallyResult): Buffer {
     String(tally.eligibleCount),
     String(tally.voterCount),
     tally.quorumMet ? '1' : '0',
-    tally.passed ? '1' : '0',
+    tally.passed ? '1' : '0'
   ];
   // Backward-compatible provenance binding: only when a ballotRef is present do we
   // append its sentinel + fields. A tally without ballotRef yields byte-identical
@@ -73,7 +76,7 @@ export function generateCommitteeKeypair(): CommitteeKeypair {
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
   return {
     publicKey: (publicKey.export({ type: 'spki', format: 'der' }) as Buffer).toString('hex'),
-    privateKey: (privateKey.export({ type: 'pkcs8', format: 'der' }) as Buffer).toString('hex'),
+    privateKey: (privateKey.export({ type: 'pkcs8', format: 'der' }) as Buffer).toString('hex')
   };
 }
 
@@ -84,12 +87,7 @@ export function generateCommitteeKeypair(): CommitteeKeypair {
 export class Ed25519MultisigSigner implements TallySigner {
   constructor(private keyring: Record<string, CommitteeKeypair>) {}
 
-  sign(
-    tally: TallyResult,
-    approvers: string[],
-    committee: string[],
-    threshold: number
-  ): TallyAttestation {
+  sign(tally: TallyResult, approvers: string[], committee: string[], threshold: number): TallyAttestation {
     const unique = assertCommitteeThreshold(approvers, committee, threshold);
     const msg = tallyPreimage(tally);
     const signatures: Record<string, string> = {};
@@ -98,7 +96,11 @@ export class Ed25519MultisigSigner implements TallySigner {
       if (!kp || !kp.privateKey) {
         throw new Error(`No private key for approver ${id}`);
       }
-      const priv = createPrivateKey({ key: Buffer.from(kp.privateKey, 'hex'), type: 'pkcs8', format: 'der' });
+      const priv = createPrivateKey({
+        key: Buffer.from(kp.privateKey, 'hex'),
+        type: 'pkcs8',
+        format: 'der'
+      });
       signatures[id] = (edSign(null, msg, priv) as Buffer).toString('hex');
     }
     return { algo: 'ed25519-multisig', approvers: unique, signatures };
@@ -107,7 +109,7 @@ export class Ed25519MultisigSigner implements TallySigner {
 
 export interface VerifyResult {
   valid: boolean;
-  signers: string[];   // distinct committee members whose signatures verified
+  signers: string[]; // distinct committee members whose signatures verified
   reason?: string;
 }
 
@@ -142,16 +144,52 @@ export function verifyTallyAttestation(
   threshold: number
 ): VerifyResult {
   if (attestation.algo !== 'ed25519-multisig') {
-    return { valid: false, signers: [], reason: `unsupported attestation algorithm: ${attestation.algo}` };
+    return {
+      valid: false,
+      signers: [],
+      reason: `unsupported attestation algorithm: ${attestation.algo}`
+    };
   }
-  if (!Number.isSafeInteger(threshold) || threshold < 1) {
-    return { valid: false, signers: [], reason: `invalid threshold: ${threshold}` };
+  if (!Number.isSafeInteger(threshold) || threshold < 2) {
+    return {
+      valid: false,
+      signers: [],
+      reason: `invalid threshold: ${threshold}`
+    };
   }
   const sigs = attestation.signatures;
   if (!sigs || Object.keys(sigs).length === 0) {
     return { valid: false, signers: [], reason: 'no signatures present' };
   }
-  const msg = tallyPreimage(tally);
+  const signatureIds = Object.keys(sigs);
+  const approverIds = attestation.approvers;
+  if (new Set(approverIds).size !== approverIds.length) {
+    return {
+      valid: false,
+      signers: [],
+      reason: 'attestation approvers contain duplicates'
+    };
+  }
+  if (
+    approverIds.length !== signatureIds.length ||
+    approverIds.some((id) => !Object.prototype.hasOwnProperty.call(sigs, id))
+  ) {
+    return {
+      valid: false,
+      signers: [],
+      reason: 'attestation approvers do not match signature ids'
+    };
+  }
+  let msg: Buffer;
+  try {
+    msg = tallyPreimage(tally);
+  } catch (error) {
+    return {
+      valid: false,
+      signers: [],
+      reason: error instanceof Error ? error.message : 'invalid tally preimage'
+    };
+  }
   const verified: string[] = [];
   // Distinct PUBLIC KEY material, not distinct ids -- if the keyring maps two
   // ids to the same key, one private key must not be able to satisfy a
@@ -161,23 +199,43 @@ export function verifyTallyAttestation(
   for (const [id, sigHex] of Object.entries(sigs)) {
     const pubHex = publicKeyring[id];
     if (!pubHex) {
-      return { valid: false, signers: [], reason: `signer ${id} not in committee keyring` };
+      return {
+        valid: false,
+        signers: [],
+        reason: `signer ${id} not in committee keyring`
+      };
     }
     if (!isHex(sigHex, 64)) {
-      return { valid: false, signers: [], reason: `malformed signature encoding from ${id}` };
+      return {
+        valid: false,
+        signers: [],
+        reason: `malformed signature encoding from ${id}`
+      };
     }
     if (!isHex(pubHex, 44)) {
-      return { valid: false, signers: [], reason: `malformed public key encoding for ${id}` };
+      return {
+        valid: false,
+        signers: [],
+        reason: `malformed public key encoding for ${id}`
+      };
     }
     let ok = false;
     try {
-      const pub = createPublicKey({ key: Buffer.from(pubHex, 'hex'), type: 'spki', format: 'der' });
+      const pub = createPublicKey({
+        key: Buffer.from(pubHex, 'hex'),
+        type: 'spki',
+        format: 'der'
+      });
       ok = edVerify(null, msg, pub, Buffer.from(sigHex, 'hex'));
     } catch {
       ok = false;
     }
     if (!ok) {
-      return { valid: false, signers: [], reason: `invalid signature from ${id}` };
+      return {
+        valid: false,
+        signers: [],
+        reason: `invalid signature from ${id}`
+      };
     }
     verified.push(id);
     distinctKeys.add(pubHex.toLowerCase());
@@ -190,7 +248,7 @@ export function verifyTallyAttestation(
     return {
       valid: false,
       signers: distinct,
-      reason: `below threshold: ${distinctKeys.size} distinct keys < ${threshold}`,
+      reason: `below threshold: ${distinctKeys.size} distinct keys < ${threshold}`
     };
   }
   return { valid: true, signers: distinct };

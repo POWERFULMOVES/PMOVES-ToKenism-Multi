@@ -1,9 +1,5 @@
 // contracts/__tests__/equalweight-governor-model.test.ts
-import {
-  EqualWeightGovernorModel,
-  MockThresholdSigner,
-  assertCommitteeThreshold,
-} from '../equalweight-governor-model';
+import { EqualWeightGovernorModel, MockThresholdSigner, assertCommitteeThreshold } from '../equalweight-governor-model';
 
 describe('EqualWeightGovernorModel', () => {
   it('tallies weighted for/against and turnout under member basis', () => {
@@ -73,7 +69,10 @@ describe('EqualWeightGovernorModel', () => {
   });
 
   it('passes on majority once quorum is met', () => {
-    const gov = new EqualWeightGovernorModel({ quorumPercentage: 0.5, passThreshold: 0.5 });
+    const gov = new EqualWeightGovernorModel({
+      quorumPercentage: 0.5,
+      passThreshold: 0.5
+    });
     gov.setRoll([{ id: '0xA' }, { id: '0xB' }, { id: '0xC' }, { id: '0xD' }]);
     gov.createProposal('p', 'x');
     gov.castVote('p', '0xA', true);
@@ -86,7 +85,10 @@ describe('EqualWeightGovernorModel', () => {
 
   it('sanitizes negative unit weights so votesFor stays non-negative and finite', () => {
     const gov = new EqualWeightGovernorModel({ votingBasis: 'unit' });
-    gov.setRoll([{ id: '0xA', units: -5 }, { id: '0xB', units: 3 }]);
+    gov.setRoll([
+      { id: '0xA', units: -5 },
+      { id: '0xB', units: 3 }
+    ]);
     gov.createProposal('p', 'x');
     gov.castVote('p', '0xA', true);
     gov.castVote('p', '0xB', true);
@@ -98,7 +100,10 @@ describe('EqualWeightGovernorModel', () => {
 
   it('sanitizes NaN share weights so votesFor is never NaN', () => {
     const gov = new EqualWeightGovernorModel({ votingBasis: 'share' });
-    gov.setRoll([{ id: '0xA', shares: NaN }, { id: '0xB', shares: 3 }]);
+    gov.setRoll([
+      { id: '0xA', shares: NaN },
+      { id: '0xB', shares: 3 }
+    ]);
     gov.createProposal('p', 'x');
     gov.castVote('p', '0xA', true);
     gov.castVote('p', '0xB', true);
@@ -107,43 +112,91 @@ describe('EqualWeightGovernorModel', () => {
     expect(Number.isNaN(t.votesFor)).toBe(false);
   });
 
-  it('counts voterCount/turnout against the CURRENT roll after a voter is removed', () => {
+  it('snapshots the eligible roll per proposal so later roll changes do not rewrite history', () => {
     const gov = new EqualWeightGovernorModel();
     gov.setRoll([{ id: '0xA' }, { id: '0xB' }, { id: '0xC' }, { id: '0xD' }]);
     gov.createProposal('p', 'x');
     gov.castVote('p', '0xA', true);
     gov.castVote('p', '0xB', true);
 
-    // A votes then is removed from the roll (roll mutation after voting)
+    // A votes, then the active roll changes for future proposals.
     gov.setRoll([{ id: '0xB' }, { id: '0xC' }, { id: '0xD' }]);
 
     const t = gov.tally('p');
-    expect(t.voterCount).toBe(1); // only B is still on the roll
-    expect(t.turnout).toBeCloseTo(1 / 3, 6); // NOT 2/4
+    expect(t.voterCount).toBe(2);
+    expect(t.eligibleCount).toBe(4);
+    expect(t.turnout).toBeCloseTo(2 / 4, 6);
     expect(t.turnout).toBeLessThanOrEqual(1);
+
+    gov.createProposal('future', 'future proposal');
+    expect(gov.tally('future').eligibleCount).toBe(3);
+  });
+
+  it('rejects duplicate proposal ids instead of overwriting votes', () => {
+    const gov = new EqualWeightGovernorModel();
+    gov.setRoll([{ id: '0xA' }]);
+    gov.createProposal('p', 'first');
+    gov.castVote('p', '0xA', true);
+
+    expect(() => gov.createProposal('p', 'replacement')).toThrow(/already exists/i);
+    expect(gov.tally('p').votesFor).toBe(1);
+  });
+
+  it('requires and enforces currentWeek for proposals with a close week', () => {
+    const gov = new EqualWeightGovernorModel();
+    gov.setRoll([{ id: '0xA' }, { id: '0xB' }]);
+    gov.createProposal('p', 'time bounded', 12);
+
+    expect(() => gov.castVote('p', '0xA', true)).toThrow(/currentWeek/i);
+    expect(() => gov.castVote('p', '0xA', true, 12)).not.toThrow();
+    expect(() => gov.castVote('p', '0xB', true, 13)).toThrow(/closed/i);
   });
 
   describe('committee config validation', () => {
     it('rejects a non-positive committeeThreshold', () => {
-      expect(() => new EqualWeightGovernorModel({ committeeThreshold: 0 })).toThrow(
-        /committeeThreshold/i
-      );
+      expect(() => new EqualWeightGovernorModel({ committeeThreshold: 0 })).toThrow(/committeeThreshold/i);
+    });
+
+    it('rejects a single-party committeeThreshold', () => {
+      expect(() => new EqualWeightGovernorModel({ committeeThreshold: 1 })).toThrow(/committeeThreshold/i);
     });
 
     it('rejects committeeThreshold greater than committeeSize', () => {
       expect(
-        () => new EqualWeightGovernorModel({ committeeThreshold: 4, committeeSize: 3 })
+        () =>
+          new EqualWeightGovernorModel({
+            committeeThreshold: 4,
+            committeeSize: 3
+          })
       ).toThrow(/committeeThreshold/i);
     });
 
     it('a default construct still works', () => {
       expect(() => new EqualWeightGovernorModel()).not.toThrow();
     });
+
+    it.each([
+      ['quorumPercentage', -0.1],
+      ['quorumPercentage', 1.1],
+      ['quorumPercentage', NaN],
+      ['passThreshold', -0.1],
+      ['passThreshold', 1.1],
+      ['passThreshold', NaN]
+    ] as const)('rejects invalid %s %p', (field, value) => {
+      expect(() => new EqualWeightGovernorModel({ [field]: value })).toThrow(new RegExp(field, 'i'));
+    });
+
+    it.each([0, 1, 1.5, NaN])('rejects invalid committeeSize %p', (committeeSize) => {
+      expect(() => new EqualWeightGovernorModel({ committeeSize })).toThrow(/committeeSize/i);
+    });
   });
 
   describe('committee finalize (M-of-N)', () => {
     const build = () => {
-      const gov = new EqualWeightGovernorModel({ committeeThreshold: 2, committeeSize: 3 });
+      const gov = new EqualWeightGovernorModel({
+        committeeThreshold: 2,
+        committeeSize: 3
+      });
       gov.setRoll([{ id: '0xA' }, { id: '0xB' }]);
       gov.setCommittee(['0xC1', '0xC2', '0xC3']);
       gov.createProposal('p', 'x');
@@ -181,12 +234,32 @@ describe('EqualWeightGovernorModel', () => {
       expect(() => gov.finalize('p', ['0xC1', '0xC1'])).toThrow(/threshold|approv/i);
     });
 
+    it('requires exactly committeeSize distinct committee members', () => {
+      const gov = new EqualWeightGovernorModel({
+        committeeThreshold: 2,
+        committeeSize: 3
+      });
+      expect(() => gov.setCommittee(['0xC1', '0xC2'])).toThrow(/exactly 3/i);
+      expect(() => gov.setCommittee(['0xC1', '0xC1', '0xC2'])).toThrow(/duplicate/i);
+    });
+
+    it('persists a finalized snapshot and rejects later votes', () => {
+      const gov = build();
+      const finalized = gov.finalize('p', ['0xC1', '0xC2']);
+
+      expect(() => gov.castVote('p', '0xA', false)).toThrow(/finalized/i);
+      expect(gov.tally('p')).toEqual(finalized);
+
+      finalized.votesFor = 999;
+      finalized.attestation!.approvers[0] = 'tampered';
+      expect(gov.tally('p').votesFor).toBe(2);
+      expect(gov.tally('p').attestation!.approvers).toEqual(['0xC1', '0xC2']);
+    });
+
     it('MockThresholdSigner rejects duplicate approvers directly (dedup replay defense)', () => {
       const signer = new MockThresholdSigner();
       const tally = { proposalId: 'p' } as any;
-      expect(() =>
-        signer.sign(tally, ['0xC1', '0xC1'], ['0xC1', '0xC2', '0xC3'], 2)
-      ).toThrow(/threshold/i);
+      expect(() => signer.sign(tally, ['0xC1', '0xC1'], ['0xC1', '0xC2', '0xC3'], 2)).toThrow(/threshold/i);
     });
   });
 
@@ -209,12 +282,10 @@ describe('EqualWeightGovernorModel', () => {
       expect(() => assertCommitteeThreshold(['0xC1', '0xSTRANGER'], committee, 2)).toThrow(/committee/i);
     });
 
-    it.each([0, -1, 1.5, NaN])(
+    it.each([0, 1, -1, 1.5, NaN])(
       'rejects a non-safe-integer threshold (%p) before any dedupe/membership logic',
       (threshold) => {
-        expect(() => assertCommitteeThreshold(['0xC1', '0xC2'], committee, threshold)).toThrow(
-          /invalid threshold/i
-        );
+        expect(() => assertCommitteeThreshold(['0xC1', '0xC2'], committee, threshold)).toThrow(/invalid threshold/i);
       }
     );
   });

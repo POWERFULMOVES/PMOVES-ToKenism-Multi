@@ -13,7 +13,7 @@ function baseTally(overrides: Partial<TallyResult> = {}): TallyResult {
     quorumMet: true,
     passed: true,
     finalized: false,
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -35,6 +35,19 @@ describe('tallyPreimage', () => {
     expect(tallyPreimage(a).equals(tallyPreimage(b))).toBe(false);
   });
 
+  it.each([
+    ['votesFor', -1],
+    ['votesAgainst', 1.5],
+    ['eligibleCount', NaN],
+    ['voterCount', Number.MAX_SAFE_INTEGER + 1]
+  ] as const)('rejects non-canonical %s count %p', (field, value) => {
+    expect(() => tallyPreimage(baseTally({ [field]: value }))).toThrow(/non-negative safe integer/i);
+  });
+
+  it('rejects voterCount greater than eligibleCount', () => {
+    expect(() => tallyPreimage(baseTally({ eligibleCount: 3, voterCount: 4 }))).toThrow(/cannot exceed/i);
+  });
+
   it('changes when a boolean outcome field changes', () => {
     const a = baseTally({ passed: true });
     const b = baseTally({ passed: false });
@@ -52,11 +65,7 @@ describe('tallyPreimage', () => {
 import { verify, createPublicKey } from 'crypto';
 // NOTE: `tallyPreimage` is already imported in the Task 1 block above — do NOT
 // re-import it (duplicate identifier). Only add the names new to this block.
-import {
-  generateCommitteeKeypair,
-  Ed25519MultisigSigner,
-  CommitteeKeypair,
-} from '../tally-signer-ed25519';
+import { generateCommitteeKeypair, Ed25519MultisigSigner, CommitteeKeypair } from '../tally-signer-ed25519';
 
 describe('Ed25519MultisigSigner', () => {
   const committee = ['0xC1', '0xC2', '0xC3'];
@@ -65,7 +74,7 @@ describe('Ed25519MultisigSigner', () => {
     keyring = {
       '0xC1': generateCommitteeKeypair(),
       '0xC2': generateCommitteeKeypair(),
-      '0xC3': generateCommitteeKeypair(),
+      '0xC3': generateCommitteeKeypair()
     };
   });
 
@@ -81,7 +90,11 @@ describe('Ed25519MultisigSigner', () => {
     // each signature really verifies against that member's public key
     const msg = tallyPreimage(tally);
     for (const id of ['0xC1', '0xC2']) {
-      const pub = createPublicKey({ key: Buffer.from(keyring[id].publicKey, 'hex'), type: 'spki', format: 'der' });
+      const pub = createPublicKey({
+        key: Buffer.from(keyring[id].publicKey, 'hex'),
+        type: 'spki',
+        format: 'der'
+      });
       const ok = verify(null, msg, pub, Buffer.from(att.signatures![id], 'hex'));
       expect(ok).toBe(true);
     }
@@ -102,11 +115,21 @@ describe('Ed25519MultisigSigner', () => {
     expect(() => signer.sign(baseTally(), ['0xC1', '0xC1'], committee, 2)).toThrow(/threshold/i);
   });
 
+  it('rejects a single-party threshold even when one signature is available', () => {
+    const signer = new Ed25519MultisigSigner(keyring);
+    expect(() => signer.sign(baseTally(), ['0xC1'], committee, 1)).toThrow(/threshold/i);
+  });
+
+  it('rejects a tally with fractional counts before signing', () => {
+    const signer = new Ed25519MultisigSigner(keyring);
+    expect(() => signer.sign(baseTally({ votesFor: 1.5 }), ['0xC1', '0xC2'], committee, 2)).toThrow(/safe integer/i);
+  });
+
   it('throws when an approver has no private key in the keyring', () => {
     const pubOnly: Record<string, CommitteeKeypair> = {
       '0xC1': keyring['0xC1'],
       '0xC2': { publicKey: keyring['0xC2'].publicKey, privateKey: '' },
-      '0xC3': keyring['0xC3'],
+      '0xC3': keyring['0xC3']
     };
     const signer = new Ed25519MultisigSigner(pubOnly);
     expect(() => signer.sign(baseTally(), ['0xC1', '0xC2'], committee, 2)).toThrow(/private key/i);
@@ -128,7 +151,7 @@ describe('verifyTallyAttestation', () => {
     keyring = {
       '0xC1': generateCommitteeKeypair(),
       '0xC2': generateCommitteeKeypair(),
-      '0xC3': generateCommitteeKeypair(),
+      '0xC3': generateCommitteeKeypair()
     };
   });
 
@@ -151,15 +174,31 @@ describe('verifyTallyAttestation', () => {
     // splice in a real signature from a stranger key under a new id
     const stranger = generateCommitteeKeypair();
     const msg = tallyPreimage(baseTally());
-    const strangerSig = (edSign2(null, msg, makePriv({ key: Buffer.from(stranger.privateKey, 'hex'), type: 'pkcs8', format: 'der' })) as Buffer).toString('hex');
+    const strangerSig = (
+      edSign2(
+        null,
+        msg,
+        makePriv({
+          key: Buffer.from(stranger.privateKey, 'hex'),
+          type: 'pkcs8',
+          format: 'der'
+        })
+      ) as Buffer
+    ).toString('hex');
     att.signatures!['0xSTRANGER'] = strangerSig;
+    att.approvers.push('0xSTRANGER');
     const res = verifyTallyAttestation(baseTally(), att, pubKeyring(keyring), 2);
     expect(res.valid).toBe(false);
     expect(res.reason).toMatch(/0xSTRANGER|keyring|committee/i);
   });
 
   it('rejects a signature presented with the wrong tally', () => {
-    const att = new Ed25519MultisigSigner(keyring).sign(baseTally({ proposalId: 'pA' }), ['0xC1', '0xC2'], committee, 2);
+    const att = new Ed25519MultisigSigner(keyring).sign(
+      baseTally({ proposalId: 'pA' }),
+      ['0xC1', '0xC2'],
+      committee,
+      2
+    );
     const res = verifyTallyAttestation(baseTally({ proposalId: 'pB' }), att, pubKeyring(keyring), 2);
     expect(res.valid).toBe(false);
   });
@@ -173,8 +212,38 @@ describe('verifyTallyAttestation', () => {
   });
 
   it('rejects an attestation with no signatures', () => {
-    const res = verifyTallyAttestation(baseTally(), { algo: 'ed25519-multisig', approvers: [] }, pubKeyring(keyring), 2);
+    const res = verifyTallyAttestation(
+      baseTally(),
+      { algo: 'ed25519-multisig', approvers: [] },
+      pubKeyring(keyring),
+      2
+    );
     expect(res.valid).toBe(false);
+  });
+
+  it('rejects approver metadata that omits a verified signature id', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    att.approvers = ['0xC1'];
+    const res = verifyTallyAttestation(baseTally(), att, pubKeyring(keyring), 2);
+    expect(res.valid).toBe(false);
+    expect(res.reason).toMatch(/approvers.*signature/i);
+  });
+
+  it('rejects duplicate approver metadata even when signatures are valid', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    att.approvers = ['0xC1', '0xC1'];
+    const res = verifyTallyAttestation(baseTally(), att, pubKeyring(keyring), 2);
+    expect(res.valid).toBe(false);
+    expect(res.reason).toMatch(/duplicate/i);
+  });
+
+  it('rejects malformed tally counts without throwing', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    const malformed = baseTally({ votesFor: 1.5 });
+    expect(() => verifyTallyAttestation(malformed, att, pubKeyring(keyring), 2)).not.toThrow();
+    const res = verifyTallyAttestation(malformed, att, pubKeyring(keyring), 2);
+    expect(res.valid).toBe(false);
+    expect(res.reason).toMatch(/safe integer/i);
   });
 
   it('rejects a malformed signature without throwing', () => {
@@ -214,7 +283,7 @@ describe('verifyTallyAttestation', () => {
     expect(res.reason).toMatch(/threshold/i);
   });
 
-  it.each([0, -1, 1.5, NaN])(
+  it.each([0, 1, -1, 1.5, NaN])(
     'rejects a non-safe-integer threshold (%p) at the verifier (fail-closed, not just NaN < 1)',
     (threshold) => {
       const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
@@ -238,17 +307,21 @@ describe('verifyTallyAttestation', () => {
     const aliasedKeyring: Record<string, CommitteeKeypair> = {
       '0xC1': sharedKp,
       '0xC2': sharedKp,
-      '0xC3': generateCommitteeKeypair(),
+      '0xC3': generateCommitteeKeypair()
     };
     const tally = baseTally();
     const msg = tallyPreimage(tally);
-    const priv = makePriv({ key: Buffer.from(sharedKp.privateKey, 'hex'), type: 'pkcs8', format: 'der' });
+    const priv = makePriv({
+      key: Buffer.from(sharedKp.privateKey, 'hex'),
+      type: 'pkcs8',
+      format: 'der'
+    });
     const sigHex = (edSign2(null, msg, priv) as Buffer).toString('hex');
     // One private key's signature, placed under both ids -> only 1 unique key.
     const att = {
       algo: 'ed25519-multisig',
       approvers: ['0xC1', '0xC2'],
-      signatures: { '0xC1': sigHex, '0xC2': sigHex },
+      signatures: { '0xC1': sigHex, '0xC2': sigHex }
     };
     const res = verifyTallyAttestation(tally, att, pubKeyring(aliasedKeyring), 2);
     expect(res.valid).toBe(false);
@@ -280,7 +353,10 @@ describe('verifyTallyAttestation', () => {
 
   it('rejects a malformed (wrong-length) public key even when it is valid hex', () => {
     const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
-    const badKeyring = { ...pubKeyring(keyring), '0xC1': pubKeyring(keyring)['0xC1'].slice(0, -2) };
+    const badKeyring = {
+      ...pubKeyring(keyring),
+      '0xC1': pubKeyring(keyring)['0xC1'].slice(0, -2)
+    };
     const res = verifyTallyAttestation(baseTally(), att, badKeyring, 2);
     expect(res.valid).toBe(false);
   });
@@ -291,7 +367,7 @@ describe('integration: governor.finalize() with the real signer', () => {
     const keyring = {
       '0xC1': generateCommitteeKeypair(),
       '0xC2': generateCommitteeKeypair(),
-      '0xC3': generateCommitteeKeypair(),
+      '0xC3': generateCommitteeKeypair()
     };
     const gov = new EqualWeightGovernorModel(
       { committeeSize: 3, committeeThreshold: 2 },
@@ -317,10 +393,13 @@ describe('integration: governor.finalize() with the real signer', () => {
 import { BallotRef } from '../mode-a-tally';
 
 describe('tallyPreimage ballotRef binding', () => {
-  const ref: BallotRef = { ballotId: 'b-2026-recall', receiptLogDigest: 'abc123' };
+  const ref: BallotRef = {
+    ballotId: 'b-2026-recall',
+    receiptLogDigest: 'abc123'
+  };
 
   it('is byte-identical to the no-ballotRef encoding when absent (backward compatible)', () => {
-    const noRef = baseTally();                       // no ballotRef
+    const noRef = baseTally(); // no ballotRef
     const withRef = baseTally({ ballotRef: ref });
     const pmNo = tallyPreimage(noRef);
     const pmWith = tallyPreimage(withRef);
@@ -333,7 +412,11 @@ describe('tallyPreimage ballotRef binding', () => {
   });
 
   it('binds ballotRef into the signature — tampering the digest fails verification', () => {
-    const keyring = { '0xC1': generateCommitteeKeypair(), '0xC2': generateCommitteeKeypair(), '0xC3': generateCommitteeKeypair() };
+    const keyring = {
+      '0xC1': generateCommitteeKeypair(),
+      '0xC2': generateCommitteeKeypair(),
+      '0xC3': generateCommitteeKeypair()
+    };
     const committee = ['0xC1', '0xC2', '0xC3'];
     const tally = baseTally({ ballotRef: ref });
     const att = new Ed25519MultisigSigner(keyring).sign(tally, ['0xC1', '0xC2'], committee, 2);
@@ -341,10 +424,17 @@ describe('tallyPreimage ballotRef binding', () => {
 
     expect(verifyTallyAttestation(tally, att, pub, 2).valid).toBe(true);
 
-    const tampered = baseTally({ ballotRef: { ballotId: ref.ballotId, receiptLogDigest: 'DIFFERENT' } });
+    const tampered = baseTally({
+      ballotRef: { ballotId: ref.ballotId, receiptLogDigest: 'DIFFERENT' }
+    });
     expect(verifyTallyAttestation(tampered, att, pub, 2).valid).toBe(false);
 
-    const tamperedId = baseTally({ ballotRef: { ballotId: 'OTHER-BALLOT', receiptLogDigest: ref.receiptLogDigest } });
+    const tamperedId = baseTally({
+      ballotRef: {
+        ballotId: 'OTHER-BALLOT',
+        receiptLogDigest: ref.receiptLogDigest
+      }
+    });
     expect(verifyTallyAttestation(tamperedId, att, pub, 2).valid).toBe(false);
   });
 });
