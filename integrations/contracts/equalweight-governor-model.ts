@@ -1,4 +1,6 @@
 // contracts/equalweight-governor-model.ts
+import { AbstentionPolicy } from './mode-a-tally';
+
 export type VotingBasis = 'member' | 'unit' | 'share';
 
 export interface EligibleMember {
@@ -8,6 +10,7 @@ export interface EligibleMember {
 }
 
 export interface EqualWeightGovernorConfig {
+  abstentionPolicy: AbstentionPolicy;
   votingBasis: VotingBasis;
   quorumPercentage: number;
   passThreshold: number;
@@ -100,6 +103,7 @@ export class EqualWeightGovernorModel {
     signer: TallySigner = new MockThresholdSigner()
   ) {
     this.config = {
+      abstentionPolicy: 'quorum',
       votingBasis: 'member',
       quorumPercentage: 0.5,
       passThreshold: 0.5,
