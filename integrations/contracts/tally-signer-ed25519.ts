@@ -7,6 +7,8 @@ import {
   generateKeyPairSync,
   sign as edSign,
   createPrivateKey,
+  verify as edVerify,
+  createPublicKey,
 } from 'crypto';
 import {
   TallyResult,
@@ -84,4 +86,51 @@ export class Ed25519MultisigSigner implements TallySigner {
     }
     return { algo: 'ed25519-multisig', approvers: unique, signatures };
   }
+}
+
+export interface VerifyResult {
+  valid: boolean;
+  signers: string[];   // distinct committee members whose signatures verified
+  reason?: string;
+}
+
+// Third-party verification on PUBLIC material only — needs no signer or
+// governor. An AG/bank runs this with the published committee public keys.
+// Requires EVERY listed signature to verify AND at least `threshold` distinct
+// committee signers. Any unknown id, bad signature, or short count => invalid,
+// with a reason (informing, not just a boolean).
+export function verifyTallyAttestation(
+  tally: TallyResult,
+  attestation: TallyAttestation,
+  publicKeyring: Record<string, string>,
+  threshold: number
+): VerifyResult {
+  const sigs = attestation.signatures;
+  if (!sigs || Object.keys(sigs).length === 0) {
+    return { valid: false, signers: [], reason: 'no signatures present' };
+  }
+  const msg = tallyPreimage(tally);
+  const verified: string[] = [];
+  for (const [id, sigHex] of Object.entries(sigs)) {
+    const pubHex = publicKeyring[id];
+    if (!pubHex) {
+      return { valid: false, signers: [], reason: `signer ${id} not in committee keyring` };
+    }
+    let ok = false;
+    try {
+      const pub = createPublicKey({ key: Buffer.from(pubHex, 'hex'), type: 'spki', format: 'der' });
+      ok = edVerify(null, msg, pub, Buffer.from(sigHex, 'hex'));
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      return { valid: false, signers: [], reason: `invalid signature from ${id}` };
+    }
+    verified.push(id);
+  }
+  const distinct = Array.from(new Set(verified));
+  if (distinct.length < threshold) {
+    return { valid: false, signers: distinct, reason: `below threshold: ${distinct.length} < ${threshold}` };
+  }
+  return { valid: true, signers: distinct };
 }

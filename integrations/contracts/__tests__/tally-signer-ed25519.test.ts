@@ -112,3 +112,96 @@ describe('Ed25519MultisigSigner', () => {
     expect(() => signer.sign(baseTally(), ['0xC1', '0xC2'], committee, 2)).toThrow(/private key/i);
   });
 });
+
+import { sign as edSign2, createPrivateKey as makePriv } from 'crypto';
+import { verifyTallyAttestation } from '../tally-signer-ed25519';
+import { EqualWeightGovernorModel } from '../equalweight-governor-model';
+
+function pubKeyring(keyring: Record<string, CommitteeKeypair>): Record<string, string> {
+  return Object.fromEntries(Object.entries(keyring).map(([id, kp]) => [id, kp.publicKey]));
+}
+
+describe('verifyTallyAttestation', () => {
+  const committee = ['0xC1', '0xC2', '0xC3'];
+  let keyring: Record<string, CommitteeKeypair>;
+  beforeEach(() => {
+    keyring = {
+      '0xC1': generateCommitteeKeypair(),
+      '0xC2': generateCommitteeKeypair(),
+      '0xC3': generateCommitteeKeypair(),
+    };
+  });
+
+  it('accepts a valid 2-of-3 attestation and reports the signers', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    const res = verifyTallyAttestation(baseTally(), att, pubKeyring(keyring), 2);
+    expect(res.valid).toBe(true);
+    expect(res.signers.sort()).toEqual(['0xC1', '0xC2']);
+  });
+
+  it('rejects a tampered tally (signature binds the exact result)', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    const tampered = baseTally({ votesFor: 99 });
+    const res = verifyTallyAttestation(tampered, att, pubKeyring(keyring), 2);
+    expect(res.valid).toBe(false);
+  });
+
+  it('rejects an outsider signature not in the committee keyring', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    // splice in a real signature from a stranger key under a new id
+    const stranger = generateCommitteeKeypair();
+    const msg = tallyPreimage(baseTally());
+    const strangerSig = (edSign2(null, msg, makePriv({ key: Buffer.from(stranger.privateKey, 'hex'), type: 'pkcs8', format: 'der' })) as Buffer).toString('hex');
+    att.signatures!['0xSTRANGER'] = strangerSig;
+    const res = verifyTallyAttestation(baseTally(), att, pubKeyring(keyring), 2);
+    expect(res.valid).toBe(false);
+    expect(res.reason).toMatch(/0xSTRANGER|keyring|committee/i);
+  });
+
+  it('rejects a signature presented with the wrong tally', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally({ proposalId: 'pA' }), ['0xC1', '0xC2'], committee, 2);
+    const res = verifyTallyAttestation(baseTally({ proposalId: 'pB' }), att, pubKeyring(keyring), 2);
+    expect(res.valid).toBe(false);
+  });
+
+  it('rejects below the required threshold count', () => {
+    // a genuine 2-of-3 attestation checked against threshold 3
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    const res = verifyTallyAttestation(baseTally(), att, pubKeyring(keyring), 3);
+    expect(res.valid).toBe(false);
+    expect(res.reason).toMatch(/threshold/i);
+  });
+
+  it('rejects an attestation with no signatures', () => {
+    const res = verifyTallyAttestation(baseTally(), { algo: 'ed25519-multisig', approvers: [] }, pubKeyring(keyring), 2);
+    expect(res.valid).toBe(false);
+  });
+});
+
+describe('integration: governor.finalize() with the real signer', () => {
+  it('produces an attestation that verifyTallyAttestation accepts', () => {
+    const keyring = {
+      '0xC1': generateCommitteeKeypair(),
+      '0xC2': generateCommitteeKeypair(),
+      '0xC3': generateCommitteeKeypair(),
+    };
+    const gov = new EqualWeightGovernorModel(
+      { committeeSize: 3, committeeThreshold: 2 },
+      new Ed25519MultisigSigner(keyring)
+    );
+    gov.setCommittee(['0xC1', '0xC2', '0xC3']);
+    gov.setRoll([{ id: '0xA' }, { id: '0xB' }, { id: '0xC' }, { id: '0xD' }]);
+    gov.createProposal('p1', 'Adopt bylaw');
+    gov.castVote('p1', '0xA', true);
+    gov.castVote('p1', '0xB', true);
+    gov.castVote('p1', '0xC', false);
+
+    const result = gov.finalize('p1', ['0xC1', '0xC2']);
+    expect(result.finalized).toBe(true);
+
+    const publicKeyring = Object.fromEntries(Object.entries(keyring).map(([id, kp]) => [id, kp.publicKey]));
+    const res = verifyTallyAttestation(result, result.attestation!, publicKeyring, 2);
+    expect(res.valid).toBe(true);
+    expect(res.signers.sort()).toEqual(['0xC1', '0xC2']);
+  });
+});
