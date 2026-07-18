@@ -1,5 +1,5 @@
 // contracts/equalweight-governor-model.ts
-import { AbstentionPolicy } from './mode-a-tally';
+import { AbstentionPolicy, BallotRef } from './mode-a-tally';
 
 export type VotingBasis = 'member' | 'unit' | 'share';
 
@@ -29,6 +29,7 @@ export interface TallyResult {
   passed: boolean;
   finalized: boolean;
   attestation?: TallyAttestation;
+  ballotRef?: BallotRef;
 }
 
 export interface TallyAttestation {

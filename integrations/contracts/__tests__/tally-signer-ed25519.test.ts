@@ -313,3 +313,38 @@ describe('integration: governor.finalize() with the real signer', () => {
     expect(res.signers.sort()).toEqual(['0xC1', '0xC2']);
   });
 });
+
+import { BallotRef } from '../mode-a-tally';
+
+describe('tallyPreimage ballotRef binding', () => {
+  const ref: BallotRef = { ballotId: 'b-2026-recall', receiptLogDigest: 'abc123' };
+
+  it('is byte-identical to the no-ballotRef encoding when absent (backward compatible)', () => {
+    const noRef = baseTally();                       // no ballotRef
+    const withRef = baseTally({ ballotRef: ref });
+    const pmNo = tallyPreimage(noRef);
+    const pmWith = tallyPreimage(withRef);
+    // no-ballotRef preimage is a strict prefix of the with-ballotRef one, and shorter
+    expect(pmWith.length).toBeGreaterThan(pmNo.length);
+    expect(pmWith.subarray(0, pmNo.length).equals(pmNo)).toBe(true);
+    // the no-ballotRef preimage contains no sentinel bytes
+    expect(pmNo.includes(Buffer.from('ballotref.v1'))).toBe(false);
+    expect(pmWith.includes(Buffer.from('ballotref.v1'))).toBe(true);
+  });
+
+  it('binds ballotRef into the signature — tampering the digest fails verification', () => {
+    const keyring = { '0xC1': generateCommitteeKeypair(), '0xC2': generateCommitteeKeypair(), '0xC3': generateCommitteeKeypair() };
+    const committee = ['0xC1', '0xC2', '0xC3'];
+    const tally = baseTally({ ballotRef: ref });
+    const att = new Ed25519MultisigSigner(keyring).sign(tally, ['0xC1', '0xC2'], committee, 2);
+    const pub = Object.fromEntries(Object.entries(keyring).map(([id, kp]) => [id, kp.publicKey]));
+
+    expect(verifyTallyAttestation(tally, att, pub, 2).valid).toBe(true);
+
+    const tampered = baseTally({ ballotRef: { ballotId: ref.ballotId, receiptLogDigest: 'DIFFERENT' } });
+    expect(verifyTallyAttestation(tampered, att, pub, 2).valid).toBe(false);
+
+    const tamperedId = baseTally({ ballotRef: { ballotId: 'OTHER-BALLOT', receiptLogDigest: ref.receiptLogDigest } });
+    expect(verifyTallyAttestation(tamperedId, att, pub, 2).valid).toBe(false);
+  });
+});
