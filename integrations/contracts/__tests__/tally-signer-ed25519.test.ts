@@ -213,6 +213,77 @@ describe('verifyTallyAttestation', () => {
     expect(res.valid).toBe(false);
     expect(res.reason).toMatch(/threshold/i);
   });
+
+  it.each([0, -1, 1.5, NaN])(
+    'rejects a non-safe-integer threshold (%p) at the verifier (fail-closed, not just NaN < 1)',
+    (threshold) => {
+      const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+      const res = verifyTallyAttestation(baseTally(), att, pubKeyring(keyring), threshold);
+      expect(res.valid).toBe(false);
+      expect(res.reason).toMatch(/invalid threshold/i);
+    }
+  );
+
+  it('rejects an attestation whose algo is not ed25519-multisig, even with populated signatures', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    const wrongAlgo = { ...att, algo: 'stub-mofn' };
+    const res = verifyTallyAttestation(baseTally(), wrongAlgo, pubKeyring(keyring), 2);
+    expect(res.valid).toBe(false);
+    expect(res.reason).toMatch(/algorithm/i);
+  });
+
+  it('counts distinct KEY MATERIAL toward threshold, not distinct ids (one key under two ids cannot satisfy 2-of-3)', () => {
+    // 0xC1 and 0xC2 are assigned the SAME committee keypair (key reuse across ids).
+    const sharedKp = generateCommitteeKeypair();
+    const aliasedKeyring: Record<string, CommitteeKeypair> = {
+      '0xC1': sharedKp,
+      '0xC2': sharedKp,
+      '0xC3': generateCommitteeKeypair(),
+    };
+    const tally = baseTally();
+    const msg = tallyPreimage(tally);
+    const priv = makePriv({ key: Buffer.from(sharedKp.privateKey, 'hex'), type: 'pkcs8', format: 'der' });
+    const sigHex = (edSign2(null, msg, priv) as Buffer).toString('hex');
+    // One private key's signature, placed under both ids -> only 1 unique key.
+    const att = {
+      algo: 'ed25519-multisig',
+      approvers: ['0xC1', '0xC2'],
+      signatures: { '0xC1': sigHex, '0xC2': sigHex },
+    };
+    const res = verifyTallyAttestation(tally, att, pubKeyring(aliasedKeyring), 2);
+    expect(res.valid).toBe(false);
+
+    // Sanity: a genuine 2-of-3 with DISTINCT keys still passes at the same threshold.
+    const genuine = new Ed25519MultisigSigner(keyring).sign(tally, ['0xC1', '0xC2'], committee, 2);
+    const genuineRes = verifyTallyAttestation(tally, genuine, pubKeyring(keyring), 2);
+    expect(genuineRes.valid).toBe(true);
+  });
+
+  it('rejects a signature with trailing junk appended after a valid signature (Buffer.from truncation)', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    const good = att.signatures!['0xC1'];
+    att.signatures!['0xC1'] = good + 'ff'; // 130 hex chars: still hex, but wrong length
+    const res = verifyTallyAttestation(baseTally(), att, pubKeyring(keyring), 2);
+    expect(res.valid).toBe(false);
+  });
+
+  it('rejects a signature with a trailing non-hex char appended (Buffer.from silently truncates and would otherwise still verify)', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    const good = att.signatures!['0xC1'];
+    // Append (not replace) a non-hex char after an otherwise-complete, valid signature.
+    // Buffer.from(good + 'z', 'hex') truncates at 'z' and reproduces the exact original
+    // 64-byte buffer, so without length/format validation this would still verify true.
+    att.signatures!['0xC1'] = good + 'z';
+    const res = verifyTallyAttestation(baseTally(), att, pubKeyring(keyring), 2);
+    expect(res.valid).toBe(false);
+  });
+
+  it('rejects a malformed (wrong-length) public key even when it is valid hex', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    const badKeyring = { ...pubKeyring(keyring), '0xC1': pubKeyring(keyring)['0xC1'].slice(0, -2) };
+    const res = verifyTallyAttestation(baseTally(), att, badKeyring, 2);
+    expect(res.valid).toBe(false);
+  });
 });
 
 describe('integration: governor.finalize() with the real signer', () => {

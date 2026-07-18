@@ -103,6 +103,16 @@ export interface VerifyResult {
   reason?: string;
 }
 
+// Canonical-hex + exact-length guard, checked BEFORE any Buffer.from(x, 'hex')
+// decode. Buffer.from silently stops at the first non-hex character instead of
+// throwing, so a string like `<valid 128-char sig>z` decodes to the exact same
+// 64 bytes as the valid signature, quietly discarding the trailing garbage
+// instead of rejecting the input. Validating length in hex chars (2 per byte)
+// against an expected byte count closes that smuggling path.
+function isHex(s: string, expectedBytes: number): boolean {
+  return typeof s === 'string' && /^[0-9a-fA-F]+$/.test(s) && s.length === expectedBytes * 2;
+}
+
 // Verification on PUBLIC material only — needs no signer, no governor, no
 // private keys, no outside authority. WE own and run this on our own
 // infrastructure, on our own command; it never waits on anyone else to bless
@@ -123,8 +133,11 @@ export function verifyTallyAttestation(
   publicKeyring: Record<string, string>,
   threshold: number
 ): VerifyResult {
-  if (threshold < 1) {
-    return { valid: false, signers: [], reason: `invalid threshold: ${threshold} < 1` };
+  if (attestation.algo !== 'ed25519-multisig') {
+    return { valid: false, signers: [], reason: `unsupported attestation algorithm: ${attestation.algo}` };
+  }
+  if (!Number.isSafeInteger(threshold) || threshold < 1) {
+    return { valid: false, signers: [], reason: `invalid threshold: ${threshold}` };
   }
   const sigs = attestation.signatures;
   if (!sigs || Object.keys(sigs).length === 0) {
@@ -132,10 +145,21 @@ export function verifyTallyAttestation(
   }
   const msg = tallyPreimage(tally);
   const verified: string[] = [];
+  // Distinct PUBLIC KEY material, not distinct ids -- if the keyring maps two
+  // ids to the same key, one private key must not be able to satisfy a
+  // multi-party quorum. Reported `signers` stays id-based; the threshold gate
+  // below keys off this set instead.
+  const distinctKeys = new Set<string>();
   for (const [id, sigHex] of Object.entries(sigs)) {
     const pubHex = publicKeyring[id];
     if (!pubHex) {
       return { valid: false, signers: [], reason: `signer ${id} not in committee keyring` };
+    }
+    if (!isHex(sigHex, 64)) {
+      return { valid: false, signers: [], reason: `malformed signature encoding from ${id}` };
+    }
+    if (!isHex(pubHex, 44)) {
+      return { valid: false, signers: [], reason: `malformed public key encoding for ${id}` };
     }
     let ok = false;
     try {
@@ -148,13 +172,18 @@ export function verifyTallyAttestation(
       return { valid: false, signers: [], reason: `invalid signature from ${id}` };
     }
     verified.push(id);
+    distinctKeys.add(pubHex.toLowerCase());
   }
   // Defense-in-depth, not a correctness requirement: `verified` entries come
   // from Object.entries(sigs), whose keys are already unique, so this dedup
   // is belt-and-suspenders against a future non-object signature container.
   const distinct = Array.from(new Set(verified));
-  if (distinct.length < threshold) {
-    return { valid: false, signers: distinct, reason: `below threshold: ${distinct.length} < ${threshold}` };
+  if (distinctKeys.size < threshold) {
+    return {
+      valid: false,
+      signers: distinct,
+      reason: `below threshold: ${distinctKeys.size} distinct keys < ${threshold}`,
+    };
   }
   return { valid: true, signers: distinct };
 }
