@@ -1,5 +1,6 @@
 // contracts/__tests__/member-registry-model.test.ts
 import { MemberRegistryModel } from '../member-registry-model';
+import { EqualWeightGovernorModel } from '../equalweight-governor-model';
 
 describe('MemberRegistryModel', () => {
   const withCommittee = (config = {}) => {
@@ -51,5 +52,24 @@ describe('MemberRegistryModel', () => {
     r.enrol({ id: '0xB' }, ['0xC1', '0xC2']);
     r.revoke('0xB', ['0xC1', '0xC2']);
     expect(r.roll().map((m) => m.id).sort()).toEqual(['0xA']);
+  });
+
+  it('roll() drives the governor: only enrolled members can vote', () => {
+    const r = withCommittee();
+    r.enrol({ id: '0xA' }, ['0xC1', '0xC2']);
+    r.enrol({ id: '0xB' }, ['0xC1', '0xC2']);
+
+    const gov = new EqualWeightGovernorModel();
+    gov.setRoll(r.roll());
+    gov.createProposal('p', 'x');
+    gov.castVote('p', '0xA', true);
+    gov.castVote('p', '0xB', false);
+
+    const t = gov.tally('p');
+    expect(t.eligibleCount).toBe(2);
+    expect(t.votesFor).toBe(1);
+    expect(t.votesAgainst).toBe(1);
+    // a member NOT on the registry roll is rejected by the governor
+    expect(() => gov.castVote('p', '0xSTRANGER', true)).toThrow(/roll|eligible/i);
   });
 });
