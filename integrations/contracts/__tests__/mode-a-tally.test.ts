@@ -141,4 +141,29 @@ describe('EqualWeightGovernorModel.ingestSecretTally', () => {
     const t2 = g.tally('p1');
     expect(t2.votesFor).toBe(3);     // stored state is unaffected
   });
+
+  it('mutating the object returned by ingestSecretTally does not corrupt stored state', () => {
+    const g = gov();
+    const r = g.ingestSecretTally('p1', { votesFor: 3, votesAgainst: 1, abstentions: 0, ballotRef: { ballotId: 'b1', receiptLogDigest: 'd1' } });
+    r.votesFor = 999;
+    r.ballotRef!.receiptLogDigest = 'HACKED';
+    const t = g.tally('p1');
+    expect(t.votesFor).toBe(3);
+    expect(t.ballotRef!.receiptLogDigest).toBe('d1');
+  });
+
+  it('mutating the input counts.ballotRef after ingest does not corrupt stored state', () => {
+    const g = gov();
+    const ref = { ballotId: 'b1', receiptLogDigest: 'd1' };
+    g.ingestSecretTally('p1', { votesFor: 3, votesAgainst: 1, abstentions: 0, ballotRef: ref });
+    ref.receiptLogDigest = 'HACKED';
+    expect(g.tally('p1').ballotRef!.receiptLogDigest).toBe('d1');
+  });
+
+  it('mutating the nested ballotRef from tally() does not corrupt stored state', () => {
+    const g = gov();
+    g.ingestSecretTally('p1', { votesFor: 3, votesAgainst: 1, abstentions: 0, ballotRef: { ballotId: 'b1', receiptLogDigest: 'd1' } });
+    g.tally('p1').ballotRef!.receiptLogDigest = 'HACKED';
+    expect(g.tally('p1').ballotRef!.receiptLogDigest).toBe('d1');
+  });
 });

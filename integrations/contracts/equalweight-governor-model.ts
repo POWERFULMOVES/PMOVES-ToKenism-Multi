@@ -131,6 +131,10 @@ export class EqualWeightGovernorModel {
     this.committee = new Set(memberIds);
   }
 
+  private cloneTally(t: TallyResult): TallyResult {
+    return { ...t, ...(t.ballotRef ? { ballotRef: { ...t.ballotRef } } : {}) };
+  }
+
   finalize(proposalId: string, approvers: string[]): TallyResult {
     const result = this.tally(proposalId);
     const attestation = this.signer.sign(
@@ -208,19 +212,19 @@ export class EqualWeightGovernorModel {
       quorumMet: outcome.quorumMet,
       passed: outcome.passed,
       finalized: false,
-      ...(counts.ballotRef ? { ballotRef: counts.ballotRef } : {}),
+      ...(counts.ballotRef ? { ballotRef: { ...counts.ballotRef } } : {}),
     };
     // lock on first SUCCESSFUL ingest — a rejected attempt does not lock the mode
     proposal.mode = 'secret';
     proposal.ingestedTally = result;
-    return result;
+    return this.cloneTally(result);
   }
 
   tally(proposalId: string): TallyResult {
     const proposal = this.proposals.get(proposalId);
     if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
     if (proposal.mode === 'secret' && proposal.ingestedTally) {
-      return { ...proposal.ingestedTally };
+      return this.cloneTally(proposal.ingestedTally);
     }
 
     let votesFor = 0;
