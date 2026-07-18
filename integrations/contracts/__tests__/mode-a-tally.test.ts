@@ -58,3 +58,64 @@ describe('EqualWeightGovernorModel abstentionPolicy config', () => {
     expect((gov as unknown as { config: { abstentionPolicy: string } }).config.abstentionPolicy).toBe('quorum');
   });
 });
+
+import { Ed25519MultisigSigner, generateCommitteeKeypair, verifyTallyAttestation } from '../tally-signer-ed25519';
+
+describe('EqualWeightGovernorModel.ingestSecretTally', () => {
+  function gov(overrides = {}) {
+    const g = new EqualWeightGovernorModel({ committeeSize: 3, committeeThreshold: 2, ...overrides });
+    g.setRoll([{ id: 'A' }, { id: 'B' }, { id: 'C' }, { id: 'D' }, { id: 'E' }]); // 5 eligible
+    g.createProposal('p1', 'Recall');
+    return g;
+  }
+
+  it('sources eligibleCount from the roll and derives voterCount', () => {
+    const g = gov();
+    const t = g.ingestSecretTally('p1', { votesFor: 3, votesAgainst: 1, abstentions: 0 });
+    expect(t.eligibleCount).toBe(5);
+    expect(t.voterCount).toBe(4);
+    expect(t.turnout).toBeCloseTo(0.8, 6);
+  });
+
+  it('locks the proposal to secret mode — a later castVote throws', () => {
+    const g = gov();
+    g.ingestSecretTally('p1', { votesFor: 3, votesAgainst: 1, abstentions: 0 });
+    expect(() => g.castVote('p1', 'A', true)).toThrow(/mode|secret|named/i);
+  });
+
+  it('refuses ingestion on a proposal already used for named votes', () => {
+    const g = gov();
+    g.castVote('p1', 'A', true);
+    expect(() => g.ingestSecretTally('p1', { votesFor: 1, votesAgainst: 0, abstentions: 0 })).toThrow(/mode|secret|named/i);
+  });
+
+  it('propagates the voterCount<=eligibleCount guard', () => {
+    const g = gov();
+    expect(() => g.ingestSecretTally('p1', { votesFor: 4, votesAgainst: 2, abstentions: 0 })).toThrow(/exceeds|eligible/i);
+  });
+
+  it('tally() returns the ingested result for a secret proposal', () => {
+    const g = gov();
+    const ingested = g.ingestSecretTally('p1', { votesFor: 3, votesAgainst: 1, abstentions: 0 });
+    expect(g.tally('p1')).toEqual(ingested);
+  });
+
+  it('finalize() signs an ingested tally and verifyTallyAttestation accepts, with ballotRef in the signed bytes', () => {
+    const keyring = { '0xC1': generateCommitteeKeypair(), '0xC2': generateCommitteeKeypair(), '0xC3': generateCommitteeKeypair() };
+    const g = new EqualWeightGovernorModel({ committeeSize: 3, committeeThreshold: 2 }, new Ed25519MultisigSigner(keyring));
+    g.setRoll([{ id: 'A' }, { id: 'B' }, { id: 'C' }, { id: 'D' }, { id: 'E' }]);
+    g.setCommittee(['0xC1', '0xC2', '0xC3']);
+    g.createProposal('p1', 'Recall');
+    g.ingestSecretTally('p1', { votesFor: 3, votesAgainst: 1, abstentions: 1, ballotRef: { ballotId: 'b1', receiptLogDigest: 'd1' } });
+
+    const result = g.finalize('p1', ['0xC1', '0xC2']);
+    expect(result.finalized).toBe(true);
+    expect(result.ballotRef).toEqual({ ballotId: 'b1', receiptLogDigest: 'd1' });
+
+    const pub = Object.fromEntries(Object.entries(keyring).map(([id, kp]) => [id, kp.publicKey]));
+    expect(verifyTallyAttestation(result, result.attestation!, pub, 2).valid).toBe(true);
+    // tampering the bound ballotRef breaks verification
+    const tampered = { ...result, ballotRef: { ballotId: 'b1', receiptLogDigest: 'HACKED' } };
+    expect(verifyTallyAttestation(tampered, result.attestation!, pub, 2).valid).toBe(false);
+  });
+});

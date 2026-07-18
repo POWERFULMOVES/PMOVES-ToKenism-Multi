@@ -1,5 +1,5 @@
 // contracts/equalweight-governor-model.ts
-import { AbstentionPolicy, BallotRef } from './mode-a-tally';
+import { AbstentionPolicy, BallotRef, SecretTallyCounts, computeSecretOutcome } from './mode-a-tally';
 
 export type VotingBasis = 'member' | 'unit' | 'share';
 
@@ -90,6 +90,8 @@ interface Proposal {
   title: string;
   closesAtWeek?: number;
   votes: Map<string, boolean>; // voter -> support
+  mode?: 'named' | 'secret';       // set on first intake; locks the proposal to one path
+  ingestedTally?: TallyResult;     // secret proposals: the precomputed result tally() returns
 }
 
 export class EqualWeightGovernorModel {
@@ -167,6 +169,10 @@ export class EqualWeightGovernorModel {
   castVote(proposalId: string, voter: string, support: boolean): void {
     const proposal = this.proposals.get(proposalId);
     if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
+    if (proposal.mode === 'secret') {
+      throw new Error(`Proposal ${proposalId} is in secret mode; named castVote is not allowed`);
+    }
+    proposal.mode = 'named';
     if (!this.roll.has(voter)) {
       throw new Error(`${voter} is not on the eligible roll`);
     }
@@ -176,9 +182,44 @@ export class EqualWeightGovernorModel {
     proposal.votes.set(voter, support);
   }
 
+  ingestSecretTally(proposalId: string, counts: SecretTallyCounts): TallyResult {
+    const proposal = this.proposals.get(proposalId);
+    if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
+    if (proposal.mode === 'named') {
+      throw new Error(`Proposal ${proposalId} is in named mode; secret ingestion is not allowed`);
+    }
+    proposal.mode = 'secret';
+    const outcome = computeSecretOutcome(
+      { votesFor: counts.votesFor, votesAgainst: counts.votesAgainst, abstentions: counts.abstentions },
+      this.roll.size,
+      {
+        abstentionPolicy: this.config.abstentionPolicy,
+        quorumPercentage: this.config.quorumPercentage,
+        passThreshold: this.config.passThreshold,
+      }
+    );
+    const result: TallyResult = {
+      proposalId,
+      votesFor: outcome.votesFor,
+      votesAgainst: outcome.votesAgainst,
+      eligibleCount: outcome.eligibleCount,
+      voterCount: outcome.voterCount,
+      turnout: outcome.turnout,
+      quorumMet: outcome.quorumMet,
+      passed: outcome.passed,
+      finalized: false,
+      ...(counts.ballotRef ? { ballotRef: counts.ballotRef } : {}),
+    };
+    proposal.ingestedTally = result;
+    return result;
+  }
+
   tally(proposalId: string): TallyResult {
     const proposal = this.proposals.get(proposalId);
     if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
+    if (proposal.mode === 'secret' && proposal.ingestedTally) {
+      return proposal.ingestedTally;
+    }
 
     let votesFor = 0;
     let votesAgainst = 0;
