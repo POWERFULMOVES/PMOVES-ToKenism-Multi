@@ -55,9 +55,12 @@ export interface CommitteeKeypair {
   privateKey: string;
 }
 
-// Sim/test convenience. Real deployments supply keys out of band (custody is a
-// counsel-gated decision — hardware token / per-device / paper-backed — and is
-// deliberately NOT coded here; keys are injected).
+// Sim/test convenience. Keys are INJECTED, never hardcoded — because who holds
+// the committee private keys IS who holds the authority, and that choice
+// belongs to the group deciding where its own power sits (hardware token /
+// per-device / paper-backed). Counsel can inform the mechanics; it does not
+// grant the authority. Custody is deliberately not coded here so the community
+// wires in its own — we build the rails, the group holds the keys.
 export function generateCommitteeKeypair(): CommitteeKeypair {
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
   return {
@@ -100,8 +103,15 @@ export interface VerifyResult {
   reason?: string;
 }
 
-// Third-party verification on PUBLIC material only — needs no signer or
-// governor. An AG/bank runs this with the published committee public keys.
+// Verification on PUBLIC material only — needs no signer, no governor, no
+// private keys, no outside authority. WE own and run this on our own
+// infrastructure, on our own command; it never waits on anyone else to bless
+// a result. Because it needs only public keys, the SAME proof is independently
+// checkable by anyone we choose to show — a member on their own laptop who
+// distrusts the operator, or an external party if we decide to open the books.
+// That is transparency we extend outward, not a gate we stand behind: the
+// forge-resistance means even the operator/builder cannot fake a result, which
+// is what makes the tally trustworthy to the group itself.
 // Requires EVERY listed signature to verify AND at least `threshold` distinct
 // committee signers. Any unknown id, bad signature, or short count => invalid,
 // with a reason (informing, not just a boolean). Consumers should recompute
