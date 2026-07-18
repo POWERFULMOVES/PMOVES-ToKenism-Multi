@@ -52,6 +52,9 @@ export function assertCommitteeThreshold(
   committee: string[],
   threshold: number
 ): string[] {
+  if (!Number.isSafeInteger(threshold) || threshold < 1) {
+    throw new Error(`invalid threshold: ${threshold}`);
+  }
   const unique = Array.from(new Set(approvers));
   for (const a of unique) {
     if (!committee.includes(a)) {

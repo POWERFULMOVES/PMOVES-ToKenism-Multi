@@ -208,5 +208,14 @@ describe('EqualWeightGovernorModel', () => {
     it('rejects an approver not on the committee', () => {
       expect(() => assertCommitteeThreshold(['0xC1', '0xSTRANGER'], committee, 2)).toThrow(/committee/i);
     });
+
+    it.each([0, -1, 1.5, NaN])(
+      'rejects a non-safe-integer threshold (%p) before any dedupe/membership logic',
+      (threshold) => {
+        expect(() => assertCommitteeThreshold(['0xC1', '0xC2'], committee, threshold)).toThrow(
+          /invalid threshold/i
+        );
+      }
+    );
   });
 });
