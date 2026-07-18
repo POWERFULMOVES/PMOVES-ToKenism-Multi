@@ -128,6 +128,9 @@ export function verifyTallyAttestation(
     }
     verified.push(id);
   }
+  // Defense-in-depth, not a correctness requirement: `verified` entries come
+  // from Object.entries(sigs), whose keys are already unique, so this dedup
+  // is belt-and-suspenders against a future non-object signature container.
   const distinct = Array.from(new Set(verified));
   if (distinct.length < threshold) {
     return { valid: false, signers: distinct, reason: `below threshold: ${distinct.length} < ${threshold}` };

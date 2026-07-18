@@ -176,6 +176,36 @@ describe('verifyTallyAttestation', () => {
     const res = verifyTallyAttestation(baseTally(), { algo: 'ed25519-multisig', approvers: [] }, pubKeyring(keyring), 2);
     expect(res.valid).toBe(false);
   });
+
+  it('rejects a malformed signature without throwing', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    att.signatures!['0xC1'] = 'zznothex'; // non-hex / corrupt
+    expect(() => verifyTallyAttestation(baseTally(), att, pubKeyring(keyring), 2)).not.toThrow();
+    const res = verifyTallyAttestation(baseTally(), att, pubKeyring(keyring), 2);
+    expect(res.valid).toBe(false);
+  });
+
+  it('rejects a malformed public key without throwing', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    const badKeyring = { ...pubKeyring(keyring), '0xC1': 'zznothex' };
+    expect(() => verifyTallyAttestation(baseTally(), att, badKeyring, 2)).not.toThrow();
+    const res = verifyTallyAttestation(baseTally(), att, badKeyring, 2);
+    expect(res.valid).toBe(false);
+  });
+
+  it('rejects the whole attestation if any single signature is invalid (all-must-verify)', () => {
+    const att = new Ed25519MultisigSigner(keyring).sign(baseTally(), ['0xC1', '0xC2'], committee, 2);
+    // corrupt exactly one signature's bytes while keeping it hex + right length,
+    // so it reaches edVerify and fails there, not the try/catch.
+    const good = att.signatures!['0xC2'];
+    const flippedChar = good[0] === '0' ? '1' : '0';
+    const flipped = flippedChar + good.slice(1);
+    expect(flipped).not.toEqual(good); // guard: the flip must actually change the byte
+    att.signatures!['0xC2'] = flipped;
+    const res = verifyTallyAttestation(baseTally(), att, pubKeyring(keyring), 2);
+    expect(res.valid).toBe(false);
+    expect(res.reason).toMatch(/invalid signature/i);
+  });
 });
 
 describe('integration: governor.finalize() with the real signer', () => {
