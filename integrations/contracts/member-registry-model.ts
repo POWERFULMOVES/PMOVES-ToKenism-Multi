@@ -62,4 +62,19 @@ export class MemberRegistryModel {
   isEligible(id: string): boolean {
     return this.members.get(id)?.status === 'active';
   }
+
+  revoke(memberId: string, approvers: string[]): void {
+    const existing = this.members.get(memberId);
+    if (!existing || existing.status !== 'active') {
+      throw new Error(`${memberId} is not an active member`);
+    }
+    this.assertCommitteeApproval(approvers);
+    existing.status = 'revoked';
+  }
+
+  roll(): EligibleMember[] {
+    return Array.from(this.members.values())
+      .filter((c) => c.status === 'active')
+      .map((c) => c.member);
+  }
 }
