@@ -1,5 +1,8 @@
 // contracts/__tests__/equalweight-governor-model.test.ts
-import { EqualWeightGovernorModel } from '../equalweight-governor-model';
+import {
+  EqualWeightGovernorModel,
+  MockThresholdSigner,
+} from '../equalweight-governor-model';
 
 describe('EqualWeightGovernorModel', () => {
   it('tallies weighted for/against and turnout under member basis', () => {
@@ -78,5 +81,41 @@ describe('EqualWeightGovernorModel', () => {
     const t = gov.tally('p');
     expect(t.quorumMet).toBe(true);
     expect(t.passed).toBe(true);
+  });
+
+  describe('committee finalize (M-of-N)', () => {
+    const build = () => {
+      const gov = new EqualWeightGovernorModel({ committeeThreshold: 2, committeeSize: 3 });
+      gov.setRoll([{ id: '0xA' }, { id: '0xB' }]);
+      gov.setCommittee(['0xC1', '0xC2', '0xC3']);
+      gov.createProposal('p', 'x');
+      gov.castVote('p', '0xA', true);
+      gov.castVote('p', '0xB', true);
+      return gov;
+    };
+
+    it('a single approver cannot finalize (no single party can forge)', () => {
+      const gov = build();
+      expect(() => gov.finalize('p', ['0xC1'])).toThrow(/threshold|approv/i);
+    });
+
+    it('k valid committee approvers finalize and attest', () => {
+      const gov = build();
+      const result = gov.finalize('p', ['0xC1', '0xC2']);
+      expect(result.finalized).toBe(true);
+      expect(result.attestation?.approvers).toEqual(['0xC1', '0xC2']);
+      expect(result.attestation?.algo).toBe('stub-mofn');
+    });
+
+    it('rejects an approver who is not on the committee', () => {
+      const gov = build();
+      expect(() => gov.finalize('p', ['0xC1', '0xNOTCOMMITTEE'])).toThrow(/committee/i);
+    });
+
+    it('MockThresholdSigner throws below threshold', () => {
+      const signer = new MockThresholdSigner();
+      const tally = { proposalId: 'p' } as any;
+      expect(() => signer.sign(tally, ['0xC1'], ['0xC1', '0xC2', '0xC3'], 2)).toThrow(/threshold/i);
+    });
   });
 });

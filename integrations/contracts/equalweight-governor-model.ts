@@ -25,6 +25,46 @@ export interface TallyResult {
   quorumMet: boolean;
   passed: boolean;
   finalized: boolean;
+  attestation?: TallyAttestation;
+}
+
+export interface TallyAttestation {
+  algo: string;
+  approvers: string[];
+  signature: string;
+}
+
+export interface TallySigner {
+  sign(
+    tally: TallyResult,
+    approvers: string[],
+    committee: string[],
+    threshold: number
+  ): TallyAttestation;
+}
+
+// Sim stub: models the k-of-n GATE (the anti-forgery property); the signature
+// bytes are stubbed. Real Ed25519/FROST implements this same interface later.
+export class MockThresholdSigner implements TallySigner {
+  sign(
+    tally: TallyResult,
+    approvers: string[],
+    committee: string[],
+    threshold: number
+  ): TallyAttestation {
+    const unique = Array.from(new Set(approvers));
+    for (const a of unique) {
+      if (!committee.includes(a)) {
+        throw new Error(`Approver ${a} is not on the committee`);
+      }
+    }
+    if (unique.length < threshold) {
+      throw new Error(
+        `Below committee threshold: ${unique.length} approvers < ${threshold}`
+      );
+    }
+    return { algo: 'stub-mofn', approvers: unique, signature: `stub:${tally.proposalId}` };
+  }
 }
 
 interface Proposal {
@@ -38,8 +78,13 @@ export class EqualWeightGovernorModel {
   private config: EqualWeightGovernorConfig;
   private roll: Map<string, EligibleMember> = new Map();
   private proposals: Map<string, Proposal> = new Map();
+  private committee: Set<string> = new Set();
+  private signer: TallySigner;
 
-  constructor(config: Partial<EqualWeightGovernorConfig> = {}) {
+  constructor(
+    config: Partial<EqualWeightGovernorConfig> = {},
+    signer: TallySigner = new MockThresholdSigner()
+  ) {
     this.config = {
       votingBasis: 'member',
       quorumPercentage: 0.5,
@@ -48,6 +93,22 @@ export class EqualWeightGovernorModel {
       committeeThreshold: 2,
       ...config,
     };
+    this.signer = signer;
+  }
+
+  setCommittee(memberIds: string[]): void {
+    this.committee = new Set(memberIds);
+  }
+
+  finalize(proposalId: string, approvers: string[]): TallyResult {
+    const result = this.tally(proposalId);
+    const attestation = this.signer.sign(
+      result,
+      approvers,
+      Array.from(this.committee),
+      this.config.committeeThreshold
+    );
+    return { ...result, finalized: true, attestation };
   }
 
   setRoll(members: EligibleMember[]): void {
