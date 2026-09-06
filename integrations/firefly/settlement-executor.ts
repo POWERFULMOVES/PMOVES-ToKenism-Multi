@@ -424,8 +424,12 @@ export class FireflySettlementExecutor {
     }
 
     if (this.config.requireDeploymentAttestation) {
+      // Gate 4 — the deployment manifest. Same keyring, same fail-closed
+      // semantics as the three gates above; it used to be the one check on
+      // this LIVE branch still satisfied by a non-empty string.
       validateSettlementDeploymentAttestation(this.config.deploymentAttestation, {
         requireFirefly: true,
+        keyring: this.config.signatureKeyring,
       });
     }
   }

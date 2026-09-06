@@ -1,4 +1,10 @@
 import type { SettlementSignature } from './settlement-planner';
+import {
+  assertSettlementSignature,
+  deploymentApprovalPreimage,
+  deploymentAttestationPreimage,
+  type SettlementKeyring,
+} from './settlement-signature';
 
 export interface SettlementDeploymentApproval {
   approval_id: string;
@@ -39,6 +45,16 @@ export interface SettlementDeploymentAttestationValidationOptions {
   requireWalletCustody?: boolean;
   requireFirefly?: boolean;
   now?: Date;
+  /**
+   * Keys used to VERIFY the manifest signature and each operator approval on
+   * it. There is no default and no bypass: with no keyring this validator
+   * rejects. Before this existed, both checks here were the same
+   * `Boolean(sig?.alg && sig.kid && sig.hmac)` truthiness test that the money
+   * path had already replaced, and this validator sits on the LIVE branch of
+   * both executors — so `hmac: 'abc123'` still satisfied a gate on real
+   * execution.
+   */
+  keyring?: SettlementKeyring;
 }
 
 export function validateSettlementDeploymentAttestation(
@@ -57,8 +73,11 @@ export function validateSettlementDeploymentAttestation(
     throw new Error('Deployment attestation environment is required');
   }
 
-  if (!isSigned(attestation.signature)) {
-    throw new Error('Deployment attestation must be signed');
+  // Structural completeness FIRST, then cryptographic verification. The
+  // approval list has to be known before the manifest signature can be
+  // checked, because the manifest signature covers the approval ids.
+  if (!Array.isArray(attestation.approvals) || attestation.approvals.length === 0) {
+    throw new Error('Deployment attestation requires at least one operator approval');
   }
 
   parseDate(attestation.signed_at, 'Deployment attestation signed_at');
@@ -76,12 +95,29 @@ export function validateSettlementDeploymentAttestation(
     validateFireflyBinding(attestation.firefly);
   }
 
-  if (!Array.isArray(attestation.approvals) || attestation.approvals.length === 0) {
-    throw new Error('Deployment attestation requires at least one operator approval');
-  }
+  assertSettlementSignature(
+    'Deployment attestation signature',
+    attestation.signature,
+    deploymentAttestationPreimage({
+      manifestId: attestation.manifest_id,
+      environment: attestation.environment,
+      rpcRef: attestation.rpc_ref,
+      custodyType: attestation.wallet_custody?.custody_type,
+      custodySignerRef: attestation.wallet_custody?.signer_ref,
+      custodyPolicyRef: attestation.wallet_custody?.policy_ref,
+      custodyOperatorRef: attestation.wallet_custody?.operator_ref,
+      fireflyInstanceRef: attestation.firefly?.instance_ref,
+      fireflyEnvironment: attestation.firefly?.environment,
+      fireflyAccountRef: attestation.firefly?.account_ref,
+      signedAt: attestation.signed_at,
+      expiresAt: attestation.expires_at,
+      approvalIds: attestation.approvals.map((approval) => approval?.approval_id),
+    }),
+    options.keyring
+  );
 
   for (const approval of attestation.approvals) {
-    validateDeploymentApproval(approval, options.now);
+    validateDeploymentApproval(approval, attestation.manifest_id, options);
   }
 }
 
@@ -115,22 +151,44 @@ function validateFireflyBinding(binding: SettlementFireflyBinding | undefined): 
 
 function validateDeploymentApproval(
   approval: SettlementDeploymentApproval,
-  now: Date | undefined
+  manifestId: string,
+  options: SettlementDeploymentAttestationValidationOptions
 ): void {
+  if (!approval || typeof approval !== 'object') {
+    throw new Error('Deployment approval is required');
+  }
+
   if (approval.scope !== 'settlement_deployment_manifest') {
     throw new Error(`Deployment approval scope is invalid: ${approval.scope}`);
+  }
+
+  if (!approval.approval_id) {
+    throw new Error('Deployment approval must include approval_id');
   }
 
   if (!approval.approved_by) {
     throw new Error('Deployment approval must include approved_by');
   }
 
-  if (!isSigned(approval.signature)) {
-    throw new Error('Deployment approval must be signed');
-  }
-
   parseDate(approval.approved_at, 'Deployment approval approved_at');
-  assertNotExpired(approval.expires_at, now, 'Deployment approval');
+  assertNotExpired(approval.expires_at, options.now, 'Deployment approval');
+
+  // Bound to the manifest it approves, using the ENCLOSING attestation's id
+  // rather than a self-declared one, so an approval cannot be lifted from
+  // another manifest.
+  assertSettlementSignature(
+    'Deployment approval signature',
+    approval.signature,
+    deploymentApprovalPreimage({
+      approvalId: approval.approval_id,
+      manifestId,
+      scope: approval.scope,
+      approvedBy: approval.approved_by,
+      approvedAt: approval.approved_at,
+      expiresAt: approval.expires_at,
+    }),
+    options.keyring
+  );
 }
 
 function assertNotExpired(expiresAt: string | undefined, now: Date | undefined, label: string): void {
@@ -153,6 +211,3 @@ function parseDate(value: string, field: string): Date {
   return date;
 }
 
-function isSigned(signature: SettlementSignature | undefined): signature is SettlementSignature {
-  return Boolean(signature?.alg && signature.kid && signature.hmac);
-}

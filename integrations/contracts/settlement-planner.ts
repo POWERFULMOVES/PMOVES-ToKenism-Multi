@@ -8,6 +8,12 @@
 
 import { createHash } from 'crypto';
 import type { CGPContributor, CGPDocument } from './chit';
+import {
+  hasSettlementProof,
+  settlementRequestPreimage,
+  signSettlement,
+  type SettlementKeyring,
+} from './settlement-signature';
 
 export type SettlementLane = 'firefly' | 'contract' | 'manual';
 
@@ -19,10 +25,19 @@ export type SettlementAction =
   | 'vault_stake'
   | 'governance_record';
 
+/**
+ * `alg` is the discriminator and it selects which field carries the proof.
+ * `hmac` is therefore OPTIONAL: it is the proof field of hmac-sha256 only, and
+ * an Ed25519 algorithm registered in settlement-signature.ts carries its proof
+ * in `sig`. Declaring `hmac` required forced every producer and every fixture
+ * to invent one, which is how `hmac: 'abc123'` became idiomatic in this repo.
+ * Presence of the right proof field is checked by `hasSettlementProof`;
+ * VALIDITY is checked only by `verifySettlementSignature`.
+ */
 export interface SettlementSignature {
   alg: string;
   kid: string;
-  hmac: string;
+  hmac?: string;
   [key: string]: unknown;
 }
 
@@ -189,23 +204,63 @@ function normalizeCgpSpec(spec: CGPDocument['spec']): 'chit.cgp.v0.2' | 'chit.cg
   throw new Error(`Unsupported settlement CGP spec: ${spec}`);
 }
 
+/**
+ * Sign here, at the producer, with a keyring. This is the missing half of the
+ * money path: `signSettlement()` had no caller outside its own file, so no
+ * in-repo producer emitted a signature that was valid under
+ * `settlementRequestPreimage`, and every consumer test had to hand-write a
+ * placeholder proof.
+ *
+ * The preimage covers `agent_id`, so the event is assembled BEFORE it is
+ * signed.
+ */
+export interface SettlementAttestationKeyring {
+  agentId: string;
+  kid: string;
+  keyring: SettlementKeyring;
+  alg?: string;
+}
+
+/**
+ * Pre-computed signature. Only a STRUCTURAL check is applied here — a producer
+ * cannot verify a proof it did not mint without the key, and pretending
+ * otherwise is what the old `signature?.hmac` check did. The gate that matters
+ * is in the executors.
+ */
+export interface SettlementAttestationPresigned {
+  agentId: string;
+  signature: SettlementSignature;
+}
+
 export function createSettlementRequestedEvent(
   batch: SettlementBatch,
-  attestation: { agentId: string; signature: SettlementSignature }
+  attestation: SettlementAttestationKeyring | SettlementAttestationPresigned
 ): SettlementRequestedEvent {
   if (!attestation.agentId) {
     throw new Error('Settlement event requires agentId');
   }
 
-  if (!attestation.signature?.hmac) {
-    throw new Error('Settlement event requires signature.hmac');
+  const unsigned = { ...batch, agent_id: attestation.agentId };
+
+  if ('keyring' in attestation) {
+    return {
+      ...unsigned,
+      signature: signSettlement(
+        settlementRequestPreimage(unsigned),
+        attestation.kid,
+        attestation.keyring,
+        attestation.alg
+      ),
+    };
   }
 
-  return {
-    ...batch,
-    agent_id: attestation.agentId,
-    signature: attestation.signature,
-  };
+  if (!hasSettlementProof(attestation.signature)) {
+    throw new Error(
+      'Settlement event requires a signature with alg, kid and a proof for that alg'
+    );
+  }
+
+  return { ...unsigned, signature: attestation.signature };
 }
 
 function validateConfig(config: SettlementPlannerConfig): void {
