@@ -3,25 +3,31 @@ import {
   validateTokenismActivationPack,
   type TokenismActivationPack,
 } from '../tokenism-activation-pack';
+import type { SettlementDeploymentAttestation } from '../settlement-deployment-attestation';
+import {
+  TEST_DEPLOYMENT_KID,
+  forgedSignature,
+  placeholderSignature,
+  signDeploymentAttestation,
+  testKeyring,
+} from '../../testing/settlement-fixtures';
 
-const SIGNATURE = { alg: 'HMAC-SHA256', kid: 'operator-test', hmac: 'sig' };
+const KEYRING = testKeyring();
 
-function activationPack(): TokenismActivationPack {
-  return {
-    spec: 'tokenism.activation.pack.v1',
-    deployment_manifest_id: 'tokenism-staging-20260609',
-    environment: 'staging',
-    chain_id: 31337,
-    network: 'hardhat',
-    contract_addresses: {
-      GroToken: '0x1111111111111111111111111111111111111111',
-      FoodUSD: '0x2222222222222222222222222222222222222222',
-    },
-    rpc_endpoint_ref: 'secret:tokenism/staging/rpc',
-    wallet_custody_ref: 'vault:tokenism/staging/signer',
-    firefly_endpoint_ref: 'secret:firefly/staging/api',
-    operator_approval_id: 'approval_deployment_1234abcd5678ef00',
-    deployment_attestation: {
+/**
+ * Shape-only placeholder.
+ *
+ * The activation-pack validator checks the SHAPE of the executor signature,
+ * the pack signature and the dry-run evidence signatures; it does not MAC-verify
+ * them. Only the deployment attestation and its operator approvals are
+ * cryptographically verified, and those are signed for real below against
+ * KEYRING, so this constant is never the thing under test.
+ */
+const SHAPE_ONLY_SIGNATURE = { alg: 'HMAC-SHA256', kid: 'operator-test', hmac: 'sig' };
+
+function signedAttestation(): SettlementDeploymentAttestation {
+  return signDeploymentAttestation(
+    {
       manifest_id: 'tokenism-staging-20260609',
       environment: 'staging',
       rpc_ref: 'secret:tokenism/staging/rpc',
@@ -42,18 +48,38 @@ function activationPack(): TokenismActivationPack {
           approved_by: 'PMOVES-OPERATOR',
           approved_at: '2026-06-09T10:00:00Z',
           expires_at: '2099-01-01T00:00:00Z',
-          signature: SIGNATURE,
+          // Overwritten with a real MAC by signDeploymentAttestation.
+          signature: SHAPE_ONLY_SIGNATURE,
         },
       ],
       signed_at: '2026-06-09T10:01:00Z',
       expires_at: '2099-01-01T00:00:00Z',
-      signature: { alg: 'HMAC-SHA256', kid: 'deployment-manifest', hmac: 'manifest-sig' },
+      // Overwritten with a real MAC by signDeploymentAttestation.
+      signature: SHAPE_ONLY_SIGNATURE,
     },
-    deployment_attestation_sig: {
-      alg: 'HMAC-SHA256',
-      kid: 'deployment-manifest',
-      hmac: 'manifest-sig',
+    KEYRING
+  );
+}
+
+function activationPack(): TokenismActivationPack {
+  const deploymentAttestation = signedAttestation();
+
+  return {
+    spec: 'tokenism.activation.pack.v1',
+    deployment_manifest_id: 'tokenism-staging-20260609',
+    environment: 'staging',
+    chain_id: 31337,
+    network: 'hardhat',
+    contract_addresses: {
+      GroToken: '0x1111111111111111111111111111111111111111',
+      FoodUSD: '0x2222222222222222222222222222222222222222',
     },
+    rpc_endpoint_ref: 'secret:tokenism/staging/rpc',
+    wallet_custody_ref: 'vault:tokenism/staging/signer',
+    firefly_endpoint_ref: 'secret:firefly/staging/api',
+    operator_approval_id: 'approval_deployment_1234abcd5678ef00',
+    deployment_attestation: deploymentAttestation,
+    deployment_attestation_sig: deploymentAttestation.signature,
     executor_agent_id: 'PMOVES-AGENT-ZERO-CODEX',
     executor_signature: {
       alg: 'HMAC-SHA256',
@@ -114,16 +140,53 @@ describe('tokenism activation pack', () => {
 
     expect(() =>
       validateTokenismActivationPack(pack, {
+        keyring: KEYRING,
         trustedExecutorIds: ['PMOVES-AGENT-ZERO-CODEX'],
       })
     ).not.toThrow();
+  });
+
+  it('fails closed when no keyring is supplied', () => {
+    const pack = activationPack();
+
+    expect(() => validateTokenismActivationPack(pack)).toThrow(
+      'Deployment attestation signature: no settlement keyring configured'
+    );
+  });
+
+  it('rejects a forged or placeholder deployment attestation signature', () => {
+    const forged = activationPack();
+    forged.deployment_attestation.signature = forgedSignature(TEST_DEPLOYMENT_KID);
+    forged.deployment_attestation_sig = forged.deployment_attestation.signature;
+
+    expect(() => validateTokenismActivationPack(forged, { keyring: KEYRING })).toThrow(
+      'Deployment attestation signature'
+    );
+
+    const placeholder = activationPack();
+    placeholder.deployment_attestation.signature = placeholderSignature(TEST_DEPLOYMENT_KID);
+    placeholder.deployment_attestation_sig = placeholder.deployment_attestation.signature;
+
+    expect(() => validateTokenismActivationPack(placeholder, { keyring: KEYRING })).toThrow(
+      'Deployment attestation signature'
+    );
+  });
+
+  it('rejects an attestation tampered with after signing', () => {
+    const pack = activationPack();
+    pack.deployment_attestation.rpc_ref = 'secret:tokenism/staging/other-rpc';
+    pack.rpc_endpoint_ref = 'secret:tokenism/staging/other-rpc';
+
+    expect(() => validateTokenismActivationPack(pack, { keyring: KEYRING })).toThrow(
+      'Deployment attestation signature'
+    );
   });
 
   it('rejects raw RPC URLs', () => {
     const pack = activationPack();
     pack.rpc_endpoint_ref = 'https://rpc.example.test';
 
-    expect(() => validateTokenismActivationPack(pack)).toThrow(
+    expect(() => validateTokenismActivationPack(pack, { keyring: KEYRING })).toThrow(
       'rpc_endpoint_ref must be a secret-managed reference, not a raw URL'
     );
   });
@@ -132,7 +195,7 @@ describe('tokenism activation pack', () => {
     const pack = activationPack();
     pack.wallet_custody_ref = `0x${'a'.repeat(64)}`;
 
-    expect(() => validateTokenismActivationPack(pack)).toThrow(
+    expect(() => validateTokenismActivationPack(pack, { keyring: KEYRING })).toThrow(
       'wallet_custody_ref must be a custody reference, not a raw private key'
     );
   });
@@ -141,14 +204,14 @@ describe('tokenism activation pack', () => {
     const pack = activationPack();
     pack.deployment_manifest_id = 'tokenism-other-manifest';
 
-    expect(() => validateTokenismActivationPack(pack)).toThrow(
+    expect(() => validateTokenismActivationPack(pack, { keyring: KEYRING })).toThrow(
       'deployment_manifest_id must match deployment_attestation.manifest_id'
     );
 
     const approvalMismatch = activationPack();
     approvalMismatch.operator_approval_id = 'approval_missing';
 
-    expect(() => validateTokenismActivationPack(approvalMismatch)).toThrow(
+    expect(() => validateTokenismActivationPack(approvalMismatch, { keyring: KEYRING })).toThrow(
       'operator_approval_id must be present in deployment_attestation approvals'
     );
   });
@@ -157,32 +220,28 @@ describe('tokenism activation pack', () => {
     const rpcMismatch = activationPack();
     rpcMismatch.rpc_endpoint_ref = 'secret:tokenism/staging/other-rpc';
 
-    expect(() => validateTokenismActivationPack(rpcMismatch)).toThrow(
+    expect(() => validateTokenismActivationPack(rpcMismatch, { keyring: KEYRING })).toThrow(
       'rpc_endpoint_ref must match deployment_attestation.rpc_ref'
     );
 
     const walletMismatch = activationPack();
     walletMismatch.wallet_custody_ref = 'vault:tokenism/staging/other-signer';
 
-    expect(() => validateTokenismActivationPack(walletMismatch)).toThrow(
+    expect(() => validateTokenismActivationPack(walletMismatch, { keyring: KEYRING })).toThrow(
       'wallet_custody_ref must match deployment_attestation.wallet_custody.signer_ref'
     );
 
     const fireflyMismatch = activationPack();
     fireflyMismatch.firefly_endpoint_ref = 'secret:firefly/staging/other-api';
 
-    expect(() => validateTokenismActivationPack(fireflyMismatch)).toThrow(
+    expect(() => validateTokenismActivationPack(fireflyMismatch, { keyring: KEYRING })).toThrow(
       'firefly_endpoint_ref must match deployment_attestation.firefly.instance_ref'
     );
 
     const signatureMismatch = activationPack();
-    signatureMismatch.deployment_attestation_sig = {
-      alg: 'HMAC-SHA256',
-      kid: 'deployment-manifest',
-      hmac: 'other-manifest-sig',
-    };
+    signatureMismatch.deployment_attestation_sig = forgedSignature(TEST_DEPLOYMENT_KID);
 
-    expect(() => validateTokenismActivationPack(signatureMismatch)).toThrow(
+    expect(() => validateTokenismActivationPack(signatureMismatch, { keyring: KEYRING })).toThrow(
       'deployment_attestation_sig must match deployment_attestation.signature'
     );
   });
@@ -191,14 +250,14 @@ describe('tokenism activation pack', () => {
     const pack = activationPack();
     pack.dry_run_evidence = pack.dry_run_evidence.filter((item) => item.lane === 'firefly');
 
-    expect(() => validateTokenismActivationPack(pack)).toThrow(
+    expect(() => validateTokenismActivationPack(pack, { keyring: KEYRING })).toThrow(
       'Tokenism activation pack requires contract dry-run evidence'
     );
 
     const failedEvidence = activationPack();
     failedEvidence.dry_run_evidence[0].passed = false;
 
-    expect(() => validateTokenismActivationPack(failedEvidence)).toThrow(
+    expect(() => validateTokenismActivationPack(failedEvidence, { keyring: KEYRING })).toThrow(
       'dry_run_evidence did not pass: dryrun_firefly_1234abcd5678ef00'
     );
   });
@@ -208,6 +267,7 @@ describe('tokenism activation pack', () => {
 
     expect(() =>
       validateTokenismActivationPack(pack, {
+        keyring: KEYRING,
         trustedExecutorIds: ['HERMES'],
       })
     ).toThrow('Tokenism activation executor is not trusted: PMOVES-AGENT-ZERO-CODEX');
