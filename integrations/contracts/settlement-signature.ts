@@ -157,7 +157,8 @@ export function settlementApprovalPreimage(params: {
 // group, not to this file.
 //
 // Nothing in this module ever prints, logs, stringifies or embeds key material
-// in an error. Rejection reasons name the `kid` and byte LENGTHS only.
+// OR key lengths in an error. Rejection reasons name the `kid` and the required
+// minimum only — never anything measured from the supplied key.
 export interface SettlementKeyring {
   // Returns the secret key for `kid`, or undefined if this keyring does not
   // hold one. Returning undefined must mean REJECT, never "skip the check".
@@ -190,8 +191,12 @@ export class InMemorySettlementKeyring implements SettlementKeyring {
       material = key;
     }
     if (material.length < MIN_KEY_BYTES) {
+      // The observed length is deliberately NOT reported. It is a property of
+      // supplied key material, and the invariant this file states twice (at the
+      // keyring contract and at kids()) is that no key material and no key
+      // length ever leaves this module. The requirement is enough to act on.
       throw new Error(
-        `key for kid ${kid} is ${material.length} bytes; minimum is ${MIN_KEY_BYTES}`
+        `key for kid ${kid} is shorter than the ${MIN_KEY_BYTES}-byte minimum`
       );
     }
     this.keys.set(kid, material);
@@ -283,6 +288,16 @@ export interface SettlementVerifyResult {
 // decode — the same smuggling path closed in tally-signer-ed25519.ts. Without
 // it, `<valid 64-char proof>z` decodes to the identical bytes as the valid
 // proof, silently discarding the trailing garbage instead of rejecting.
+// Own-property read. A bare index would consult the prototype chain, so with
+// `Object.prototype.hmac` polluted, a signature that OMITS `hmac` inherits one
+// and can verify. Settlement events are JSON.parse'd off NATS, i.e. the shape
+// of the object is attacker-influenced, so the read must be own-property only.
+function readOwnField(source: object, field: string): unknown {
+  return Object.prototype.hasOwnProperty.call(source, field)
+    ? (source as Record<string, unknown>)[field]
+    : undefined;
+}
+
 function decodeProof(value: unknown, expectedBytes: number): Buffer | undefined {
   if (typeof value !== 'string') {
     return undefined;
@@ -323,7 +338,7 @@ export function verifySettlementSignature(
     return { valid: false, reason: 'no settlement keyring configured' };
   }
   const proof = decodeProof(
-    (signature as Record<string, unknown>)[algorithm.proofField],
+    readOwnField(signature, algorithm.proofField),
     algorithm.proofBytes
   );
   if (!proof) {
