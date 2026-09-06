@@ -1,5 +1,7 @@
 // contracts/settlement-signature.ts
-// Real MAC verification for the settlement money path.
+// Real MAC verification for the settlement money path — BOTH executors on it
+// (firefly/settlement-executor.ts and contracts/contract-settlement-executor.ts)
+// plus the deployment attestation that gates them.
 //
 // Before this module, `isSigned()` in firefly/settlement-executor.ts was a
 // truthiness check on three strings — `Boolean(sig?.alg && sig.kid && sig.hmac)`
@@ -34,7 +36,15 @@ export const SETTLEMENT_DOMAIN = 'pmoves.settlement.v1';
 export type SettlementSignaturePurpose =
   | 'settlement.request'
   | 'settlement.executor'
-  | 'settlement.operator_approval';
+  | 'settlement.operator_approval'
+  // The contract lane is a SECOND executor on the same money path. It gets its
+  // own executor tag so a Firefly executor identity cannot be replayed to
+  // authorise an on-chain execution of the same settlement, or vice versa.
+  | 'contract.executor'
+  // The deployment manifest that says WHICH chain, WHICH wallet custody and
+  // WHICH Firefly instance a live execution is allowed to touch.
+  | 'settlement.deployment_attestation'
+  | 'settlement.deployment_approval';
 
 // Netstring: <utf8 byte length>:<utf8 bytes>, — length-prefixed so adjacent
 // fields cannot collide by concatenation (e.g. "ab"+"c" vs "a"+"bc").
@@ -115,18 +125,36 @@ export function settlementRequestPreimage(batch: SettlementBatch & { agent_id?: 
 // The executor identity binds the acting agent to THIS settlement. Binding the
 // settlement_id is what stops an executor signature captured from one batch
 // being replayed to authorise a different one.
-export function settlementExecutorPreimage(params: {
+export interface ExecutorPreimageParams {
   settlementId: string;
   executorAgentId: string;
   cgpHash: string;
   week: number;
-}): Buffer {
-  return preimage('settlement.executor', [
+}
+
+function executorPreimage(
+  purpose: 'settlement.executor' | 'contract.executor',
+  params: ExecutorPreimageParams
+): Buffer {
+  return preimage(purpose, [
     params.settlementId,
     params.executorAgentId,
     params.cgpHash,
     String(params.week),
   ]);
+}
+
+// Firefly-lane executor identity.
+export function settlementExecutorPreimage(params: ExecutorPreimageParams): Buffer {
+  return executorPreimage('settlement.executor', params);
+}
+
+// Contract-lane executor identity. Deliberately a SEPARATE exported function
+// rather than an optional `purpose` argument on the one above: an optional
+// argument is a footgun that silently degrades to cross-lane replay when a
+// caller forgets it, whereas a wrong function name is greppable.
+export function contractExecutorPreimage(params: ExecutorPreimageParams): Buffer {
+  return executorPreimage('contract.executor', params);
 }
 
 export function settlementApprovalPreimage(params: {
@@ -140,6 +168,67 @@ export function settlementApprovalPreimage(params: {
   return preimage('settlement.operator_approval', [
     params.approvalId,
     params.settlementId,
+    params.scope,
+    params.approvedBy,
+    params.approvedAt,
+    opt(params.expiresAt),
+  ]);
+}
+
+// The deployment manifest signature. It covers the environment and the RPC /
+// custody / Firefly bindings, AND the id list of its own approvals, so an
+// attested manifest cannot have an approval added, removed or reordered after
+// signing, and cannot be repointed at another chain or another Firefly
+// instance while keeping the manifest_id constant.
+export function deploymentAttestationPreimage(params: {
+  manifestId: string;
+  environment: string;
+  rpcRef?: string;
+  custodyType?: string;
+  custodySignerRef?: string;
+  custodyPolicyRef?: string;
+  custodyOperatorRef?: string;
+  fireflyInstanceRef?: string;
+  fireflyEnvironment?: string;
+  fireflyAccountRef?: string;
+  signedAt: string;
+  expiresAt?: string;
+  approvalIds: string[];
+}): Buffer {
+  return preimage('settlement.deployment_attestation', [
+    params.manifestId,
+    params.environment,
+    opt(params.rpcRef),
+    opt(params.custodyType),
+    opt(params.custodySignerRef),
+    opt(params.custodyPolicyRef),
+    opt(params.custodyOperatorRef),
+    opt(params.fireflyInstanceRef),
+    opt(params.fireflyEnvironment),
+    opt(params.fireflyAccountRef),
+    params.signedAt,
+    opt(params.expiresAt),
+    String(params.approvalIds.length),
+    ...params.approvalIds,
+  ]);
+}
+
+// A deployment approval is bound to the manifest it approves. The approval
+// object itself carries no manifest_id field, so the id is supplied by the
+// enclosing attestation at verification time — which is strictly stronger than
+// a self-declared one: an approval lifted from another manifest verifies
+// against that manifest's id and therefore fails here.
+export function deploymentApprovalPreimage(params: {
+  approvalId: string;
+  manifestId: string;
+  scope: string;
+  approvedBy: string;
+  approvedAt: string;
+  expiresAt?: string;
+}): Buffer {
+  return preimage('settlement.deployment_approval', [
+    params.approvalId,
+    params.manifestId,
     params.scope,
     params.approvedBy,
     params.approvedAt,
@@ -359,6 +448,29 @@ export function verifySettlementSignature(
     return { valid: false, reason: 'signature verification failed' };
   }
   return ok ? { valid: true } : { valid: false, reason: 'signature does not verify' };
+}
+
+// STRUCTURAL check only — "does this object carry a proof for its declared
+// algorithm", NOT "is this proof valid". Producers use it to refuse to emit an
+// obviously unsigned event; it is NEVER a substitute for
+// verifySettlementSignature at a gate. Named to say so: `hasProof`, not
+// `isSigned`. The old `isSigned()` blurred exactly this line, which is how a
+// structural check ended up standing in for a security gate.
+export function hasSettlementProof(signature: SettlementSignature | undefined): boolean {
+  if (!signature || typeof signature !== 'object') {
+    return false;
+  }
+  if (typeof signature.alg !== 'string' || !signature.alg) {
+    return false;
+  }
+  if (typeof signature.kid !== 'string' || !signature.kid) {
+    return false;
+  }
+  const algorithm = ALGORITHMS.get(signature.alg.toLowerCase());
+  if (!algorithm) {
+    return false;
+  }
+  return decodeProof(readOwnField(signature, algorithm.proofField), algorithm.proofBytes) !== undefined;
 }
 
 // Throwing wrapper for the gates. `gate` names WHICH gate refused so the three
