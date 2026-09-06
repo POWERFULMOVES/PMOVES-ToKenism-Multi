@@ -7,20 +7,51 @@ import {
   SettlementDeploymentAttestation,
   SettlementRequestedEvent,
 } from '../';
+import type { SettlementBatch } from '../settlement-planner';
+import {
+  TEST_EXECUTOR_KID,
+  forgedSignature,
+  placeholderSignature,
+  signApproval,
+  signContractExecutor,
+  signFireflyExecutor,
+  signDeploymentAttestation,
+  signRequest,
+  testKeyring,
+} from '../../testing/settlement-fixtures';
 
-const SIGNATURE = { alg: 'HMAC-SHA256', kid: 'agent-zero-test', hmac: 'abc123' };
-const EXECUTOR_SIGNATURE = { alg: 'HMAC-SHA256', kid: 'contract-exec', hmac: 'execsig' };
-const OPERATOR_APPROVAL = {
-  approval_id: 'approval_contract_1234abcd5678ef00',
-  settlement_id: 'settlement_1234abcd5678ef00',
-  scope: 'contract_live_execution' as const,
-  approved_by: 'PMOVES-OPERATOR',
-  approved_at: '2026-05-25T12:00:00Z',
-  expires_at: '2099-01-01T00:00:00Z',
-  signature: { alg: 'HMAC-SHA256', kid: 'operator-test', hmac: 'operatorsig' },
-};
+// Real, test-only key material. Before this, every signature in this file was
+// a placeholder string that the executor's private isSigned() accepted.
+const KEYRING = testKeyring();
+const AGENT_ID = 'PMOVES-AGENT-ZERO-CODEX';
+const SETTLEMENT_ID = 'settlement_1234abcd5678ef00';
+const CGP_HASH = `sha256:${'a'.repeat(64)}`;
+const EXECUTOR_AGENT = 'CONTRACT-SETTLEMENT-EXECUTOR';
 
-const DEPLOYMENT_ATTESTATION: SettlementDeploymentAttestation = {
+const EXECUTOR_SIGNATURE = signContractExecutor(
+  {
+    settlementId: SETTLEMENT_ID,
+    executorAgentId: EXECUTOR_AGENT,
+    cgpHash: CGP_HASH,
+    week: 12,
+  },
+  KEYRING
+);
+
+const OPERATOR_APPROVAL = signApproval(
+  {
+    approval_id: 'approval_contract_1234abcd5678ef00',
+    settlement_id: SETTLEMENT_ID,
+    scope: 'contract_live_execution' as const,
+    approved_by: 'PMOVES-OPERATOR',
+    approved_at: '2026-05-25T12:00:00Z',
+    expires_at: '2099-01-01T00:00:00Z',
+  },
+  KEYRING
+);
+
+const DEPLOYMENT_ATTESTATION: SettlementDeploymentAttestation = signDeploymentAttestation(
+  {
   manifest_id: 'tokenism-hardhat-local-20260525',
   environment: 'local',
   rpc_ref: 'env:ETHEREUM_RPC_URL',
@@ -36,13 +67,13 @@ const DEPLOYMENT_ATTESTATION: SettlementDeploymentAttestation = {
       approved_by: 'PMOVES-OPERATOR',
       approved_at: '2026-05-25T12:00:00Z',
       expires_at: '2099-01-01T00:00:00Z',
-      signature: { alg: 'HMAC-SHA256', kid: 'operator-test', hmac: 'deploymentsig' },
     },
   ],
   signed_at: '2026-05-25T12:00:00Z',
   expires_at: '2099-01-01T00:00:00Z',
-  signature: { alg: 'HMAC-SHA256', kid: 'deployment-manifest', hmac: 'manifestsig' },
-};
+  } as SettlementDeploymentAttestation,
+  KEYRING
+);
 
 const MANIFEST: ContractDeploymentManifest = {
   chain_id: 31337,
@@ -65,7 +96,7 @@ const MANIFEST: ContractDeploymentManifest = {
   },
 };
 
-function settlementRequest(): SettlementRequestedEvent {
+function settlementBatch(): SettlementBatch {
   return {
     settlement_id: 'settlement_1234abcd5678ef00',
     source_subject: 'tokenism.cgp.weekly.v1',
@@ -76,8 +107,6 @@ function settlementRequest(): SettlementRequestedEvent {
     status: 'planned',
     settlement_profile: 'weekly-grotoken-v1',
     created_at: '2026-05-22T01:02:03Z',
-    agent_id: 'PMOVES-AGENT-ZERO-CODEX',
-    signature: SIGNATURE,
     totals: {
       instruction_count: 2,
       amount: 1000,
@@ -119,7 +148,12 @@ function settlementRequest(): SettlementRequestedEvent {
         },
       },
     ],
-  };
+  } as SettlementBatch;
+}
+
+/** A contract-lane settlement request carrying a REAL MAC over its preimage. */
+function settlementRequest(): SettlementRequestedEvent {
+  return signRequest(settlementBatch(), AGENT_ID, KEYRING);
 }
 
 describe('ContractSettlementExecutor', () => {
@@ -129,6 +163,7 @@ describe('ContractSettlementExecutor', () => {
     };
     const executor = new ContractSettlementExecutor(client, {
       deploymentManifest: MANIFEST,
+      signatureKeyring: KEYRING,
     });
 
     const result = await executor.execute(settlementRequest());
@@ -163,21 +198,23 @@ describe('ContractSettlementExecutor', () => {
   });
 
   it('formats tiny exponent amounts before converting to token units', async () => {
-    const request = settlementRequest();
-    request.totals = {
+    const batch = settlementBatch();
+    batch.totals = {
       instruction_count: 1,
       amount: 0.00000001,
       asset: 'GRO',
     };
-    request.instructions = [
+    batch.instructions = [
       {
-        ...request.instructions[0],
+        ...batch.instructions[0],
         amount: 0.00000001,
       },
     ];
+    const request = signRequest(batch, AGENT_ID, KEYRING);
 
     const executor = new ContractSettlementExecutor(undefined, {
       deploymentManifest: MANIFEST,
+      signatureKeyring: KEYRING,
       assetDecimals: {
         GRO: 8,
       },
@@ -195,7 +232,7 @@ describe('ContractSettlementExecutor', () => {
   });
 
   it('requires a deployment manifest', async () => {
-    const executor = new ContractSettlementExecutor();
+    const executor = new ContractSettlementExecutor(undefined, { signatureKeyring: KEYRING });
 
     await expect(executor.execute(settlementRequest())).rejects.toThrow(
       'Contract deployment manifest is required'
@@ -204,6 +241,7 @@ describe('ContractSettlementExecutor', () => {
 
   it('validates manifest contract addresses', async () => {
     const executor = new ContractSettlementExecutor(undefined, {
+      signatureKeyring: KEYRING,
       deploymentManifest: {
         ...MANIFEST,
         contracts: {
@@ -230,6 +268,7 @@ describe('ContractSettlementExecutor', () => {
       operatorApproval: OPERATOR_APPROVAL,
       trustedExecutorIds: ['CONTRACT-SETTLEMENT-EXECUTOR'],
       deploymentManifest: MANIFEST,
+      signatureKeyring: KEYRING,
     });
 
     const result = await executor.execute(settlementRequest());
@@ -268,6 +307,7 @@ describe('ContractSettlementExecutor', () => {
       executorAgentId: 'CONTRACT-SETTLEMENT-EXECUTOR',
       executorSignature: EXECUTOR_SIGNATURE,
       deploymentManifest: MANIFEST,
+      signatureKeyring: KEYRING,
     });
 
     await expect(executor.execute(settlementRequest())).rejects.toThrow(
@@ -285,6 +325,7 @@ describe('ContractSettlementExecutor', () => {
       executorAgentId: 'CONTRACT-SETTLEMENT-EXECUTOR',
       executorSignature: EXECUTOR_SIGNATURE,
       operatorApproval: OPERATOR_APPROVAL,
+      signatureKeyring: KEYRING,
       deploymentManifest: {
         ...MANIFEST,
         attestation: undefined,
@@ -306,6 +347,7 @@ describe('ContractSettlementExecutor', () => {
       executorAgentId: 'CONTRACT-SETTLEMENT-EXECUTOR',
       executorSignature: EXECUTOR_SIGNATURE,
       operatorApproval: OPERATOR_APPROVAL,
+      signatureKeyring: KEYRING,
       deploymentManifest: {
         ...MANIFEST,
         attestation: {
@@ -328,13 +370,14 @@ describe('ContractSettlementExecutor', () => {
     const executor = new ContractSettlementExecutor(client, {
       dryRun: false,
       executorAgentId: 'CONTRACT-SETTLEMENT-EXECUTOR',
-      executorSignature: { alg: '', kid: '', hmac: '' },
+      executorSignature: { alg: '', kid: '' },
       operatorApproval: OPERATOR_APPROVAL,
       deploymentManifest: MANIFEST,
+      signatureKeyring: KEYRING,
     });
 
     await expect(executor.execute(settlementRequest())).rejects.toThrow(
-      'Live contract settlement requires executorSignature'
+      'Live contract settlement executorSignature: signature.alg is missing'
     );
     expect(client.executeContractCall).not.toHaveBeenCalled();
   });
@@ -347,11 +390,15 @@ describe('ContractSettlementExecutor', () => {
       dryRun: false,
       executorAgentId: 'CONTRACT-SETTLEMENT-EXECUTOR',
       executorSignature: EXECUTOR_SIGNATURE,
-      operatorApproval: {
-        ...OPERATOR_APPROVAL,
-        settlement_id: 'settlement_deadbeefdeadbeef',
-      },
+      // Re-signed for the OTHER settlement_id so this test reaches the
+      // settlement_id comparison it names, instead of tripping the signature
+      // check first and passing for the wrong reason.
+      operatorApproval: signApproval(
+        { ...OPERATOR_APPROVAL, settlement_id: 'settlement_deadbeefdeadbeef' },
+        KEYRING
+      ),
       deploymentManifest: MANIFEST,
+      signatureKeyring: KEYRING,
     });
 
     await expect(executor.execute(settlementRequest())).rejects.toThrow(
@@ -370,6 +417,7 @@ describe('ContractSettlementExecutor', () => {
       executorSignature: EXECUTOR_SIGNATURE,
       operatorApproval: OPERATOR_APPROVAL,
       deploymentManifest: MANIFEST,
+      signatureKeyring: KEYRING,
     });
 
     const result = await executor.execute(settlementRequest());
@@ -390,10 +438,10 @@ describe('ContractSettlementExecutor', () => {
   });
 
   it('maps group purchase settlement to execute(order_id)', async () => {
-    const request = settlementRequest();
-    request.instructions = [
+    const batch = settlementBatch();
+    batch.instructions = [
       {
-        ...request.instructions[0],
+        ...batch.instructions[0],
         action: 'group_purchase_settle',
         amount: 1,
         asset: 'FUSD',
@@ -404,8 +452,10 @@ describe('ContractSettlementExecutor', () => {
         },
       },
     ];
+    const request = signRequest(batch, AGENT_ID, KEYRING);
     const executor = new ContractSettlementExecutor(undefined, {
       deploymentManifest: MANIFEST,
+      signatureKeyring: KEYRING,
     });
 
     const result = await executor.execute(request);
@@ -419,10 +469,10 @@ describe('ContractSettlementExecutor', () => {
   });
 
   it('requires explicit mappings for vault and governance actions', async () => {
-    const request = settlementRequest();
-    request.instructions = [
+    const batch = settlementBatch();
+    batch.instructions = [
       {
-        ...request.instructions[0],
+        ...batch.instructions[0],
         action: 'vault_stake',
         contract: {
           contract: 'SettlementExecutor',
@@ -430,12 +480,153 @@ describe('ContractSettlementExecutor', () => {
         },
       },
     ];
+    const request = signRequest(batch, AGENT_ID, KEYRING);
     const executor = new ContractSettlementExecutor(undefined, {
       deploymentManifest: MANIFEST,
+      signatureKeyring: KEYRING,
     });
 
     await expect(executor.execute(request)).rejects.toThrow(
       'vault_stake requires an explicit non-SettlementExecutor contract mapping'
+    );
+  });
+});
+
+/**
+ * The contract lane is the SECOND executor on the settlement money path. Its
+ * three gates kept a private copy of the isSigned() truthiness check after the
+ * Firefly lane was fixed, so every placeholder below opened a gate on LIVE
+ * on-chain execution until this branch. Each case asserts the SPECIFIC reason.
+ */
+describe('ContractSettlementExecutor — the `abc123` placeholder is refused at every gate', () => {
+  function liveConfig(overrides: Record<string, unknown> = {}) {
+    return {
+      dryRun: false,
+      executorAgentId: EXECUTOR_AGENT,
+      executorSignature: EXECUTOR_SIGNATURE,
+      operatorApproval: OPERATOR_APPROVAL,
+      deploymentManifest: MANIFEST,
+      signatureKeyring: KEYRING,
+      ...overrides,
+    };
+  }
+
+  function writingClient(): ContractWritableClient {
+    return {
+      executeContractCall: jest.fn().mockResolvedValue({ hash: `0x${'c'.repeat(64)}` }),
+    };
+  }
+
+  it('gate 1: the settlement request', async () => {
+    const client = writingClient();
+    const request = {
+      ...settlementRequest(),
+      signature: placeholderSignature('test-agent-zero'),
+    };
+    const executor = new ContractSettlementExecutor(client, liveConfig());
+
+    await expect(executor.execute(request)).rejects.toThrow(
+      'Settlement request signature: signature.hmac must be 64 canonical hex characters'
+    );
+    expect(client.executeContractCall).not.toHaveBeenCalled();
+  });
+
+  it('gate 2: the live on-chain executor identity', async () => {
+    const client = writingClient();
+    const executor = new ContractSettlementExecutor(
+      client,
+      liveConfig({ executorSignature: placeholderSignature(TEST_EXECUTOR_KID) })
+    );
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Live contract settlement executorSignature: signature.hmac must be 64 canonical hex characters'
+    );
+    expect(client.executeContractCall).not.toHaveBeenCalled();
+  });
+
+  it('gate 3: the operator approval', async () => {
+    const client = writingClient();
+    const executor = new ContractSettlementExecutor(
+      client,
+      liveConfig({
+        operatorApproval: {
+          ...OPERATOR_APPROVAL,
+          signature: placeholderSignature('test-operator'),
+        },
+      })
+    );
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Contract operator approval signature: signature.hmac must be 64 canonical hex characters'
+    );
+    expect(client.executeContractCall).not.toHaveBeenCalled();
+  });
+
+  it('gate 4: the deployment attestation', async () => {
+    const client = writingClient();
+    const executor = new ContractSettlementExecutor(
+      client,
+      liveConfig({
+        deploymentManifest: {
+          ...MANIFEST,
+          attestation: {
+            ...DEPLOYMENT_ATTESTATION,
+            signature: placeholderSignature('test-deployment-manifest'),
+          },
+        },
+      })
+    );
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Deployment attestation signature: signature.hmac must be 64 canonical hex characters'
+    );
+    expect(client.executeContractCall).not.toHaveBeenCalled();
+  });
+
+  it('refuses a well-formed but forged on-chain executor proof', async () => {
+    const client = writingClient();
+    const executor = new ContractSettlementExecutor(
+      client,
+      liveConfig({ executorSignature: forgedSignature(TEST_EXECUTOR_KID) })
+    );
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Live contract settlement executorSignature: signature does not verify'
+    );
+    expect(client.executeContractCall).not.toHaveBeenCalled();
+  });
+
+  it('refuses a Firefly executor identity replayed onto the contract lane', async () => {
+    // Same settlement, same agent, same key — only the purpose tag differs.
+    const client = writingClient();
+    const executor = new ContractSettlementExecutor(
+      client,
+      liveConfig({
+        executorSignature: signFireflyExecutor(
+          {
+            settlementId: SETTLEMENT_ID,
+            executorAgentId: EXECUTOR_AGENT,
+            cgpHash: CGP_HASH,
+            week: 12,
+          },
+          KEYRING
+        ),
+      })
+    );
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Live contract settlement executorSignature: signature does not verify'
+    );
+    expect(client.executeContractCall).not.toHaveBeenCalled();
+  });
+
+  it('refuses even a DRY RUN when no keyring is configured', async () => {
+    const executor = new ContractSettlementExecutor(undefined, {
+      deploymentManifest: MANIFEST,
+    });
+
+    await expect(executor.execute(settlementRequest())).rejects.toThrow(
+      'Settlement request signature: no settlement keyring configured'
     );
   });
 });
