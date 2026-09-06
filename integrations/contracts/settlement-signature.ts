@@ -146,3 +146,233 @@ export function settlementApprovalPreimage(params: {
     opt(params.expiresAt),
   ]);
 }
+
+// ---------------------------------------------------------------------------
+// Keyring
+// ---------------------------------------------------------------------------
+
+// Key material is INJECTED, never hardcoded and never generated here — the same
+// custody stance as tally-signer-ed25519.ts. Whoever holds the settlement key
+// holds the authority to move money, and that choice belongs to the deploying
+// group, not to this file.
+//
+// Nothing in this module ever prints, logs, stringifies or embeds key material
+// in an error. Rejection reasons name the `kid` and byte LENGTHS only.
+export interface SettlementKeyring {
+  // Returns the secret key for `kid`, or undefined if this keyring does not
+  // hold one. Returning undefined must mean REJECT, never "skip the check".
+  get(kid: string): Buffer | undefined;
+}
+
+export class InMemorySettlementKeyring implements SettlementKeyring {
+  private keys = new Map<string, Buffer>();
+
+  constructor(entries: Record<string, Buffer | string> = {}) {
+    for (const [kid, key] of Object.entries(entries)) {
+      this.set(kid, key);
+    }
+  }
+
+  // Hex strings are decoded with a canonical-hex guard: Buffer.from(x, 'hex')
+  // silently stops at the first non-hex character rather than throwing, so an
+  // operator typo could otherwise install a short, weak key without any error.
+  set(kid: string, key: Buffer | string): this {
+    if (!kid) {
+      throw new Error('keyring entry requires a non-empty kid');
+    }
+    let material: Buffer;
+    if (typeof key === 'string') {
+      if (!/^[0-9a-fA-F]+$/.test(key) || key.length % 2 !== 0) {
+        throw new Error(`key for kid ${kid} must be canonical even-length hex`);
+      }
+      material = Buffer.from(key, 'hex');
+    } else {
+      material = key;
+    }
+    if (material.length < MIN_KEY_BYTES) {
+      throw new Error(
+        `key for kid ${kid} is ${material.length} bytes; minimum is ${MIN_KEY_BYTES}`
+      );
+    }
+    this.keys.set(kid, material);
+    return this;
+  }
+
+  get(kid: string): Buffer | undefined {
+    return this.keys.get(kid);
+  }
+
+  // Diagnostics expose kids only — never key material or key lengths that
+  // could narrow a search.
+  kids(): string[] {
+    return [...this.keys.keys()];
+  }
+}
+
+const MIN_KEY_BYTES = 32;
+
+// ---------------------------------------------------------------------------
+// Algorithm registry — step B's door
+// ---------------------------------------------------------------------------
+
+// `alg` is the discriminator. Each algorithm declares which field of the
+// signature carries its proof, so `hmac` is NOT hardcoded as the only proof
+// field: an Ed25519 algorithm (step B) registers here with proofField 'sig'
+// and the gates below need no change.
+export interface SettlementSignatureAlgorithm {
+  alg: string;
+  proofField: string;
+  proofBytes: number;
+  // Verifies `proof` against `message` for `kid`. Must return false rather
+  // than throw for any attacker-controlled input.
+  verify(message: Buffer, proof: Buffer, kid: string, keyring: SettlementKeyring): boolean;
+  // Optional — present only for algorithms this process can also produce.
+  sign?(message: Buffer, kid: string, keyring: SettlementKeyring): Buffer;
+}
+
+const HMAC_SHA256: SettlementSignatureAlgorithm = {
+  alg: 'hmac-sha256',
+  proofField: 'hmac',
+  proofBytes: 32,
+  verify(message, proof, kid, keyring) {
+    const key = keyring.get(kid);
+    if (!key) {
+      return false;
+    }
+    const expected = createHmac('sha256', key).update(message).digest();
+    // Constant-time. A plain `===` on hex strings leaks the length of the
+    // matching prefix through comparison timing, which is enough to forge a
+    // MAC byte by byte against an online oracle. Lengths are already equal by
+    // the proofBytes guard, but timingSafeEqual throws on a length mismatch so
+    // the guard is load-bearing, not decorative.
+    return proof.length === expected.length && timingSafeEqual(proof, expected);
+  },
+  sign(message, kid, keyring) {
+    const key = keyring.get(kid);
+    if (!key) {
+      throw new Error(`no settlement key for kid ${kid}`);
+    }
+    return createHmac('sha256', key).update(message).digest();
+  },
+};
+
+const ALGORITHMS = new Map<string, SettlementSignatureAlgorithm>([
+  [HMAC_SHA256.alg, HMAC_SHA256],
+]);
+
+export function registerSettlementAlgorithm(algorithm: SettlementSignatureAlgorithm): void {
+  ALGORITHMS.set(algorithm.alg.toLowerCase(), algorithm);
+}
+
+export function supportedSettlementAlgorithms(): string[] {
+  return [...ALGORITHMS.keys()].sort();
+}
+
+// ---------------------------------------------------------------------------
+// Verification — fail closed
+// ---------------------------------------------------------------------------
+
+export interface SettlementVerifyResult {
+  valid: boolean;
+  // Informing, not just a boolean: an operator staring at a refused settlement
+  // needs to know WHICH check refused it. Never contains key material.
+  reason?: string;
+}
+
+// Canonical-hex + exact-length guard, checked BEFORE any Buffer.from(x, 'hex')
+// decode — the same smuggling path closed in tally-signer-ed25519.ts. Without
+// it, `<valid 64-char proof>z` decodes to the identical bytes as the valid
+// proof, silently discarding the trailing garbage instead of rejecting.
+function decodeProof(value: unknown, expectedBytes: number): Buffer | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  if (!/^[0-9a-fA-F]+$/.test(value) || value.length !== expectedBytes * 2) {
+    return undefined;
+  }
+  return Buffer.from(value, 'hex');
+}
+
+// EVERY failure path returns { valid: false }. There is no branch on which an
+// unrecognised, unkeyed or unparseable signature is treated as acceptable —
+// that was the whole defect this module replaces.
+export function verifySettlementSignature(
+  signature: SettlementSignature | undefined,
+  message: Buffer,
+  keyring: SettlementKeyring | undefined
+): SettlementVerifyResult {
+  if (!signature || typeof signature !== 'object') {
+    return { valid: false, reason: 'signature is missing' };
+  }
+  if (typeof signature.alg !== 'string' || !signature.alg) {
+    return { valid: false, reason: 'signature.alg is missing' };
+  }
+  if (typeof signature.kid !== 'string' || !signature.kid) {
+    return { valid: false, reason: 'signature.kid is missing' };
+  }
+  const algorithm = ALGORITHMS.get(signature.alg.toLowerCase());
+  if (!algorithm) {
+    return {
+      valid: false,
+      reason: `unsupported signature.alg (supported: ${supportedSettlementAlgorithms().join(', ')})`,
+    };
+  }
+  // A missing keyring is a REJECT, not a bypass. A deployment that forgot to
+  // configure keys must fail shut rather than wave every settlement through.
+  if (!keyring) {
+    return { valid: false, reason: 'no settlement keyring configured' };
+  }
+  const proof = decodeProof(
+    (signature as Record<string, unknown>)[algorithm.proofField],
+    algorithm.proofBytes
+  );
+  if (!proof) {
+    return {
+      valid: false,
+      reason: `signature.${algorithm.proofField} must be ${algorithm.proofBytes * 2} canonical hex characters`,
+    };
+  }
+  if (!keyring.get(signature.kid)) {
+    return { valid: false, reason: `unknown signature.kid: ${signature.kid}` };
+  }
+  let ok = false;
+  try {
+    ok = algorithm.verify(message, proof, signature.kid, keyring);
+  } catch {
+    // Any throw from a verifier is a rejection, and the underlying error is
+    // deliberately not surfaced — it could carry key-shaped detail.
+    return { valid: false, reason: 'signature verification failed' };
+  }
+  return ok ? { valid: true } : { valid: false, reason: 'signature does not verify' };
+}
+
+// Throwing wrapper for the gates. `gate` names WHICH gate refused so the three
+// call sites stay distinguishable in operator-facing errors.
+export function assertSettlementSignature(
+  gate: string,
+  signature: SettlementSignature | undefined,
+  message: Buffer,
+  keyring: SettlementKeyring | undefined
+): void {
+  const result = verifySettlementSignature(signature, message, keyring);
+  if (!result.valid) {
+    throw new Error(`${gate}: ${result.reason}`);
+  }
+}
+
+// Produce a signature. Sim/test/ceremony convenience — a production signer may
+// live in an HSM or a separate process and only the verify path above is
+// required of it.
+export function signSettlement(
+  message: Buffer,
+  kid: string,
+  keyring: SettlementKeyring,
+  alg: string = HMAC_SHA256.alg
+): SettlementSignature {
+  const algorithm = ALGORITHMS.get(alg.toLowerCase());
+  if (!algorithm || !algorithm.sign) {
+    throw new Error(`cannot sign with alg ${alg}`);
+  }
+  const proof = algorithm.sign(message, kid, keyring);
+  return { alg: algorithm.alg, kid, [algorithm.proofField]: proof.toString('hex') } as SettlementSignature;
+}
