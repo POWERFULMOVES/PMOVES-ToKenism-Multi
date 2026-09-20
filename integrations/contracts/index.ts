@@ -91,6 +91,32 @@ export {
   SettlementSignature,
 } from './settlement-planner';
 
+// Settlement signature verification.
+// Consumers MUST configure a keyring or every settlement gate fails closed, so
+// the keyring API has to be reachable from the package entry point rather than
+// through a deep path import.
+export {
+  SETTLEMENT_DOMAIN,
+  InMemorySettlementKeyring,
+  SettlementKeyring,
+  SettlementSignatureAlgorithm,
+  SettlementSignaturePurpose,
+  SettlementVerifyResult,
+  ExecutorPreimageParams,
+  assertSettlementSignature,
+  contractExecutorPreimage,
+  deploymentApprovalPreimage,
+  deploymentAttestationPreimage,
+  hasSettlementProof,
+  registerSettlementAlgorithm,
+  settlementApprovalPreimage,
+  settlementExecutorPreimage,
+  settlementRequestPreimage,
+  signSettlement,
+  supportedSettlementAlgorithms,
+  verifySettlementSignature,
+} from './settlement-signature';
+
 export {
   SettlementExecutionResultEvents,
   SettlementFailedEvent,

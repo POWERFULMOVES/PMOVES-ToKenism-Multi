@@ -126,6 +126,9 @@ dmypy.json
 
 # Node.js / Next.js
 node_modules/
+# slash-less form: a trailing slash matches directories only, so a
+# node_modules SYMLINK is not covered by the pattern above.
+node_modules
 .next/
 coverage/
 dist/

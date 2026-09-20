@@ -21,6 +21,13 @@ import {
   validateSettlementDeploymentAttestation,
   type SettlementDeploymentAttestation,
 } from '../contracts/settlement-deployment-attestation';
+import {
+  assertSettlementSignature,
+  settlementApprovalPreimage,
+  settlementExecutorPreimage,
+  settlementRequestPreimage,
+  type SettlementKeyring,
+} from '../contracts/settlement-signature';
 
 export type {
   SettlementFailedEvent,
@@ -69,6 +76,13 @@ export interface FireflySettlementExecutorConfig {
   trustedExecutorIds?: string[];
   deploymentAttestation?: SettlementDeploymentAttestation;
   requireDeploymentAttestation?: boolean;
+  /**
+   * Keys used to VERIFY settlement signatures. There is no default and no
+   * bypass: with no keyring, every signature check below fails closed. Key
+   * material is injected by the deployment and is never generated, logged or
+   * defaulted here.
+   */
+  signatureKeyring?: SettlementKeyring;
 }
 
 interface ResolvedFireflySettlementExecutorConfig {
@@ -84,6 +98,7 @@ interface ResolvedFireflySettlementExecutorConfig {
   trustedExecutorIds: string[];
   deploymentAttestation?: SettlementDeploymentAttestation;
   requireDeploymentAttestation: boolean;
+  signatureKeyring?: SettlementKeyring;
 }
 
 export interface FireflySettlementDraft {
@@ -141,13 +156,14 @@ export class FireflySettlementExecutor {
       trustedExecutorIds: config.trustedExecutorIds ?? [],
       deploymentAttestation: config.deploymentAttestation,
       requireDeploymentAttestation: config.requireDeploymentAttestation ?? true,
+      signatureKeyring: config.signatureKeyring,
     };
   }
 
   async execute(
     request: SettlementRequestedEvent
   ): Promise<FireflySettlementExecutionResult> {
-    validateRequest(request);
+    this.validateRequest(request);
 
     if (!this.config.dryRun && !this.client) {
       throw new Error('Firefly client is required when dryRun=false');
@@ -307,8 +323,32 @@ export class FireflySettlementExecutor {
     return this.config.executorAgentId || request.agent_id;
   }
 
+  // Selection, not a gate: picks which signature to STAMP on emitted result
+  // events. Keyed off alg+kid rather than the literal `hmac` field so an
+  // Ed25519 executor signature (proof field `sig`) is selected the same way.
   private executorSignature(request: SettlementRequestedEvent): SettlementSignature {
-    return this.config.executorSignature.hmac ? this.config.executorSignature : request.signature;
+    const configured = this.config.executorSignature;
+    return configured.alg && configured.kid ? configured : request.signature;
+  }
+
+  /**
+   * Gate 1 — the settlement request itself. This check was already mandatory
+   * in dry-run (it demanded a non-empty `hmac`); it is now a real MAC over the
+   * canonical request preimage, which covers every instruction field. A
+   * verified batch therefore cannot have an address or amount swapped while
+   * holding the totals constant.
+   */
+  private validateRequest(request: SettlementRequestedEvent): void {
+    assertSettlementSignature(
+      'Settlement request signature',
+      request.signature,
+      settlementRequestPreimage(request),
+      this.config.signatureKeyring
+    );
+
+    if (!request.instructions.length) {
+      throw new Error('Settlement request must contain instructions');
+    }
   }
 
   private validateLiveExecutionGate(request: SettlementRequestedEvent): void {
@@ -319,9 +359,20 @@ export class FireflySettlementExecutor {
       throw new Error('Live Firefly settlement requires executorAgentId');
     }
 
-    if (!isSigned(executorSignature)) {
-      throw new Error('Live Firefly settlement requires executorSignature');
-    }
+    // Gate 2 — LIVE execution identity. The preimage binds the executor agent
+    // to THIS settlement_id/cgp_hash/week, so an executor signature captured
+    // from one batch cannot be replayed to authorise a different one.
+    assertSettlementSignature(
+      'Live Firefly settlement executorSignature',
+      executorSignature,
+      settlementExecutorPreimage({
+        settlementId: request.settlement_id,
+        executorAgentId,
+        cgpHash: request.cgp_hash,
+        week: request.week,
+      }),
+      this.config.signatureKeyring
+    );
 
     if (
       this.config.trustedExecutorIds.length > 0 &&
@@ -348,9 +399,23 @@ export class FireflySettlementExecutor {
         throw new Error('Operator approval must include approved_by');
       }
 
-      if (!isSigned(approval.signature)) {
-        throw new Error('Operator approval must be signed');
-      }
+      // Gate 3 — operator approval. Signed under a purpose tag distinct from
+      // both the request and the executor identity, so neither of those
+      // signatures can be presented here as an approval, and an approval
+      // cannot be presented as the request it approves.
+      assertSettlementSignature(
+        'Operator approval signature',
+        approval.signature,
+        settlementApprovalPreimage({
+          approvalId: approval.approval_id,
+          settlementId: approval.settlement_id,
+          scope: approval.scope,
+          approvedBy: approval.approved_by,
+          approvedAt: approval.approved_at,
+          expiresAt: approval.expires_at,
+        }),
+        this.config.signatureKeyring
+      );
 
       parseDate(approval.approved_at);
       if (approval.expires_at && parseDate(approval.expires_at).getTime() < Date.now()) {
@@ -359,8 +424,12 @@ export class FireflySettlementExecutor {
     }
 
     if (this.config.requireDeploymentAttestation) {
+      // Gate 4 — the deployment manifest. Same keyring, same fail-closed
+      // semantics as the three gates above; it used to be the one check on
+      // this LIVE branch still satisfied by a non-empty string.
       validateSettlementDeploymentAttestation(this.config.deploymentAttestation, {
         requireFirefly: true,
+        keyring: this.config.signatureKeyring,
       });
     }
   }
@@ -377,20 +446,6 @@ export class FireflySettlementExecutor {
       instruction.instruction_id,
     ].join(' | ');
   }
-}
-
-function validateRequest(request: SettlementRequestedEvent): void {
-  if (!isSigned(request.signature)) {
-    throw new Error('Settlement request must be signed');
-  }
-
-  if (!request.instructions.length) {
-    throw new Error('Settlement request must contain instructions');
-  }
-}
-
-function isSigned(signature: SettlementSignature | undefined): signature is SettlementSignature {
-  return Boolean(signature?.alg && signature.kid && signature.hmac);
 }
 
 function defaultTransactionType(action: SettlementAction): FireflyTransactionType {

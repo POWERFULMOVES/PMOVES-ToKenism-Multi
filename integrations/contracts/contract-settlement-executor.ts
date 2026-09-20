@@ -22,6 +22,13 @@ import {
   validateSettlementDeploymentAttestation,
   type SettlementDeploymentAttestation,
 } from './settlement-deployment-attestation';
+import {
+  assertSettlementSignature,
+  contractExecutorPreimage,
+  settlementApprovalPreimage,
+  settlementRequestPreimage,
+  type SettlementKeyring,
+} from './settlement-signature';
 
 export type SettlementContractName =
   | 'GroToken'
@@ -72,6 +79,17 @@ export interface ContractSettlementExecutorConfig {
   deploymentManifest?: ContractDeploymentManifest;
   requireDeploymentAttestation?: boolean;
   assetDecimals?: Record<string, number>;
+  /**
+   * Keys used to VERIFY settlement signatures on the CONTRACT lane. There is
+   * no default and no bypass: with no keyring every gate below fails closed.
+   *
+   * This executor is the SECOND executor on the settlement money path. When
+   * the Firefly executor's `isSigned()` truthiness gate was replaced with real
+   * MAC verification, this file kept its own private copy of the same defect,
+   * so `hmac: 'abc123'` still opened three gates here — including on the LIVE
+   * on-chain branch.
+   */
+  signatureKeyring?: SettlementKeyring;
 }
 
 interface ResolvedContractSettlementExecutorConfig {
@@ -85,6 +103,7 @@ interface ResolvedContractSettlementExecutorConfig {
   deploymentManifest?: ContractDeploymentManifest;
   requireDeploymentAttestation: boolean;
   assetDecimals: Record<string, number>;
+  signatureKeyring?: SettlementKeyring;
 }
 
 export interface ContractSettlementCall {
@@ -149,13 +168,14 @@ export class ContractSettlementExecutor {
       deploymentManifest: config.deploymentManifest,
       requireDeploymentAttestation: config.requireDeploymentAttestation ?? true,
       assetDecimals: { ...DEFAULT_ASSET_DECIMALS, ...(config.assetDecimals ?? {}) },
+      signatureKeyring: config.signatureKeyring,
     };
   }
 
   async execute(
     request: SettlementRequestedEvent
   ): Promise<ContractSettlementExecutionResult> {
-    validateRequest(request);
+    validateRequest(request, this.config.signatureKeyring);
     const manifest = this.requireManifest();
 
     if (!this.config.dryRun && !this.client) {
@@ -403,9 +423,20 @@ export class ContractSettlementExecutor {
       throw new Error('Live contract settlement requires executorAgentId');
     }
 
-    if (!isSigned(this.config.executorSignature)) {
-      throw new Error('Live contract settlement requires executorSignature');
-    }
+    // Gate 2 — LIVE on-chain execution identity, under the CONTRACT purpose
+    // tag. A Firefly executor identity for the same settlement will not verify
+    // here, and vice versa.
+    assertSettlementSignature(
+      'Live contract settlement executorSignature',
+      this.config.executorSignature,
+      contractExecutorPreimage({
+        settlementId: request.settlement_id,
+        executorAgentId: this.config.executorAgentId,
+        cgpHash: request.cgp_hash,
+        week: request.week,
+      }),
+      this.config.signatureKeyring
+    );
 
     if (
       this.config.trustedExecutorIds.length > 0 &&
@@ -432,9 +463,22 @@ export class ContractSettlementExecutor {
         throw new Error('Contract operator approval must include approved_by');
       }
 
-      if (!isSigned(approval.signature)) {
-        throw new Error('Contract operator approval must be signed');
-      }
+      // Gate 3 — operator approval. The scope string is part of the signed
+      // preimage, so a `firefly_live_execution` approval cannot be presented
+      // as a `contract_live_execution` one.
+      assertSettlementSignature(
+        'Contract operator approval signature',
+        approval.signature,
+        settlementApprovalPreimage({
+          approvalId: approval.approval_id,
+          settlementId: approval.settlement_id,
+          scope: approval.scope,
+          approvedBy: approval.approved_by,
+          approvedAt: approval.approved_at,
+          expiresAt: approval.expires_at,
+        }),
+        this.config.signatureKeyring
+      );
 
       parseDate(approval.approved_at);
       if (approval.expires_at && parseDate(approval.expires_at).getTime() < Date.now()) {
@@ -446,6 +490,7 @@ export class ContractSettlementExecutor {
       validateSettlementDeploymentAttestation(manifest.attestation, {
         requireRpc: true,
         requireWalletCustody: true,
+        keyring: this.config.signatureKeyring,
       });
     }
   }
@@ -493,18 +538,23 @@ function formatAmountForParseUnits(amount: number, decimals: number): string {
     .replace(/(?:\.0+|(\.\d*?)0+)$/, '$1');
 }
 
-function validateRequest(request: SettlementRequestedEvent): void {
-  if (!isSigned(request.signature)) {
-    throw new Error('Settlement request must be signed');
-  }
+// Gate 1 — the settlement request. Same canonical preimage as the Firefly
+// lane: it is the same event, and a batch verified for one lane must be the
+// same bytes as a batch verified for the other.
+function validateRequest(
+  request: SettlementRequestedEvent,
+  keyring: SettlementKeyring | undefined
+): void {
+  assertSettlementSignature(
+    'Settlement request signature',
+    request.signature,
+    settlementRequestPreimage(request),
+    keyring
+  );
 
   if (!request.instructions.length) {
     throw new Error('Settlement request must contain instructions');
   }
-}
-
-function isSigned(signature: SettlementSignature | undefined): signature is SettlementSignature {
-  return Boolean(signature?.alg && signature.kid && signature.hmac);
 }
 
 function asString(value: unknown): string | undefined {

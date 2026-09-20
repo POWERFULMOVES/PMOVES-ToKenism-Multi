@@ -3,6 +3,7 @@ import {
   validateSettlementDeploymentAttestation,
   type SettlementDeploymentAttestation,
 } from './settlement-deployment-attestation';
+import type { SettlementKeyring } from './settlement-signature';
 import {
   type ContractDeploymentManifest,
   type SettlementContractName,
@@ -62,6 +63,13 @@ export interface TokenismActivationPackValidationOptions {
   requireContract?: boolean;
   trustedExecutorIds?: string[];
   now?: Date;
+  /**
+   * Forwarded to the deployment-attestation validator, which now performs real
+   * MAC verification and rejects when no keyring is supplied. Validating an
+   * activation pack without a keyring therefore fails closed rather than
+   * accepting an unverifiable manifest.
+   */
+  keyring?: SettlementKeyring;
 }
 
 const PLACEHOLDER_PATTERN = /^(todo|tbd|placeholder|changeme|change-me|example|sample|unset|none)$/i;
@@ -110,6 +118,7 @@ export function validateTokenismActivationPack(
     requireWalletCustody: requireContract,
     requireFirefly,
     now: options.now,
+    keyring: options.keyring,
   });
 
   if (pack.deployment_attestation.manifest_id !== pack.deployment_manifest_id) {

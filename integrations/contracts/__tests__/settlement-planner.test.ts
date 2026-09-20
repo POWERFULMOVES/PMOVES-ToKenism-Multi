@@ -3,6 +3,13 @@ import {
   planTokenSettlement,
 } from '../settlement-planner';
 import type { CGPDocument } from '../chit';
+import {
+  settlementRequestPreimage,
+  verifySettlementSignature,
+} from '../settlement-signature';
+import { TEST_REQUEST_KID, testKeyring } from '../../testing/settlement-fixtures';
+
+const KEYRING = testKeyring();
 
 const MERKLE_ROOT = `0x${'a'.repeat(64)}`;
 
@@ -110,17 +117,58 @@ describe('settlement planner', () => {
       createdAt: '2026-05-22T01:00:00Z',
     });
 
+    // The producer now SIGNS. Before this, signSettlement() had no caller
+    // outside its own file, so nothing in the repo emitted a signature that was
+    // valid under settlementRequestPreimage.
     const event = createSettlementRequestedEvent(batch, {
       agentId: 'PMOVES-AGENT-ZERO-CODEX',
-      signature: {
-        alg: 'HMAC-SHA256',
-        kid: 'agent-zero-test',
-        hmac: 'abc123',
-      },
+      kid: TEST_REQUEST_KID,
+      keyring: KEYRING,
     });
 
     expect(event.agent_id).toBe('PMOVES-AGENT-ZERO-CODEX');
-    expect(event.signature.kid).toBe('agent-zero-test');
+    expect(event.signature.kid).toBe(TEST_REQUEST_KID);
     expect(event.instructions).toHaveLength(2);
+
+    // And what it emits actually verifies — against the preimage that includes
+    // agent_id, which is why the event is assembled before it is signed.
+    expect(
+      verifySettlementSignature(
+        event.signature,
+        settlementRequestPreimage(event),
+        KEYRING
+      )
+    ).toEqual({ valid: true });
+  });
+
+  it('refuses to emit an event carrying the `abc123` placeholder', () => {
+    const batch = planTokenSettlement(sampleCgp(), {
+      totalRewardPool: 100,
+      createdAt: '2026-05-22T01:00:00Z',
+    });
+
+    // The inversion of the fixture above: this is exactly what the old
+    // `signature?.hmac` truthiness check waved through.
+    expect(() =>
+      createSettlementRequestedEvent(batch, {
+        agentId: 'PMOVES-AGENT-ZERO-CODEX',
+        signature: { alg: 'HMAC-SHA256', kid: 'agent-zero-test', hmac: 'abc123' },
+      })
+    ).toThrow('Settlement event requires a signature with alg, kid and a proof for that alg');
+  });
+
+  it('still requires an agentId', () => {
+    const batch = planTokenSettlement(sampleCgp(), {
+      totalRewardPool: 100,
+      createdAt: '2026-05-22T01:00:00Z',
+    });
+
+    expect(() =>
+      createSettlementRequestedEvent(batch, {
+        agentId: '',
+        kid: TEST_REQUEST_KID,
+        keyring: KEYRING,
+      })
+    ).toThrow('Settlement event requires agentId');
   });
 });
