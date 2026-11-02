@@ -34,9 +34,9 @@ global.ResizeObserver = class ResizeObserver {
   }
   
   observe() {
-    // Simulate resize observer behavior
+    // Simulate resize observer behavior with a valid entry (consumers read contentRect)
     setTimeout(() => {
-      this.callback();
+      this.callback([{ contentRect: { width: 600, height: 300 } }], this);
     }, 100);
   }
   
@@ -111,10 +111,4 @@ afterAll(() => {
   console.warn = originalWarn;
 });
 
-// Suppress ResizeObserver loop errors
-if (typeof global.ResizeObserver !== 'undefined') {
-  const originalResizeObserverError = global.ResizeObserver.prototype.observe;
-  global.ResizeObserver.prototype.observe = jest.fn(function() {
-    return originalResizeObserverError.call(this, arguments);
-  });
-}
+
