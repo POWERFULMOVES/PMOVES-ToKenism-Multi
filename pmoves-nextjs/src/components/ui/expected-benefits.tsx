@@ -23,10 +23,17 @@ export function ExpectedBenefits({ params }: ExpectedBenefitsProps) {
           <h3 className="text-sm font-medium">Expected Benefits</h3>
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger>
-                <InfoCircledIcon className="h-4 w-4 text-muted-foreground" />
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-label="More information about expected benefits"
+                  className="text-muted-foreground cursor-help"
+                >
+                  <InfoCircledIcon className="h-4 w-4" />
+                </button>
               </TooltipTrigger>
-              <TooltipContent className="max-w-xs">
+              <TooltipContent className="max-w-xs" forceMount>
                 <p>These are the expected benefits based on our mathematical model.</p>
                 <p className="text-xs mt-1">The model has a margin of error of {formatPercentage(errorThreshold)}.</p>
                 {isDownturn && (
@@ -39,11 +46,11 @@ export function ExpectedBenefits({ params }: ExpectedBenefitsProps) {
         
         <div className="text-sm space-y-2">
           <div className="flex justify-between">
-            <span>Total per member:</span>
+            <span>Expected benefit per member:</span>
             <span className="font-medium">{formatCurrency(expectedBenefitPerMember)}</span>
           </div>
           <div className="flex justify-between">
-            <span>Weekly per member:</span>
+            <span>Expected weekly benefit:</span>
             <span className="font-medium">{formatCurrency(expectedWeeklyBenefit)}</span>
           </div>
           <div className="flex justify-between mt-1">
