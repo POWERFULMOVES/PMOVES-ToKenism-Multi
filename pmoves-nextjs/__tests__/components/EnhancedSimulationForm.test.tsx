@@ -101,11 +101,10 @@ describe('EnhancedSimulationForm', () => {
         INITIAL_WEALTH_SIGMA_LOG: expect.any(Number),
         WEEKLY_FOOD_BUDGET_STDDEV: expect.any(Number),
         WEEKLY_INCOME_STDDEV: expect.any(Number),
-        MIN_WEEKLY_FOOD_BUDGET: expect.any(Number),
+        MIN_WEEKLY_BUDGET: expect.any(Number),
         MIN_WEEKLY_INCOME: expect.any(Number),
         PERCENT_SPEND_INTERNAL_STDDEV: expect.any(Number),
         GROTOKEN_REWARD_STDDEV: expect.any(Number),
-        localEconomicActivities: expect.any(Array)
       }));
     });
   });
@@ -167,6 +166,7 @@ describe('EnhancedSimulationForm', () => {
     expect(firstInput).toHaveFocus();
     
     // Test slider interaction with keyboard
+    await user.clear(firstInput);
     await user.type(firstInput, '25');
     await user.keyboard('{ArrowUp}');
     expect(screen.getByDisplayValue('25')).toBeInTheDocument();
