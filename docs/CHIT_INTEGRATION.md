@@ -137,6 +137,33 @@ The CGP document embedded in `cgp` follows spec `chit.cgp.v0.2` (weekly export) 
 
 Parent-side enablement flags (from the parent catalog): `DEEPRESEARCH_CGP_PUBLISH`, `SUPASERCH_CGP_PUBLISH` (research-produced CGPs → `tokenism.cgp.ready.v1`), `CHIT_VOICE_ATTRIBUTION` (`tokenism.geometry.event.v1`, voice events).
 
+## Corpus & Integration Links
+
+This integration is governed by the AGNOTE4482 corpus and PMOVESCHIT doctrine in the parent monorepo:
+
+| Document | Link | Relevance |
+|---|---|---|
+| AGNOTE4482 (main corpus) | [pmoves/docs/AGENTS/AGNOTE4482.md](https://github.com/POWERFULMOVES/PMOVES.AI/blob/main/pmoves/docs/AGENTS/AGNOTE4482.md) | Canonical convergence record; agents claim work here before edits |
+| AGNOTE4482 Signoff Checklist | [AGNOTE4482_SIGNOFF_CHECKLIST.md](https://github.com/POWERFULMOVES/PMOVES.AI/blob/main/pmoves/docs/AGENTS/AGNOTE4482_SIGNOFF_CHECKLIST.md) | Shared multi-agent merge-signoff gate |
+| AGNOTE4482.FlOO$ (PR review flow) | [AGNOTE4482.FlOO$.md](https://github.com/POWERFULMOVES/PMOVES.AI/blob/main/pmoves/docs/AGENTS/AGNOTE4482.FlOO$.md) | Sanctioned merge chain: validate → resolve → run-dry → chit-packet → strict |
+| pr-monitor skill | [pr-monitor-skill/SKILL.md](https://github.com/POWERFULMOVES/PMOVES.AI/blob/main/pmoves/skills/pr-monitor-skill/SKILL.md) | Retry discipline, learning taxonomy, strict gate behavior |
+| Geometry Bus NATS Subject Catalog | [geometry-nats-subjects.md](https://github.com/POWERFULMOVES/PMOVES.AI/blob/main/pmoves/.claude/context/geometry-nats-subjects.md) | The subject catalog this document fulfills |
+| Three-Body Doctrine | [THREE_BODY_DOCTRINE.md](https://github.com/POWERFULMOVES/PMOVES.AI/blob/main/pmoves/docs/PMOVESCHIT/THREE_BODY_DOCTRINE.md) | Foundational Human/AI/System stabilization layer behind CHIT geometry |
+| CHIT Flow Index | [CHIT_FLOW_INDEX.md](https://github.com/POWERFULMOVES/PMOVES.AI/blob/main/pmoves/docs/PMOVESCHIT/CHIT_FLOW_INDEX.md) | CHIT pipeline flow index (run-dry → chit-packet chain) |
+
+Integrating repositories and services:
+
+| Repo / Service | Role |
+|---|---|
+| [POWERFULMOVES/PMOVES.AI](https://github.com/POWERFULMOVES/PMOVES.AI) | Parent monorepo; consumes this repo as a core submodule tracking `PMOVES.AI-Edition-Hardened`; builds GHCR images from it |
+| [POWERFULMOVES/PMOVES-Wealth](https://github.com/POWERFULMOVES/PMOVES-Wealth) | Submodule sibling — wealth/finance lane; Firefly III settlement bridge feeds it |
+| [POWERFULMOVES/PMOVES-DoX](https://github.com/POWERFULMOVES/PMOVES-DoX) | Submodule sibling — Agent Zero MCP tool for standalone mode |
+| Pmoves-hyperdimensions (parent) | Three.js CHIT geometry visualizer — consumes CGP documents |
+| publisher-discord (parent service) | Consumes `tokenism.*` → Discord embeds |
+| Hi-RAG Gateway v2 (parent service) | Consumes `tokenism.cgp.ready.v1`, `geometry.*` → `POST /geometry/event` |
+| Shape Store (parent service) | Persistence for `geometry.event.v1` |
+| Consciousness Service (parent service) | Always-on consumer of `tokenism.cgp.ready.v1` |
+
 ## Monitoring
 
 - Grep targets: `[CHIT] Published`, `[CHIT] Failed to publish`, `[NATS] Connecting`, `[NATS] Drained subscription`
