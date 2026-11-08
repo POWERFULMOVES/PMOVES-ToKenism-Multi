@@ -18,7 +18,7 @@ Snapshot of open Dependabot alerts on `PMOVES.AI-Edition-Hardened` at time of wr
 | Package | Alerts | Manifests | First patched | Fix path |
 |---|---:|---|---|---|
 | `next` | 3 critical (of 30 total) | pmoves-nextjs | 15.5.28+ (also 16.x lines) | **Direct dep** — bump `next` from `^15.5.12` to latest 15.5.x (`npm audit fix` may suffice; advisories GHSA-2464-fhr4-w9xw, GHSA-2xp9-vwfh-vxw4, GHSA-p293-qw3h-jr36) |
-| `handlebars` | 2 critical × 3 manifests (of 10 each) | contracts, integrations, pmoves-nextjs | 4.7.9 / 4.7.10 | **Transitive** (via hardhat toolchain) — add npm `overrides`: `"handlebars": "^4.7.9"` |
+| `handlebars` | 3 critical × 3 manifests = 9 (of 10 each) | contracts, integrations, pmoves-nextjs | 4.7.9 / 4.7.10 | **Transitive** (via hardhat toolchain) — add npm `overrides`: `"handlebars": "^4.7.9"` |
 | `basic-ftp` | 1 critical + 1 high | pmoves-nextjs | 5.2.0 / 5.2.2 | npm `overrides` → `5.2.2` |
 
 ## P1 — High (136 alerts)
@@ -55,9 +55,13 @@ After the P0/P1 waves, run `npm audit fix` per manifest and re-check; remaining 
 After each remediation wave:
 
 ```bash
-# per npm manifest
-npm ci --no-audit --no-fund && npx jest --silent
+# pmoves-nextjs (Jest + build)
+cd pmoves-nextjs && npm ci --no-audit --no-fund && npx jest --silent && npm run build
+# integrations (Jest)
+cd integrations && npm ci --no-audit --no-fund && npx jest --silent
+# contracts/solidity (Hardhat, not Jest)
+cd contracts/solidity && npm ci --no-audit --no-fund && npx hardhat compile && npx hardhat test
 # then confirm alert counts dropped
 ```
 
-Expected outcome: P0+P1 waves clear ~85% of alerts (the top 8 packages account for 208 of 292); P2 removes the pip block entirely.
+Expected outcome: the top 8 packages (axios 60 + next 30 + handlebars 30 + fast-uri 23 + js-yaml 20 + undici 12 + brace-expansion 12 + picomatch 8 = **195 of 292, ~67%**) clear in the first two waves; P2 removes the pip block entirely (21 more, ~74% cumulative).
