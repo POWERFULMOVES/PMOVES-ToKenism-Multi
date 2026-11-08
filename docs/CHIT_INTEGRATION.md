@@ -6,6 +6,8 @@
 
 ToKenism runs weekly economic simulations whose attribution outcomes are exported as **CHIT geometry documents (CGP)** and broadcast on the shared PMOVES.AI NATS bus. The integration is publish-only from this repo's simulation side; parent services (publisher-discord, Hi-RAG v2, Shape Store, consciousness service) consume the events.
 
+**Wiring status:** the publisher is fully implemented and test-covered, but has **no production call site yet** — `CHITNATSPublisher` is currently exercised only by tests and re-exports. Simulator wiring is planned; until then treat these subjects as the forward contract for consumers.
+
 Implementation lives in:
 
 - `integrations/contracts/chit/chit-nats-publisher.ts` — validated publisher (`CHITNATSPublisher`)
@@ -24,7 +26,7 @@ All subjects are published (not subscribed) by this repo and match the parent Ge
 | `tokenism.cgp.weekly.v1` | Weekly CGP export (end-of-week attribution summary) | `week, cgp, super_node_count, total_attributions, cgp_spec` | `gini, poverty_rate` |
 | `tokenism.cgp.ready.v1` | CGP document ready for downstream consumption (also used by parent research services: DeepResearch / SupaSerch CGP publish) | `cgp, super_node_count, source, cgp_spec, timestamp` | `week` |
 
-The CGP document embedded in `cgp` follows spec `chit.cgp.v0.2` (weekly export) / `chit.cgp.v0.1` (research-produced CGPs), and itself validates against `contracts/schemas/geometry/cgp.v1.schema.json`.
+The CGP document embedded in `cgp` follows the spec versions accepted by the bus — per the `spec` enum in `contracts/schemas/geometry/cgp.v1.schema.json`, that is `chit.cgp.v0.2` (current weekly export) or `chit.cgp.v1.0`. Anything else is rejected before publication.
 
 ## Payload Reference
 
@@ -37,24 +39,37 @@ The CGP document embedded in `cgp` follows spec `chit.cgp.v0.2` (weekly export) 
     "spec": "chit.cgp.v0.2",
     "summary": "ToKenism Week 12 Economic Simulation",
     "created_at": "2026-01-05T12:00:00Z",
+    "updated_at": "2026-01-05T12:00:00Z",
     "super_nodes": [
       {
         "id": "grotoken-week-12",
         "label": "GroToken Distribution",
+        "summary": "GroToken rewards issued in week 12",
         "x": 0.0,
         "y": 0.0,
         "r": 0.3,
-        "constellations": ["..."]
+        "constellations": [
+          {
+            "id": "attr-week-12",
+            "summary": "Week 12 attribution cluster",
+            "points": [
+              {
+                "id": "attr-grotoken-week-12-0001",
+                "modality": "economic-sim",
+                "ref_id": "member-001",
+                "summary": "GroToken reward for cooperative purchase",
+                "x": 0.2,
+                "y": 0.2,
+                "conf": 0.98
+              }
+            ]
+          }
+        ]
       }
     ],
     "meta": {
       "attribution": {
-        "total_attributions": 1240,
-        "by_category": {
-          "grotoken_reward": 620,
-          "coop_purchase": 380,
-          "local_production": 240
-        }
+        "total_attributions": 1240
       }
     }
   },
@@ -76,7 +91,7 @@ The CGP document embedded in `cgp` follows spec `chit.cgp.v0.2` (weekly export) 
   "amount": 12.5,
   "week": 12,
   "category": "grotoken_reward",
-  "merkle_root": null,
+  "merkle_root": "0xa3f19c8ea3f19c8ea3f19c8ea3f19c8ea3f19c8ea3f19c8ea3f19c8ea3f19c8e",
   "timestamp": "2026-01-05T12:00:00Z"
 }
 ```
@@ -88,7 +103,7 @@ The CGP document embedded in `cgp` follows spec `chit.cgp.v0.2` (weekly export) 
   "namespace": "tokenism",
   "modality": "economic-sim",
   "pack_id": "grotoken-week-12",
-  "status": "running",
+  "status": "active",
   "population_id": "pop-001",
   "generation": 42,
   "best_fitness": 0.87,
@@ -104,7 +119,44 @@ The CGP document embedded in `cgp` follows spec `chit.cgp.v0.2` (weekly export) 
 
 ```json
 {
-  "cgp": { "spec": "chit.cgp.v0.2", "summary": "...", "super_nodes": ["..."], "meta": {} },
+  "cgp": {
+    "spec": "chit.cgp.v0.2",
+    "summary": "ToKenism Week 12 Economic Simulation",
+    "created_at": "2026-01-05T12:00:00Z",
+    "updated_at": "2026-01-05T12:00:00Z",
+    "super_nodes": [
+      {
+        "id": "grotoken-week-12",
+        "label": "GroToken Distribution",
+        "summary": "GroToken rewards issued in week 12",
+        "x": 0.0,
+        "y": 0.0,
+        "r": 0.3,
+        "constellations": [
+          {
+            "id": "attr-week-12",
+            "summary": "Week 12 attribution cluster",
+            "points": [
+              {
+                "id": "attr-grotoken-week-12-0001",
+                "modality": "economic-sim",
+                "ref_id": "member-001",
+                "summary": "GroToken reward for cooperative purchase",
+                "x": 0.2,
+                "y": 0.2,
+                "conf": 0.98
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "attribution": {
+        "total_attributions": 1240
+      }
+    }
+  },
   "super_node_count": 1,
   "week": 12,
   "source": "tokenism-simulator",
@@ -115,10 +167,13 @@ The CGP document embedded in `cgp` follows spec `chit.cgp.v0.2` (weekly export) 
 
 ## Validation & Publishing Guarantees
 
-- Every payload is **AJV-validated** against its JSON Schema **before** publish; an invalid payload raises and is **not** published (fail-closed).
-- The geometry CGP schema is registered alongside the tokenism schemas so nested `cgp` objects validate against `contracts/schemas/geometry/cgp.v1.schema.json`.
-- Publish failures are logged as `[CHIT] Failed to publish <subject>: <reason>` and return `false` to the caller.
+- Every payload is **AJV-validated** against its JSON Schema **before** publish. The geometry CGP schema is registered alongside the tokenism schemas so nested `cgp` objects validate against `contracts/schemas/geometry/cgp.v1.schema.json`.
+- **Two publish modes** — constructor option `strictPublish` (default `false`):
+  - **Default (lenient):** a schema-invalid payload or publish error is logged (`[CHIT] Failed to publish <subject>: <reason>`) and the method returns `false` — nothing is published, but the caller keeps running.
+  - **Strict (`strictPublish: true`):** the same conditions **throw** — use for lanes where silent drops are unacceptable.
+- In **both** modes an invalid payload is never published.
 - Successful publishes log `[CHIT] Published <subject>: <pack_id>`.
+- A subject with no registered validator throws regardless of mode (programming error, not data error).
 
 ## Connection
 
