@@ -91,7 +91,7 @@ describe('ChartWrapper Accessibility', () => {
 
       // Charts should have accessible alternatives
       // This would typically be implemented with a data table or screen reader-friendly text
-      const chartContainer = screen.getByRole('img') || screen.getByRole('application');
+      const chartContainer = screen.getByRole('figure');
       if (chartContainer) {
         const hasAriaLabel = chartContainer.hasAttribute('aria-label');
         const hasAriaLabelledBy = chartContainer.hasAttribute('aria-labelledby');
@@ -208,7 +208,7 @@ describe('ChartWrapper Accessibility', () => {
       rerender(<ChartWrapper {...defaultProps} loading={false} />);
       
       // Chart should be properly announced as loaded
-      expect(screen.getByRole('img') || screen.getByRole('application')).toBeInTheDocument();
+      expect(screen.getByRole('figure')).toBeInTheDocument();
     });
   });
 
@@ -300,7 +300,7 @@ describe('ChartWrapper Accessibility', () => {
 
       // Complex charts should have data table alternatives
       // This is a placeholder for where a data table would be implemented
-      const chartArea = screen.getByRole('img') || screen.getByRole('application');
+      const chartArea = screen.getByRole('figure');
       if (chartArea) {
         expect(chartArea).toHaveAttribute('role');
       }

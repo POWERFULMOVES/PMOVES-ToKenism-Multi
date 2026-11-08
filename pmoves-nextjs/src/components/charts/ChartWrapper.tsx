@@ -93,7 +93,7 @@ export function ChartWrapper({
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
       <CardContent>
-        <div className={`h-[${height}px]`} role="img" aria-label={chartLabel}>
+        <div className={`h-[${height}px]`} role="figure" aria-label={chartLabel}>
           <ResponsiveContainer width="100%" height="100%">
             {children ? (children as React.ReactElement) : <div />}
           </ResponsiveContainer>
