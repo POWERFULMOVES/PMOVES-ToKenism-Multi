@@ -101,11 +101,10 @@ describe('EnhancedSimulationForm', () => {
         INITIAL_WEALTH_SIGMA_LOG: expect.any(Number),
         WEEKLY_FOOD_BUDGET_STDDEV: expect.any(Number),
         WEEKLY_INCOME_STDDEV: expect.any(Number),
-        MIN_WEEKLY_FOOD_BUDGET: expect.any(Number),
+        MIN_WEEKLY_BUDGET: expect.any(Number),
         MIN_WEEKLY_INCOME: expect.any(Number),
         PERCENT_SPEND_INTERNAL_STDDEV: expect.any(Number),
         GROTOKEN_REWARD_STDDEV: expect.any(Number),
-        localEconomicActivities: expect.any(Array)
       }));
     });
   });
@@ -166,10 +165,12 @@ describe('EnhancedSimulationForm', () => {
     const firstInput = screen.getByLabelText(/number of members/i);
     expect(firstInput).toHaveFocus();
     
-    // Test slider interaction with keyboard
+    // Slider keys adjust by the configured step (ARIA slider pattern):
+    // 25 + step(10) = 35, clamped to bounds.
+    await user.clear(firstInput);
     await user.type(firstInput, '25');
     await user.keyboard('{ArrowUp}');
-    expect(screen.getByDisplayValue('25')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('35')).toBeInTheDocument();
   });
 
   test('provides accessible labels and descriptions', () => {

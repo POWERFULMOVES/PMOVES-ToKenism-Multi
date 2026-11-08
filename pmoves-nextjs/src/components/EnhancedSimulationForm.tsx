@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InfoCircledIcon } from '@radix-ui/react-icons';
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { SimulationParams } from '@/lib/simulation/types';
+import { DEFAULT_PARAMS } from '@/lib/simulation';
 import { formatCurrency, formatPercentage } from '@/lib/utils/formatters';
 import { ModelExplanation } from './ModelExplanation';
 import { ExpectedBenefits } from './ui/expected-benefits';
@@ -28,6 +29,49 @@ interface EnhancedSimulationFormProps {
   showPreview?: boolean;
 }
 
+interface FieldConfig {
+  id: string;
+  label: string;
+  description: string;
+  min: number;
+  max: number;
+  step: number;
+  errorUnit: string;
+  format?: 'currency' | 'percent' | 'plain' | 'dollars';
+}
+
+const FIELDS: Record<'basic' | 'members' | 'cooperative', FieldConfig[]> = {
+  basic: [
+    { id: 'NUM_MEMBERS', label: 'Number of Members', description: 'Total number of participants in the simulation. Larger communities may show different dynamics.', min: 10, max: 200, step: 10, errorUnit: 'members', format: 'plain' },
+    { id: 'SIMULATION_WEEKS', label: 'Simulation Duration (Weeks)', description: 'Length of the simulation in weeks. Longer simulations show long-term trends (52 weeks = 1 year).', min: 12, max: 520, step: 12, errorUnit: 'weeks', format: 'plain' },
+    { id: 'INITIAL_WEALTH_MEAN_LOG', label: 'Starting Wealth (Log Mean)', description: 'Controls the average initial wealth. Higher values mean members start with more money (6.9 ≈ $1000).', min: 5.0, max: 8.0, step: 0.1, errorUnit: 'value', format: 'dollars' },
+    { id: 'INITIAL_WEALTH_SIGMA_LOG', label: 'Initial Wealth Inequality', description: 'Controls the spread of initial wealth. Higher values mean more initial inequality (0.6 is moderate, 1.0 is high).', min: 0.2, max: 1.2, step: 0.1, errorUnit: 'value', format: 'plain' },
+  ],
+  members: [
+    { id: 'WEEKLY_INCOME_AVG', label: 'Average Weekly Income', description: 'Average income earned per member per week. Higher values mean more money flowing into the system.', min: 0, max: 500, step: 10, errorUnit: 'income', format: 'currency' },
+    { id: 'WEEKLY_INCOME_STDDEV', label: 'Income Variation', description: 'How much incomes vary between members. Higher values create a wider spread of wealth outcomes.', min: 0, max: 200, step: 5, errorUnit: 'value', format: 'currency' },
+    { id: 'WEEKLY_FOOD_BUDGET_AVG', label: 'Average Weekly Budget', description: 'Average amount each member spends on food per week. This drives demand in the local economy.', min: 0, max: 400, step: 10, errorUnit: 'value', format: 'currency' },
+    { id: 'WEEKLY_FOOD_BUDGET_STDDEV', label: 'Budget Variation', description: 'How much food budgets vary between members. Higher values mean more diverse spending patterns.', min: 0, max: 150, step: 5, errorUnit: 'value', format: 'currency' },
+  ],
+  cooperative: [
+    { id: 'PERCENT_SPEND_INTERNAL_AVG', label: 'Percent Spent Internally', description: 'Share of food spending that stays inside the cooperative. Higher values keep more money circulating locally.', min: 0, max: 1, step: 0.05, errorUnit: 'value', format: 'percent' },
+    { id: 'GROUP_BUY_SAVINGS_PERCENT', label: 'Group Buy Savings', description: 'Discount members get by buying food together in bulk. Savings from collective purchasing power.', min: 0, max: 1, step: 0.05, errorUnit: 'value', format: 'percent' },
+    { id: 'LOCAL_PRODUCTION_SAVINGS_PERCENT', label: 'Local Production Savings', description: 'Additional savings from food produced locally by the cooperative itself, cutting out middlemen.', min: 0, max: 1, step: 0.05, errorUnit: 'value', format: 'percent' },
+    { id: 'GROTOKEN_REWARD_PER_WEEK_AVG', label: 'Weekly GroToken Reward', description: 'GroTokens earned per member per week for participating in the cooperative economy.', min: 0, max: 50, step: 1, errorUnit: 'value', format: 'plain' },
+    { id: 'GROTOKEN_USD_VALUE', label: 'GroToken Value', description: 'USD value of one GroToken. This determines how much the token rewards add to member wealth.', min: 0, max: 10, step: 0.1, errorUnit: 'value', format: 'currency' },
+    { id: 'WEEKLY_COOP_FEE_B', label: 'Weekly Coop Fee', description: 'Weekly fee members pay to cover cooperative operating costs like storage and coordination.', min: 0, max: 50, step: 1, errorUnit: 'value', format: 'currency' },
+  ],
+};
+
+function formatFieldValue(value: number, format?: FieldConfig['format']): string {
+  switch (format) {
+    case 'currency': return formatCurrency(value);
+    case 'percent': return formatPercentage(value);
+    case 'dollars': return `≈ ${formatCurrency(Math.exp(value))}`;
+    default: return String(value);
+  }
+}
+
 export const EnhancedSimulationForm = memo(function EnhancedSimulationForm({
   params,
   onParamsChange,
@@ -38,6 +82,9 @@ export const EnhancedSimulationForm = memo(function EnhancedSimulationForm({
   showPreview = true
 }: EnhancedSimulationFormProps) {
   const [localParams, setLocalParams] = useState<SimulationParams>(params);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [rawValues, setRawValues] = useState<Record<string, string>>({});
+  const [activeTab, setActiveTab] = useState<string>('basic');
   interface PreviewDataPoint {
     week: number;
     wealthA: number;
@@ -51,12 +98,14 @@ export const EnhancedSimulationForm = memo(function EnhancedSimulationForm({
   // Update local params when global params change (e.g., from preset selection)
   useEffect(() => {
     setLocalParams(params);
+    setErrors({});
+    setRawValues({});
   }, [params]);
 
   // Generate preview data when parameters change
   const generatePreviewData = useCallback(() => {
-    const weeks = Math.min(52, localParams.SIMULATION_WEEKS); // Use simulation weeks but cap at 52 for preview
-    const data = [];
+    const weeks = Math.min(52, Math.max(1, localParams.SIMULATION_WEEKS)); // Use simulation weeks but cap at 52 for preview
+    const data: PreviewDataPoint[] = [];
 
     // Simple model for preview - not the actual simulation
     const initialWealthA = Math.exp(localParams.INITIAL_WEALTH_MEAN_LOG);
@@ -114,44 +163,208 @@ export const EnhancedSimulationForm = memo(function EnhancedSimulationForm({
     generatePreviewData();
   }, [generatePreviewData]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type } = e.target;
-    const parsedValue = type === 'number' ? Number.parseFloat(value) : value;
+  const validateField = useCallback((id: string, value: number): string | undefined => {
+    const field = Object.values(FIELDS).flat().find((f) => f.id === id);
+    if (!field) return undefined;
+    if (!Number.isFinite(value)) {
+      return `A valid number is required for ${field.label}`;
+    }
+    if (value < field.min) {
+      return `Minimum ${field.min} ${field.errorUnit} required`;
+    }
+    if (value > field.max) {
+      return `Maximum ${field.max} ${field.errorUnit} allowed`;
+    }
+    return undefined;
+  }, []);
 
-    setLocalParams((prev) => ({
-      ...prev,
-      [name]: parsedValue,
-    } as SimulationParams));
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    const parsedValue = Number.parseFloat(value);
+
+    // Keep the raw text in the field; commit only finite parses to the model
+    setRawValues((prev) => ({ ...prev, [name]: value }));
+    if (Number.isFinite(parsedValue)) {
+      setLocalParams((prev) => ({
+        ...prev,
+        [name]: parsedValue,
+      } as SimulationParams));
+    }
+
+    const error = validateField(name, parsedValue);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (error) next[name] = error;
+      else delete next[name];
+      return next;
+    });
   };
 
-  const handleSliderChange = (name: string, value: number[]) => {
-    setLocalParams((prev) => ({
-      ...prev,
-      [name]: value[0],
-    } as SimulationParams));
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    const parsedValue = Number.parseFloat(value);
+    const error = validateField(name, parsedValue);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (error) next[name] = error;
+      else delete next[name];
+      return next;
+    });
+  };
+
+  const validateAllFields = (): Record<string, string> => {
+    const next: Record<string, string> = {};
+    for (const field of Object.values(FIELDS).flat()) {
+      const value = localParams[field.id as keyof SimulationParams] as number;
+      const error = validateField(field.id, value);
+      if (error) next[field.id] = error;
+    }
+    return next;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const allErrors = validateAllFields();
+    if (Object.keys(allErrors).length > 0) {
+      // Block submission while any parameter is invalid
+      setErrors((prev) => ({ ...prev, ...allErrors }));
+      return;
+    }
     // Update global params with local params
     onParamsChange(localParams);
     onSubmit();
   };
 
   const handleReset = () => {
+    setLocalParams(DEFAULT_PARAMS);
+    setErrors({});
+    onParamsChange(DEFAULT_PARAMS);
     onReset();
   };
 
+  // ARIA slider pattern: arrow keys step by `step`, Home/End jump to bounds,
+  // PageUp/PageDown step by 10x. Values commit through the same validated path
+  // as typed input (review thread: restore keyboard value changes).
+  const handleSliderKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    const field = Object.values(FIELDS)
+      .flat()
+      .find((f) => f.id === e.currentTarget.name);
+    if (!field) return;
+
+    const current = localParams[field.id as keyof SimulationParams] as number;
+    let next: number;
+    switch (e.key) {
+      case 'ArrowUp':
+      case 'ArrowRight':
+        next = Math.min(field.max, current + field.step);
+        break;
+      case 'ArrowDown':
+      case 'ArrowLeft':
+        next = Math.max(field.min, current - field.step);
+        break;
+      case 'Home':
+        next = field.min;
+        break;
+      case 'End':
+        next = field.max;
+        break;
+      case 'PageUp':
+        next = Math.min(field.max, current + field.step * 10);
+        break;
+      case 'PageDown':
+        next = Math.max(field.min, current - field.step * 10);
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+
+    setLocalParams((prev) => ({ ...prev, [field.id]: next } as SimulationParams));
+    setRawValues((prev) => ({ ...prev, [field.id]: String(next) }));
+    const error = validateField(field.id, next);
+    setErrors((prev) => {
+      const n = { ...prev };
+      if (error) n[field.id] = error;
+      else delete n[field.id];
+      return n;
+    });
+  };
+
+  const renderField = (field: FieldConfig, tabbable: boolean) => {
+    const value = localParams[field.id as keyof SimulationParams] as number;
+    const error = errors[field.id];
+    const describedBy = error ? `${field.id}-error ${field.id}-description` : `${field.id}-description`;
+
+    return (
+      <div className="space-y-2" key={field.id}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Label htmlFor={field.id} className="flex items-center">
+              {field.label}
+            </Label>
+            <span aria-hidden="true" className="text-destructive ml-0.5">*</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-label="More information"
+                  className="ml-1 text-muted-foreground cursor-help"
+                >
+                  <InfoCircledIcon className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent forceMount>
+                <p className="max-w-xs">{field.description}</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <span className="text-sm text-muted-foreground">{formatFieldValue(value, field.format)}</span>
+        </div>
+        <Input
+          id={field.id}
+          name={field.id}
+          type="text"
+          inputMode="decimal"
+          role="slider"
+          tabIndex={tabbable ? 0 : -1}
+          min={field.min}
+          max={field.max}
+          step={field.step}
+          value={rawValues[field.id] ?? (Number.isFinite(value) ? String(value) : '')}
+          disabled={isLoading}
+          onChange={handleInputChange}
+          onBlur={handleBlur}
+          onKeyDown={handleSliderKeyDown}
+          onFocus={(e) => e.target.select()}
+          aria-valuemin={field.min}
+          aria-valuemax={field.max}
+          aria-valuenow={Number.isFinite(value) ? value : undefined}
+          aria-valuetext={formatFieldValue(value, field.format)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+        />
+        {error && (
+          <p id={`${field.id}-error`} role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <p id={`${field.id}-description`} className="sr-only">
+          {field.description}
+        </p>
+      </div>
+    );
+  };
 
   return (
     <TooltipProvider>
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-6">
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} aria-label="Simulation Parameters">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center">
+                  <CardTitle role="heading" aria-level={2} className="flex items-center">
                     Simulation Parameters
                     {presetName && (
                       <span className="ml-2 text-sm font-normal text-muted-foreground">
@@ -160,369 +373,45 @@ export const EnhancedSimulationForm = memo(function EnhancedSimulationForm({
                     )}
                   </CardTitle>
                   <CardDescription>
-                    Configure the economic simulation parameters
+                    Configure the economic simulation parameters. Fields marked with * are required.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue="basic" className="space-y-4">
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
                     <TabsList className="grid grid-cols-3">
                       <TabsTrigger value="basic">Basic</TabsTrigger>
                       <TabsTrigger value="members">Members</TabsTrigger>
                       <TabsTrigger value="cooperative">Cooperative</TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="basic" className="space-y-4">
+                    <TabsContent forceMount tabIndex={-1} value="basic" className="space-y-4">
                       <div className="grid grid-cols-1 gap-4">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="NUM_MEMBERS" className="flex items-center">
-                              Number of Members
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    aria-label="More information about number of members"
-                                    className="ml-1 text-muted-foreground cursor-help"
-                                  >
-                                    <InfoCircledIcon className="h-4 w-4" />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">Total number of participants in the simulation. Larger communities may show different dynamics.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </Label>
-                            <span className="text-sm text-muted-foreground">{localParams.NUM_MEMBERS}</span>
-                          </div>
-                          <Slider
-                            id="NUM_MEMBERS"
-                            min={10}
-                            max={200}
-                            step={10}
-                            value={[localParams.NUM_MEMBERS]}
-                            onValueChange={(value) => handleSliderChange('NUM_MEMBERS', value)}
-                            aria-describedby="num-members-tooltip"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="SIMULATION_WEEKS" className="flex items-center">
-                              Simulation Duration (Weeks)
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">Length of the simulation in weeks. Longer simulations show long-term trends (52 weeks = 1 year).</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </Label>
-                            <span className="text-sm text-muted-foreground">{localParams.SIMULATION_WEEKS} weeks</span>
-                          </div>
-                          <Slider
-                            id="SIMULATION_WEEKS"
-                            min={12}
-                            max={520}
-                            step={12}
-                            value={[localParams.SIMULATION_WEEKS]}
-                            onValueChange={(value) => handleSliderChange('SIMULATION_WEEKS', value)}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="INITIAL_WEALTH_MEAN_LOG" className="flex items-center">
-                              Initial Wealth (Log Mean)
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">Controls the average initial wealth. Higher values mean members start with more money (6.9 ≈ $1000).</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </Label>
-                            <span className="text-sm text-muted-foreground">≈ {formatCurrency(Math.exp(localParams.INITIAL_WEALTH_MEAN_LOG))}</span>
-                          </div>
-                          <Slider
-                            id="INITIAL_WEALTH_MEAN_LOG"
-                            min={5.0}
-                            max={8.0}
-                            step={0.1}
-                            value={[localParams.INITIAL_WEALTH_MEAN_LOG]}
-                            onValueChange={(value) => handleSliderChange('INITIAL_WEALTH_MEAN_LOG', value)}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="INITIAL_WEALTH_SIGMA_LOG" className="flex items-center">
-                              Initial Wealth Inequality
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">Controls the spread of initial wealth. Higher values mean more initial inequality (0.6 is moderate, 1.0 is high).</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </Label>
-                            <span className="text-sm text-muted-foreground">{localParams.INITIAL_WEALTH_SIGMA_LOG.toFixed(1)}</span>
-                          </div>
-                          <Slider
-                            id="INITIAL_WEALTH_SIGMA_LOG"
-                            min={0.2}
-                            max={1.2}
-                            step={0.1}
-                            value={[localParams.INITIAL_WEALTH_SIGMA_LOG]}
-                            onValueChange={(value) => handleSliderChange('INITIAL_WEALTH_SIGMA_LOG', value)}
-                          />
-                        </div>
+                        {FIELDS.basic.map((f) => renderField(f, activeTab === 'basic'))}
                       </div>
                     </TabsContent>
 
-                    <TabsContent value="members" className="space-y-4">
+                    <TabsContent forceMount tabIndex={-1} value="members" className="space-y-4">
                       <div className="grid grid-cols-1 gap-4">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="WEEKLY_INCOME_AVG" className="flex items-center">
-                              Average Weekly Income
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">Average income earned per member per week. Higher values mean more money flowing into the system.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </Label>
-                            <span className="text-sm text-muted-foreground">{formatCurrency(localParams.WEEKLY_INCOME_AVG)}</span>
-                          </div>
-                          <Slider
-                            id="WEEKLY_INCOME_AVG"
-                            min={50}
-                            max={500}
-                            step={10}
-                            value={[localParams.WEEKLY_INCOME_AVG]}
-                            onValueChange={(value) => handleSliderChange('WEEKLY_INCOME_AVG', value)}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="WEEKLY_INCOME_STDDEV" className="flex items-center">
-                              Income Variation
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">Standard deviation of weekly income. Higher values mean more income inequality between members.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </Label>
-                            <span className="text-sm text-muted-foreground">{formatCurrency(localParams.WEEKLY_INCOME_STDDEV)}</span>
-                          </div>
-                          <Slider
-                            id="WEEKLY_INCOME_STDDEV"
-                            min={10}
-                            max={200}
-                            step={5}
-                            value={[localParams.WEEKLY_INCOME_STDDEV]}
-                            onValueChange={(value) => handleSliderChange('WEEKLY_INCOME_STDDEV', value)}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="WEEKLY_FOOD_BUDGET_AVG" className="flex items-center">
-                              Average Weekly Budget
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">Average amount needed for food/essentials per member per week. This is the basic spending requirement.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </Label>
-                            <span className="text-sm text-muted-foreground">{formatCurrency(localParams.WEEKLY_FOOD_BUDGET_AVG)}</span>
-                          </div>
-                          <Slider
-                            id="WEEKLY_FOOD_BUDGET_AVG"
-                            min={20}
-                            max={200}
-                            step={5}
-                            value={[localParams.WEEKLY_FOOD_BUDGET_AVG]}
-                            onValueChange={(value) => handleSliderChange('WEEKLY_FOOD_BUDGET_AVG', value)}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="PERCENT_SPEND_INTERNAL_AVG" className="flex items-center">
-                              % Spent Internally (Co-op)
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">Average proportion of budget spent via co-op in Scenario B. Higher values mean more money stays in the community.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </Label>
-                            <span className="text-sm text-muted-foreground">{formatPercentage(localParams.PERCENT_SPEND_INTERNAL_AVG)}</span>
-                          </div>
-                          <Slider
-                            id="PERCENT_SPEND_INTERNAL_AVG"
-                            min={0.1}
-                            max={0.9}
-                            step={0.05}
-                            value={[localParams.PERCENT_SPEND_INTERNAL_AVG]}
-                            onValueChange={(value) => handleSliderChange('PERCENT_SPEND_INTERNAL_AVG', value)}
-                          />
-                        </div>
+                        {FIELDS.members.map((f) => renderField(f, activeTab === 'members'))}
                       </div>
                     </TabsContent>
 
-                    <TabsContent value="cooperative" className="space-y-4">
+                    <TabsContent forceMount tabIndex={-1} value="cooperative" className="space-y-4">
                       <div className="grid grid-cols-1 gap-4">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="GROUP_BUY_SAVINGS_PERCENT" className="flex items-center">
-                              Group Buy Savings
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">Savings rate for group purchases. Higher values mean more cost reduction from bulk buying (0.15 = 15% savings).</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </Label>
-                            <span className="text-sm text-muted-foreground">{formatPercentage(localParams.GROUP_BUY_SAVINGS_PERCENT)}</span>
-                          </div>
-                          <Slider
-                            id="GROUP_BUY_SAVINGS_PERCENT"
-                            min={0.05}
-                            max={0.3}
-                            step={0.01}
-                            value={[localParams.GROUP_BUY_SAVINGS_PERCENT]}
-                            onValueChange={(value) => handleSliderChange('GROUP_BUY_SAVINGS_PERCENT', value)}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="LOCAL_PRODUCTION_SAVINGS_PERCENT" className="flex items-center">
-                              Local Production Savings
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">Savings rate for locally produced goods. Higher values mean more cost reduction from local production (0.25 = 25% savings).</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </Label>
-                            <span className="text-sm text-muted-foreground">{formatPercentage(localParams.LOCAL_PRODUCTION_SAVINGS_PERCENT)}</span>
-                          </div>
-                          <Slider
-                            id="LOCAL_PRODUCTION_SAVINGS_PERCENT"
-                            min={0.05}
-                            max={0.4}
-                            step={0.01}
-                            value={[localParams.LOCAL_PRODUCTION_SAVINGS_PERCENT]}
-                            onValueChange={(value) => handleSliderChange('LOCAL_PRODUCTION_SAVINGS_PERCENT', value)}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="GROTOKEN_REWARD_PER_WEEK_AVG" className="flex items-center">
-                              Weekly GroToken Reward
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">Average GroTokens earned per member per week. These tokens add to total wealth in Scenario B.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </Label>
-                            <span className="text-sm text-muted-foreground">{localParams.GROTOKEN_REWARD_PER_WEEK_AVG.toFixed(1)} tokens</span>
-                          </div>
-                          <Slider
-                            id="GROTOKEN_REWARD_PER_WEEK_AVG"
-                            min={0.1}
-                            max={20}
-                            step={0.5}
-                            value={[localParams.GROTOKEN_REWARD_PER_WEEK_AVG]}
-                            onValueChange={(value) => handleSliderChange('GROTOKEN_REWARD_PER_WEEK_AVG', value)}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="GROTOKEN_USD_VALUE" className="flex items-center">
-                              GroToken Value ($)
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">USD value per GroToken for wealth calculation. Higher values increase the impact of the community currency.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </Label>
-                            <span className="text-sm text-muted-foreground">{formatCurrency(localParams.GROTOKEN_USD_VALUE)}</span>
-                          </div>
-                          <Slider
-                            id="GROTOKEN_USD_VALUE"
-                            min={0.5}
-                            max={5}
-                            step={0.1}
-                            value={[localParams.GROTOKEN_USD_VALUE]}
-                            onValueChange={(value) => handleSliderChange('GROTOKEN_USD_VALUE', value)}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="WEEKLY_COOP_FEE_B" className="flex items-center">
-                              Weekly Co-op Fee
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <InfoCircledIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">Weekly fee per member for co-op upkeep in Scenario B. This represents the cost of maintaining the cooperative infrastructure.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </Label>
-                            <span className="text-sm text-muted-foreground">{formatCurrency(localParams.WEEKLY_COOP_FEE_B)}</span>
-                          </div>
-                          <Slider
-                            id="WEEKLY_COOP_FEE_B"
-                            min={0.1}
-                            max={5}
-                            step={0.1}
-                            value={[localParams.WEEKLY_COOP_FEE_B]}
-                            onValueChange={(value) => handleSliderChange('WEEKLY_COOP_FEE_B', value)}
-                          />
-                        </div>
+                        {FIELDS.cooperative.map((f) => renderField(f, activeTab === 'cooperative'))}
                       </div>
                     </TabsContent>
                   </Tabs>
-                  <ExpectedBenefits params={localParams as Record<string, number>} />
                 </CardContent>
                 <CardFooter className="flex justify-between">
-                  <Button variant="outline" type="button" onClick={handleReset}>
+                  <ExpectedBenefits params={localParams as Record<string, number>} />
+                </CardFooter>
+                <CardFooter className="flex justify-between">
+                  <Button variant="outline" type="button" onClick={handleReset} disabled={isLoading}>
                     Reset
                   </Button>
-                  <Button type="submit" disabled={isLoading}>
-                    {isLoading ? 'Running...' : 'Run Simulation'}
+                  <Button type="submit" disabled={isLoading} aria-disabled={isLoading || undefined} aria-live="polite">
+                    {isLoading ? 'Running…' : 'Run Simulation'}
                   </Button>
                 </CardFooter>
               </Card>
@@ -530,74 +419,38 @@ export const EnhancedSimulationForm = memo(function EnhancedSimulationForm({
           </div>
 
           {showPreview && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Parameter Preview</CardTitle>
+                  <CardTitle role="heading" aria-level={2}>Parameter Preview</CardTitle>
                   <CardDescription>
-                    See how changes affect the simulation (simplified model)
+                    Projected wealth trajectories based on current parameters
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[300px]">
+                  <div title="Parameter Preview" role="img" aria-label="Projected wealth trajectories preview chart" className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={previewData}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="week"
-                          label={{ value: 'Week', position: 'insideBottom', offset: -5 }}
-                          domain={[1, 'dataMax']}
-                        />
-                        <YAxis
-                          label={{ value: 'Wealth ($)', angle: -90, position: 'insideLeft' }}
-                          domain={[0, 'auto']} // Start at 0, auto-scale the max
-                          tickFormatter={(value) => formatCurrency(value, true)} // Simplified currency format
-                        />
-                        <RechartsTooltip
-                          formatter={(value, name) => {
-                            if (name === 'Traditional (A)' || name === 'Cooperative (B)') {
-                              return [formatCurrency(value as number), name];
-                            }
-                            return [value, name];
-                          }}
-                          labelFormatter={(label) => `Week ${label}`}
-                        />
+                        <XAxis dataKey="week" />
+                        <YAxis />
+                        <RechartsTooltip />
                         <Legend />
-                        <Line type="monotone" dataKey="wealthA" name="Traditional (A)" stroke="#8884d8" />
-                        <Line type="monotone" dataKey="wealthB" name="Cooperative (B)" stroke="#82ca9d" />
-                        <Line type="monotone" dataKey="usdB" name="USD Component (B)" stroke="#82ca9d" strokeDasharray="3 3" strokeWidth={1} dot={false} />
-                        <Line type="monotone" dataKey="grotokenValueUSD" name="GroToken Value (B)" stroke="#ffc658" strokeDasharray="3 3" strokeWidth={1} dot={false} />
+                        <Line type="monotone" dataKey="wealthA" stroke="#8884d8" name="Traditional" />
+                        <Line type="monotone" dataKey="wealthB" stroke="#82ca9d" name="Cooperative" />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-4">
-                    <div className="bg-blue-50 p-3 rounded-md">
-                      <h4 className="text-sm font-medium text-blue-800">Key Parameters</h4>
-                      <ul className="mt-2 text-xs space-y-1 text-blue-700">
-                        <li>Members: {localParams.NUM_MEMBERS}</li>
-                        <li>Weeks: {localParams.SIMULATION_WEEKS}</li>
-                        <li>Avg Income: {formatCurrency(localParams.WEEKLY_INCOME_AVG)}</li>
-                        <li>Avg Budget: {formatCurrency(localParams.WEEKLY_FOOD_BUDGET_AVG)}</li>
-                      </ul>
-                    </div>
-                    <div className="bg-green-50 p-3 rounded-md">
-                      <h4 className="text-sm font-medium text-green-800">Cooperative Benefits</h4>
-                      <ul className="mt-2 text-xs space-y-1 text-green-700">
-                        <li>Internal Spending: {formatPercentage(localParams.PERCENT_SPEND_INTERNAL_AVG)}</li>
-                        <li>Group Savings: {formatPercentage(localParams.GROUP_BUY_SAVINGS_PERCENT)}</li>
-                        <li>Local Savings: {formatPercentage(localParams.LOCAL_PRODUCTION_SAVINGS_PERCENT)}</li>
-                        <li>GroToken Value: {formatCurrency(localParams.GROTOKEN_USD_VALUE)}</li>
-                      </ul>
-                    </div>
-                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    See how changes affect the simulation before execution.
+                  </p>
                 </CardContent>
               </Card>
-
-              <ModelExplanation />
             </div>
           )}
         </div>
+
+        <ModelExplanation />
       </div>
     </TooltipProvider>
   );

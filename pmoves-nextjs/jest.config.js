@@ -12,7 +12,6 @@ module.exports = {
     '__tests__/accessibility/color-contrast\\.test\\.tsx$',
     '__tests__/accessibility/keyboard-navigation\\.test\\.tsx$',
     '__tests__/accessibility/screen-reader\\.test\\.tsx$',
-    '__tests__/components/EnhancedSimulationForm\\.',
   ],
   collectCoverageFrom: ['**/src/**/*.ts', '**/src/**/*.tsx'],
   coverageDirectory: 'coverage',
