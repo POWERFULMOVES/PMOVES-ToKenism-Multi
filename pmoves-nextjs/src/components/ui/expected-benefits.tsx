@@ -26,7 +26,6 @@ export function ExpectedBenefits({ params }: ExpectedBenefitsProps) {
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  tabIndex={-1}
                   aria-label="More information about expected benefits"
                   className="text-muted-foreground cursor-help"
                 >

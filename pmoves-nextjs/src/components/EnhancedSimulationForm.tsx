@@ -55,8 +55,8 @@ const FIELDS: Record<'basic' | 'members' | 'cooperative', FieldConfig[]> = {
   ],
   cooperative: [
     { id: 'PERCENT_SPEND_INTERNAL_AVG', label: 'Percent Spent Internally', description: 'Share of food spending that stays inside the cooperative. Higher values keep more money circulating locally.', min: 0, max: 1, step: 0.05, errorUnit: 'value', format: 'percent' },
-    { id: 'GROUP_BUY_SAVINGS_PERCENT', label: 'Group Buy Savings', description: 'Discount members get by buying food together in bulk. Savings from collective purchasing power.', min: 0, max: 30, step: 1, errorUnit: 'value', format: 'percent' },
-    { id: 'LOCAL_PRODUCTION_SAVINGS_PERCENT', label: 'Local Production Savings', description: 'Additional savings from food produced locally by the cooperative itself, cutting out middlemen.', min: 0, max: 30, step: 1, errorUnit: 'value', format: 'percent' },
+    { id: 'GROUP_BUY_SAVINGS_PERCENT', label: 'Group Buy Savings', description: 'Discount members get by buying food together in bulk. Savings from collective purchasing power.', min: 0, max: 1, step: 0.05, errorUnit: 'value', format: 'percent' },
+    { id: 'LOCAL_PRODUCTION_SAVINGS_PERCENT', label: 'Local Production Savings', description: 'Additional savings from food produced locally by the cooperative itself, cutting out middlemen.', min: 0, max: 1, step: 0.05, errorUnit: 'value', format: 'percent' },
     { id: 'GROTOKEN_REWARD_PER_WEEK_AVG', label: 'Weekly GroToken Reward', description: 'GroTokens earned per member per week for participating in the cooperative economy.', min: 0, max: 50, step: 1, errorUnit: 'value', format: 'plain' },
     { id: 'GROTOKEN_USD_VALUE', label: 'GroToken Value', description: 'USD value of one GroToken. This determines how much the token rewards add to member wealth.', min: 0, max: 10, step: 0.1, errorUnit: 'value', format: 'currency' },
     { id: 'WEEKLY_COOP_FEE_B', label: 'Weekly Coop Fee', description: 'Weekly fee members pay to cover cooperative operating costs like storage and coordination.', min: 0, max: 50, step: 1, errorUnit: 'value', format: 'currency' },
@@ -212,8 +212,24 @@ export const EnhancedSimulationForm = memo(function EnhancedSimulationForm({
     });
   };
 
+  const validateAllFields = (): Record<string, string> => {
+    const next: Record<string, string> = {};
+    for (const field of Object.values(FIELDS).flat()) {
+      const value = localParams[field.id as keyof SimulationParams] as number;
+      const error = validateField(field.id, value);
+      if (error) next[field.id] = error;
+    }
+    return next;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const allErrors = validateAllFields();
+    if (Object.keys(allErrors).length > 0) {
+      // Block submission while any parameter is invalid
+      setErrors((prev) => ({ ...prev, ...allErrors }));
+      return;
+    }
     // Update global params with local params
     onParamsChange(localParams);
     onSubmit();
@@ -226,12 +242,52 @@ export const EnhancedSimulationForm = memo(function EnhancedSimulationForm({
     onReset();
   };
 
+  // ARIA slider pattern: arrow keys step by `step`, Home/End jump to bounds,
+  // PageUp/PageDown step by 10x. Values commit through the same validated path
+  // as typed input (review thread: restore keyboard value changes).
   const handleSliderKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
-    // Explicit slider semantics: arrows/home/end are announced but values change
-    // through direct input; prevent native interference with typed values.
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key)) {
-      e.preventDefault();
+    const field = Object.values(FIELDS)
+      .flat()
+      .find((f) => f.id === e.currentTarget.name);
+    if (!field) return;
+
+    const current = localParams[field.id as keyof SimulationParams] as number;
+    let next: number;
+    switch (e.key) {
+      case 'ArrowUp':
+      case 'ArrowRight':
+        next = Math.min(field.max, current + field.step);
+        break;
+      case 'ArrowDown':
+      case 'ArrowLeft':
+        next = Math.max(field.min, current - field.step);
+        break;
+      case 'Home':
+        next = field.min;
+        break;
+      case 'End':
+        next = field.max;
+        break;
+      case 'PageUp':
+        next = Math.min(field.max, current + field.step * 10);
+        break;
+      case 'PageDown':
+        next = Math.max(field.min, current - field.step * 10);
+        break;
+      default:
+        return;
     }
+    e.preventDefault();
+
+    setLocalParams((prev) => ({ ...prev, [field.id]: next } as SimulationParams));
+    setRawValues((prev) => ({ ...prev, [field.id]: String(next) }));
+    const error = validateField(field.id, next);
+    setErrors((prev) => {
+      const n = { ...prev };
+      if (error) n[field.id] = error;
+      else delete n[field.id];
+      return n;
+    });
   };
 
   const renderField = (field: FieldConfig, tabbable: boolean) => {

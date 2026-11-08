@@ -165,11 +165,12 @@ describe('EnhancedSimulationForm', () => {
     const firstInput = screen.getByLabelText(/number of members/i);
     expect(firstInput).toHaveFocus();
     
-    // Test slider interaction with keyboard
+    // Slider keys adjust by the configured step (ARIA slider pattern):
+    // 25 + step(10) = 35, clamped to bounds.
     await user.clear(firstInput);
     await user.type(firstInput, '25');
     await user.keyboard('{ArrowUp}');
-    expect(screen.getByDisplayValue('25')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('35')).toBeInTheDocument();
   });
 
   test('provides accessible labels and descriptions', () => {
