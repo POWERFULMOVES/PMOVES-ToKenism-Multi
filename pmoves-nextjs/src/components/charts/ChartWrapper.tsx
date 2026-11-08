@@ -30,15 +30,22 @@ export function ChartWrapper({
   error,
   className
 }: ChartWrapperProps) {
+  const chartLabel = description ? `${title} — ${description}` : title;
+
   if (loading) {
     return (
-      <Card className={className}>
+      <Card className={className} role="region" aria-label={title}>
         <CardHeader>
-          <CardTitle className="text-base">{title}</CardTitle>
+          <CardTitle role="heading" aria-level={2} className="text-base">{title}</CardTitle>
           {description && <CardDescription>{description}</CardDescription>}
         </CardHeader>
         <CardContent>
-          <div className={`h-[${height}px] flex items-center justify-center`}>
+          <div
+            className={`h-[${height}px] flex items-center justify-center`}
+            role="status"
+            aria-label={`Loading ${title}`}
+            aria-busy="true"
+          >
             <Skeleton className="h-full w-full" />
           </div>
         </CardContent>
@@ -48,20 +55,25 @@ export function ChartWrapper({
 
   if (error) {
     return (
-      <Card className={`border-destructive bg-destructive/5 ${className}`}>
+      <Card className={`border-destructive bg-destructive/5 ${className}`} role="region" aria-label={title}>
         <CardHeader>
-          <CardTitle className="text-base flex items-center text-destructive">
+          <CardTitle role="heading" aria-level={2} className="text-base flex items-center text-destructive">
             <AlertCircle className="h-4 w-4 mr-2" />
             Chart Error
           </CardTitle>
           {description && <CardDescription>{description}</CardDescription>}
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="flex flex-col items-center justify-center h-[200px] text-center">
+          <div
+            className="flex flex-col items-center justify-center h-[200px] text-center"
+            role="alert"
+          >
             <AlertCircle className="h-12 w-12 text-destructive mb-4" />
             <p className="text-destructive font-medium mb-2">Failed to load chart</p>
             <p className="text-sm text-muted-foreground">{error}</p>
             <button
+              type="button"
+              tabIndex={0}
               onClick={() => window.location.reload()}
               className="mt-4 px-4 py-2 bg-background text-foreground border border-border rounded-md hover:bg-accent hover:text-accent-foreground"
             >
@@ -75,13 +87,13 @@ export function ChartWrapper({
   }
 
   return (
-    <Card className={className}>
+    <Card className={className} role="region" aria-label={title}>
       <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
+        <CardTitle role="heading" aria-level={2} className="text-base">{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
       <CardContent>
-        <div className={`h-[${height}px]`}>
+        <div className={`h-[${height}px]`} role="figure" aria-label={chartLabel}>
           <ResponsiveContainer width="100%" height="100%">
             {children ? (children as React.ReactElement) : <div />}
           </ResponsiveContainer>
