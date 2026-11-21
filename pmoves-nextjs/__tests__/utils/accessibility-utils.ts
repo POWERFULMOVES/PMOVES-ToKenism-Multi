@@ -48,7 +48,12 @@ export async function testAccessibility(
     rules: { 'aria-allowed-role': { enabled: false } },
   };
   if (excludedRules?.length) {
-    axeConfig.rules = Object.fromEntries(excludedRules.map(rule => [rule, { enabled: false }]));
+    // Merge caller exclusions with the default aria-allowed-role exclusion
+    // (review thread: replacement silently re-enabled the default)
+    axeConfig.rules = {
+      ...(axeConfig.rules as Record<string, unknown> | undefined),
+      ...Object.fromEntries(excludedRules.map(rule => [rule, { enabled: false }])),
+    };
   }
   if (rules?.length) {
     axeConfig.rules = {

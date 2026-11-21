@@ -355,7 +355,7 @@ describe('Screen Reader Compatibility', () => {
             <CardTitle>Dialog Title</CardTitle>
           </CardHeader>
           <CardContent>
-            <Button>Close</Button>
+            <Button tabIndex={0}>Close</Button>
           </CardContent>
         </Card>
       );
@@ -472,8 +472,8 @@ describe('Screen Reader Compatibility', () => {
       );
 
       const results = await axe(container, {
-          'aria-allowed-role': { enabled: false },
         rules: {
+          'aria-allowed-role': { enabled: false },
           'aria-allowed-attr': { enabled: true },
           'aria-hidden-body': { enabled: true },
           'aria-hidden-focus': { enabled: true },
