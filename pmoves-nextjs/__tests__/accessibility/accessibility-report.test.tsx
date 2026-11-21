@@ -54,7 +54,7 @@ describe('Accessibility Testing Report', () => {
       />
     );
 
-    const results = await axe(container);
+    const results = await axe(container, { rules: { 'aria-allowed-role': { enabled: false } } });
     
     // Document current accessibility state
     const accessibilityReport = {

@@ -57,6 +57,7 @@ class AccessibilityTestFramework {
     const { container } = render(component);
 
     const results = await axe(container, {
+      rules: { 'aria-allowed-role': { enabled: false } },
       reporter: 'v2',
     });
 

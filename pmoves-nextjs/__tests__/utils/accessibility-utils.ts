@@ -43,9 +43,17 @@ export async function testAccessibility(
 
   const axeConfig: Record<string, unknown> = {
     tags: [`wcag2${level.toLowerCase()}`],
+    // Project decision (#67): number inputs carry explicit role=slider ARIA semantics;
+    // axe's aria-allowed-role rejects that on text inputs, so disable it by default.
+    rules: { 'aria-allowed-role': { enabled: false } },
   };
   if (excludedRules?.length) {
-    axeConfig.rules = Object.fromEntries(excludedRules.map(rule => [rule, { enabled: false }]));
+    // Merge caller exclusions with the default aria-allowed-role exclusion
+    // (review thread: replacement silently re-enabled the default)
+    axeConfig.rules = {
+      ...(axeConfig.rules as Record<string, unknown> | undefined),
+      ...Object.fromEntries(excludedRules.map(rule => [rule, { enabled: false }])),
+    };
   }
   if (rules?.length) {
     axeConfig.rules = {

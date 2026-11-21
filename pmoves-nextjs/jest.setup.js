@@ -5,6 +5,9 @@
 
 require('@testing-library/jest-dom');
 
+// jsdom does not set html lang; screen-reader tests expect 'en'
+document.documentElement.lang = 'en';
+
 // Mock IntersectionObserver for charts
 global.IntersectionObserver = class IntersectionObserver {
   constructor(callback) {
